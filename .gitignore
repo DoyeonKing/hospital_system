@@ -73,6 +73,11 @@ vue/dist/
 vue/node_modules/
 vue/.vscode/
 
+# Vue 相关
+vue_admin/dist/
+vue_admin/node_modules/
+vue_admin/.vscode/
+
 # 数据库文件
 *.db
 *.sqlite
