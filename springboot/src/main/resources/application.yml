@@ -1,0 +1,16 @@
+spring:
+  datasource:
+
+    url: jdbc:sqlserver://127.0.0.1:1433;databaseName=volunteer_web_09;encrypt=false
+    username: volunteer_09
+    password: volunteer
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+
+# 配置mybatis实体和xml映射
+mybatis:
+  ## 映射xml
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    # 配置日志
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
