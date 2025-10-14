@@ -1,8 +1,18 @@
 <template>
   <div class="admin-dashboard">
-    <div class="back-area" style="margin-bottom: 12px;">
-      <BackButton />
+    <!-- 顶部导航栏 -->
+    <div class="top-navbar">
+      <div class="navbar-content">
+        <div class="navbar-left">
+          <h2>医院后台管理系统</h2>
+        </div>
+        <div class="navbar-right">
+          <span class="welcome-text">欢迎，{{ adminStore.displayName }}</span>
+          <el-button type="danger" size="small" @click="handleLogout">退出登录</el-button>
+        </div>
+      </div>
     </div>
+
     <!-- 顶部欢迎横幅 -->
     <div class="welcome-banner">
       <div class="banner-content">
@@ -42,9 +52,38 @@
 
 <script setup>
 import { Tickets, UserFilled } from '@element-plus/icons-vue';
+import { useRouter } from 'vue-router';
+import { ElMessage, ElMessageBox } from 'element-plus';
 // 导入本地图片
 import doctorImage from '@/assets/doctor.jpg';
 import BackButton from '@/components/BackButton.vue';
+import { useAdminStore } from '@/stores/adminStore';
+
+const router = useRouter();
+const adminStore = useAdminStore();
+
+const handleLogout = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要退出登录吗？',
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
+    // 清除登录状态
+    adminStore.logout();
+    ElMessage.success('已退出登录');
+    
+    // 跳转到登录页面
+    router.push('/login');
+  } catch {
+    // 用户取消操作
+  }
+};
 </script>
 
 <style scoped>

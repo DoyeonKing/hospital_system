@@ -1,5 +1,6 @@
 {
   "pages": [
+    "pages/login/patient-login",
     "pages/index/index"
   ],
   "window": {
@@ -12,3 +13,4 @@
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }
+

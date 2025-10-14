@@ -46,6 +46,9 @@ export const useAdminStore = defineStore('admin', {
 
             this.loggedInAdminBasicInfo = basicLoginInfoFromLogin; // 更新 Store 中的基本管理员信息
             localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(basicLoginInfoFromLogin)); // 持久化
+            
+            // 确保状态立即更新
+            console.log('AdminStore: 登录状态已更新', this.loggedInAdminBasicInfo);
 
             if (apiResponseData && (apiResponseData.adminId || apiResponseData.name)) { // 确保API响应中至少有一个有效标识
                 // 更新 detailedAdminInfo 的逻辑 (确保字段名匹配)

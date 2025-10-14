@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router';
 
 // 导入主入口
 import AdminIndex from '@/views/AdminIndex.vue';
+import AdminLogin from '@/views/AdminLogin.vue';
+import Debug from '@/views/Debug.vue';
 
 // 导入科室管理页面组件
 import DepartmentIndex from '@/views/departments/Index.vue';
@@ -22,39 +24,48 @@ import UserHistory from '@/views/users/History.vue';
 const NotFoundView = () => import('../views/404.vue');
 
 const routes = [
-    // 根路径指向新的主入口页面
-    { path: '/', component: AdminIndex, meta: { title: '后台管理主页' } },
+    // 登录页面
+    { path: '/login', name: 'AdminLogin', component: AdminLogin, meta: { title: '管理员登录' } },
+    
+    // 调试页面
+    { path: '/debug', name: 'Debug', component: Debug, meta: { title: '调试页面' } },
+    
+    // 根路径重定向到登录页面
+    { path: '/', redirect: '/login' },
+    
+    // 后台管理主页（需要登录）
+    { path: '/admin', component: AdminIndex, meta: { title: '后台管理主页', requiresAuth: true } },
 
     // =======================================================
     // 科室管理相关的所有路由
     {
         path: '/departments',
         name: 'DepartmentIndex',
-        meta: { title: '科室管理' },
+        meta: { title: '科室管理', requiresAuth: true },
         component: DepartmentIndex
     },
     {
         path: '/departments/create',
         name: 'CreateDepartment',
-        meta: { title: '创建新科室' },
+        meta: { title: '创建新科室', requiresAuth: true },
         component: CreateDepartment
     },
     {
         path: '/departments/manage',
         name: 'ManageDepartments',
-        meta: { title: '管理所有科室' },
+        meta: { title: '管理所有科室', requiresAuth: true },
         component: ManageDepartments
     },
     {
         path: '/departments/view',
         name: 'DepartmentView',
-        meta: { title: '查看科室信息' },
+        meta: { title: '查看科室信息', requiresAuth: true },
         component: DepartmentView
     },
     {
         path: '/departments/members',
         name: 'DepartmentMembers',
-        meta: { title: '科室成员管理' },
+        meta: { title: '科室成员管理', requiresAuth: true },
         component: DepartmentMembers
     },
     // =======================================================
@@ -64,38 +75,38 @@ const routes = [
     {
         path: '/users',
         name: 'UserIndex',
-        meta: { title: '用户账户管理' },
+        meta: { title: '用户账户管理', requiresAuth: true },
         component: UserIndex
     },
     {
         path: '/users/create',
         name: 'CreateUser',
-        meta: { title: '创建新用户' },
+        meta: { title: '创建新用户', requiresAuth: true },
         component: CreateUser
     },
     // 为批量导入功能添加路由
     {
         path: '/users/import',
         name: 'ImportUser',
-        meta: { title: '批量导入用户' },
+        meta: { title: '批量导入用户', requiresAuth: true },
         component: ImportUser
     },
     {
         path: '/users/search',
         name: 'SearchUser',
-        meta: { title: '搜索用户信息' },
+        meta: { title: '搜索用户信息', requiresAuth: true },
         component: SearchUser
     },
     {
         path: '/users/edit',
         name: 'EditUser',
-        meta: { title: '编辑用户信息' },
+        meta: { title: '编辑用户信息', requiresAuth: true },
         component: EditUser
     },
     {
         path: '/users/history',
         name: 'UserHistory',
-        meta: { title: '修改用户病史' },
+        meta: { title: '修改用户病史', requiresAuth: true },
         component: UserHistory
     },
     // =======================================================
@@ -113,8 +124,31 @@ const router = createRouter({
     routes
 });
 
+// 导入adminStore用于权限验证
+import { useAdminStore } from '@/stores/adminStore';
+
 router.beforeEach((to, from, next) => {
     document.title = to.meta.title || '医院后台管理'; // 默认标题
+    
+    // 检查是否需要登录验证
+    if (to.meta.requiresAuth) {
+        const adminStore = useAdminStore();
+        if (!adminStore.isAuthenticated) {
+            // 未登录，重定向到登录页面
+            next('/login');
+            return;
+        }
+    }
+    
+    // 如果已登录且访问登录页面，重定向到管理主页
+    if (to.path === '/login') {
+        const adminStore = useAdminStore();
+        if (adminStore.isAuthenticated) {
+            next('/admin');
+            return;
+        }
+    }
+    
     next();
 });
 
