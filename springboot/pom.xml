@@ -5,54 +5,104 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.4.3</version>
-		<relativePath/> 
+		<version>3.2.0</version> <!-- Spring Boot 3.x 版本 -->
+		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.example</groupId>
-	<artifactId>springboot</artifactId>
+	<groupId>com.yourcompany.ghlm</groupId>
+	<artifactId>ghlm-backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>springboot</name>
-	<description>springboot</description>
-	<url/>
+	<name>ghlm-backend</name>
+	<description>校医院挂号系统后端</description>
+
 	<properties>
-		<java.version>21</java.version>
+		<java.version>21</java.version> <!-- Spring Boot 3 要求 Java 17 或更高 -->
 	</properties>
+
 	<dependencies>
+		<!-- Spring Boot Web Starter (包含 Tomcat 和 Spring MVC) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
+
 		<dependency>
 			<groupId>org.mybatis.spring.boot</groupId>
 			<artifactId>mybatis-spring-boot-starter</artifactId>
 			<version>3.0.4</version>
 		</dependency>
+
+		<!-- Spring Data JPA Starter (包含 Hibernate) -->
 		<dependency>
-			<groupId>com.github.pagehelper</groupId>
-			<artifactId>pagehelper-spring-boot-starter</artifactId>
-			<version>1.4.6</version>
-			<exclusions>
-				<exclusion>
-					<groupId>org.mybatis</groupId>
-					<artifactId>mybatis</artifactId>
-				</exclusion>
-			</exclusions>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
+
+		<!-- MySQL 数据库驱动 -->
 		<dependency>
-			<groupId>com.microsoft.sqlserver</groupId>
-			<artifactId>mssql-jdbc</artifactId>
-			<version>12.10.0.jre11</version>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+
+		<!-- Lombok (减少 boilerplate 代码) -->
 		<dependency>
-			<groupId>cn.hutool</groupId>
-			<artifactId>hutool-all</artifactId>
-			<version>5.8.26</version>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- Spring Boot Test Starter -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Spring Security Starter -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
+		<!-- 用于 DTO 验证 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
+		<!-- Swagger/OpenAPI 3 UI -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>2.3.0</version> <!-- 确保与 Spring Boot 3 兼容 -->
+		</dependency>
+
+		<!-- 开发者工具，提供热部署等功能 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
 	</dependencies>
 
 	<build>
 		<plugins>
+			<!-- 指定 Java 编译版本 -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.11.0</version>
+				<configuration>
+					<source>21</source>
+					<target>21</target>
+				</configuration>
+			</plugin>
+
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
@@ -60,4 +110,4 @@
 		</plugins>
 	</build>
 
-</project> 
+</project>
