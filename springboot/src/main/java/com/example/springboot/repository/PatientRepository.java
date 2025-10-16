@@ -1,6 +1,6 @@
-package com.example.springboot.repository; // 包名调整
+package com.example.springboot.repository;
 
-import com.example.springboot.entity.Patient; // 导入路径调整
+import com.example.springboot.entity.Patient;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
