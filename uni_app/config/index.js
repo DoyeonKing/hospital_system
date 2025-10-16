@@ -1,0 +1,19 @@
+/**
+ * 应用配置文件
+ */
+
+// 开发环境配置
+const development = {
+	baseURL: 'http://localhost:8080'
+}
+
+// 生产环境配置
+const production = {
+	baseURL: 'https://your-production-api.com'
+}
+
+// 当前使用的配置（开发阶段使用 development）
+const config = development
+
+export default config
+
