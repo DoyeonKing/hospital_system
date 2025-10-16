@@ -46,17 +46,30 @@
           <p>创建、搜索、编辑用户信息</p>
         </div>
       </router-link>
+
+      <!-- 新增：排班管理入口 -->
+      <router-link to="/scheduling/dashboard" class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #f0e6ff;">
+            <el-icon :size="32" color="#9f7aea"><Calendar /></el-icon>
+          </div>
+          <h3>排班管理</h3>
+          <p>定义医生班次与安排工作日程</p>
+        </div>
+      </router-link>
     </div>
   </div>
 </template>
 
 <script setup>
-import { Tickets, UserFilled } from '@element-plus/icons-vue';
+// 修改：增加了 Calendar 图标的导入
+import { Tickets, UserFilled, Calendar } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 // 导入本地图片
 import doctorImage from '@/assets/doctor.jpg';
-import BackButton from '@/components/BackButton.vue';
+// BackButton 组件在此页面未使用，可以按需移除
+// import BackButton from '@/components/BackButton.vue';
 import { useAdminStore } from '@/stores/adminStore';
 
 const router = useRouter();
@@ -65,19 +78,19 @@ const adminStore = useAdminStore();
 const handleLogout = async () => {
   try {
     await ElMessageBox.confirm(
-      '确定要退出登录吗？',
-      '提示',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      }
+        '确定要退出登录吗？',
+        '提示',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
     );
-    
+
     // 清除登录状态
     adminStore.logout();
     ElMessage.success('已退出登录');
-    
+
     // 跳转到登录页面
     router.push('/login');
   } catch {
@@ -87,6 +100,31 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
+/* 增加了顶部导航栏的样式 */
+.top-navbar {
+  background-color: #fff;
+  padding: 0 24px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 24px;
+}
+.navbar-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 60px;
+}
+.navbar-left h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.navbar-right {
+  display: flex;
+  align-items: center;
+}
+.welcome-text {
+  margin-right: 16px;
+  color: #606266;
+}
 .admin-dashboard {
   padding: 24px;
   background-color: #f7fafc;
