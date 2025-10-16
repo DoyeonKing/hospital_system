@@ -14,17 +14,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import com.example.springboot.entity.Department;
+import com.example.springboot.repository.DepartmentRepository;
 
 @Service
 public class DoctorService {
 
     private final DoctorRepository doctorRepository;
     private final PasswordEncoderUtil passwordEncoderUtil;
+    private final DepartmentRepository departmentRepository;
 
     @Autowired
-    public DoctorService(DoctorRepository doctorRepository, PasswordEncoderUtil passwordEncoderUtil) {
+    public DoctorService(DoctorRepository doctorRepository, PasswordEncoderUtil passwordEncoderUtil, DepartmentRepository departmentRepository) { // 【修改构造函数】
         this.doctorRepository = doctorRepository;
         this.passwordEncoderUtil = passwordEncoderUtil;
+        this.departmentRepository = departmentRepository;
     }
 
     // =========================================================================
@@ -102,6 +106,94 @@ public class DoctorService {
         doctor.setPasswordHash(hashedPassword);
         doctor.setStatus(DoctorStatus.active); // Set to active status
         doctorRepository.save(doctor);
+    }
+    // =========================================================================
+    // 【新增核心业务方法】将医生分配到指定科室
+    // =========================================================================
+
+    /**
+     * 【核心业务方法】将医生分配到指定科室（更新 Doctor.department 字段）。
+     * 业务逻辑：根据工号查找医生，如果不存在则创建，无论如何都更新其所属科室和基本信息。
+     * @param departmentId 目标科室的ID
+     * @param identifier 医生的工号/ID
+     * @param fullName 医生姓名
+     * @param title 职称
+     * @return 更新后的医生响应 DTO DoctorResponse
+     */
+    @Transactional
+    public DoctorResponse assignDoctorToDepartment(
+            Integer departmentId,
+            String identifier,
+            String fullName,
+            String title) {
+
+        // 1. 验证目标科室是否存在
+        Department department = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("科室ID " + departmentId + " 不存在"));
+
+        // 2. 根据工号查找医生
+        // 假设 DoctorRepository 中存在 findByIdentifier(String identifier) 方法
+        Optional<Doctor> existingDoctor = doctorRepository.findByIdentifier(identifier);
+
+        Doctor doctor;
+
+        if (existingDoctor.isPresent()) {
+            // 3a. 医生已存在：更新其信息和科室
+            doctor = existingDoctor.get();
+
+            // 业务校验：检查医生是否已经属于该科室
+            if (doctor.getDepartment() != null && doctor.getDepartment().getDepartmentId().equals(departmentId)) {
+                // 如果已存在于该科室，返回冲突
+                throw new RuntimeException("医生 " + identifier + " 已经属于该科室");
+            }
+
+            // 更新医生基本信息和所属科室
+            doctor.setFullName(fullName);
+            doctor.setTitle(title);
+            doctor.setDepartment(department); // 【核心操作】
+
+        } else {
+            // 3b. 医生不存在：创建新医生实体
+            doctor = new Doctor();
+
+            // 赋值前端提供的信息
+            doctor.setIdentifier(identifier);
+            doctor.setFullName(fullName);
+            doctor.setTitle(title);
+            doctor.setDepartment(department); // 设置所属科室
+
+            // 处理非空约束字段 (来自 Doctor.java)
+            String tempPassword = "DefaultTempPassword";
+            doctor.setPasswordHash(passwordEncoderUtil.encodePassword(tempPassword));
+            doctor.setStatus(DoctorStatus.inactive); // 默认设置为未激活状态
+        }
+
+        // 4. 保存到数据库
+        Doctor savedDoctor = doctorRepository.save(doctor);
+
+        // 5. 转换为 DTO 返回
+        return convertToResponseDto(savedDoctor);
+    }
+    // =========================================================================
+    // 【新增核心业务方法】删除科室成员
+    // =========================================================================
+
+    /**
+     * 【核心业务方法】根据工号删除医生。
+     * @param identifier 医生的工号/ID
+     */
+    @Transactional
+    public void deleteDoctorByIdentifier(String identifier) {
+        // 1. 查找医生
+        Optional<Doctor> doctorOptional = doctorRepository.findByIdentifier(identifier);
+
+        if (doctorOptional.isEmpty()) {
+            throw new ResourceNotFoundException("工号为 " + identifier + " 的医生不存在");
+        }
+
+        // 2. 执行删除
+        // 假设 DoctorRepository 中存在 delete(Doctor doctor) 方法
+        doctorRepository.delete(doctorOptional.get());
     }
 
     // =========================================================================

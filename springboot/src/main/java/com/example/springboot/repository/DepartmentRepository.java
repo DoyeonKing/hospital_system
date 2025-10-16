@@ -1,17 +1,16 @@
 package com.example.springboot.repository;
 
-import com.example.springboot.entity.Clinic;
 import com.example.springboot.entity.Department;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-import java.util.List;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor; // <-- 引入
 import java.util.Optional;
 
-@Repository
-public interface DepartmentRepository extends JpaRepository<Department, Integer> {
-    List<Department> findByClinic(Clinic clinic);
-    Optional<Department> findByClinicAndName(Clinic clinic, String name);
-    List<Department> findByParentDepartment(Department parentDepartment);
-    List<Department> findByParentDepartmentIsNullAndClinic(Clinic clinic); // 查询一级部门
+public interface DepartmentRepository extends JpaRepository<Department, Integer>, JpaSpecificationExecutor<Department> { // <-- 继承 JpaSpecificationExecutor
+
+    /**
+     * 根据科室名称查找科室
+     * @param name 科室名称
+     * @return 匹配的科室 Optional
+     */
+    Optional<Department> findByName(String name);
 }

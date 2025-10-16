@@ -1,200 +1,219 @@
 package com.example.springboot.service;
 
-import com.example.springboot.dto.department.DepartmentCreateRequest;
-import com.example.springboot.dto.department.DepartmentResponse;
-import com.example.springboot.dto.department.DepartmentUpdateRequest;
-import com.example.springboot.entity.Clinic;
+import com.example.springboot.dto.department.DepartmentDTO;
+import com.example.springboot.dto.department.DepartmentResponseDTO; // 引入Response DTO
 import com.example.springboot.entity.Department;
-import com.example.springboot.exception.BadRequestException;
-import com.example.springboot.exception.ResourceNotFoundException;
-import com.example.springboot.repository.ClinicRepository;
 import com.example.springboot.repository.DepartmentRepository;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Comparator;
-import java.util.List;
+import java.util.Optional;
+import java.util.Set; // 引入 Set 用于处理子科室
+import org.hibernate.Hibernate; // <--- 引入 Hibernate
+import com.example.springboot.dto.department.DepartmentDTO;
+import com.example.springboot.dto.department.DepartmentResponseDTO;
+import com.example.springboot.dto.department.DepartmentQueryDTO; // <-- 引入查询 DTO
+import com.example.springboot.entity.Department;
+import com.example.springboot.repository.DepartmentRepository;
+import org.springframework.data.domain.Page; // <-- 引入 Page
+import org.springframework.data.domain.PageRequest; // <-- 引入 PageRequest
+import org.springframework.data.domain.Sort; // <-- 引入 Sort
+import org.springframework.data.jpa.domain.Specification; // <-- 引入 Specification
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.stream.Collectors; // <-- 引入 Collectors 用于 Page 转换
+import org.hibernate.Hibernate;
+import com.example.springboot.specifications.DepartmentSpecification;
+import com.example.springboot.dto.department.DepartmentQueryDTO; // 引入查询DTO
+import org.springframework.data.domain.Page; // 引入 Spring Data 的 Page 类型
 
 @Service
 public class DepartmentService {
 
     private final DepartmentRepository departmentRepository;
-    private final ClinicRepository clinicRepository;
-    private final ClinicService clinicService; // 注入 ClinicService 以便转换 Clinic 为 DTO
 
-    @Autowired
-    public DepartmentService(DepartmentRepository departmentRepository,
-                             ClinicRepository clinicRepository,
-                             ClinicService clinicService) {
+    public DepartmentService(DepartmentRepository departmentRepository) {
         this.departmentRepository = departmentRepository;
-        this.clinicRepository = clinicRepository;
-        this.clinicService = clinicService;
     }
 
-    @Transactional(readOnly = true)
-    public List<DepartmentResponse> findAllDepartments() {
-        return departmentRepository.findAll().stream()
-                .map(this::convertToResponseDto)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public DepartmentResponse findDepartmentById(Integer id) {
-        Department department = departmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Department not found with id " + id));
-        return convertToResponseDto(department);
-    }
-
-    @Transactional(readOnly = true)
-    public List<DepartmentResponse> findDepartmentsByClinic(Integer clinicId) {
-        Clinic clinic = clinicRepository.findById(clinicId)
-                .orElseThrow(() -> new ResourceNotFoundException("Clinic not found with id " + clinicId));
-        return departmentRepository.findByClinic(clinic).stream()
-                .map(this::convertToResponseDto)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<DepartmentResponse> findDepartmentsByClinicHierarchy(Integer clinicId) {
-        Clinic clinic = clinicRepository.findById(clinicId)
-                .orElseThrow(() -> new ResourceNotFoundException("Clinic not found with id " + clinicId));
-
-        List<Department> topLevelDepartments = departmentRepository.findByParentDepartmentIsNullAndClinic(clinic);
-
-        return topLevelDepartments.stream()
-                .map(this::convertToHierarchyResponseDto)
-                .sorted(Comparator.comparing(DepartmentResponse::getName)) // 按名称排序
-                .collect(Collectors.toList());
-    }
-
-
+    /**
+     * 创建新科室
+     * @param departmentDTO 包含新科室信息的DTO
+     * @return 创建成功的科室的响应DTO
+     * @throws RuntimeException 如果科室名称已存在或上级科室不存在
+     */
     @Transactional
-    public DepartmentResponse createDepartment(DepartmentCreateRequest request) {
-        Clinic clinic = clinicRepository.findById(request.getClinicId())
-                .orElseThrow(() -> new ResourceNotFoundException("Clinic not found with id " + request.getClinicId()));
-
-        if (departmentRepository.findByClinicAndName(clinic, request.getName()).isPresent()) {
-            throw new BadRequestException("Department with name '" + request.getName() + "' already exists in this clinic.");
+    public DepartmentResponseDTO createDepartment(DepartmentDTO departmentDTO) {
+        // 1. 检查科室名称是否已存在
+        if (departmentRepository.findByName(departmentDTO.getName()).isPresent()) {
+            throw new RuntimeException("科室名称已存在: " + departmentDTO.getName());
         }
 
-        Department department = new Department();
-        BeanUtils.copyProperties(request, department, "clinicId", "parentId");
-        department.setClinic(clinic);
+        Department newDepartment = new Department();
+        newDepartment.setName(departmentDTO.getName());
+        newDepartment.setDescription(departmentDTO.getDescription());
 
-        if (request.getParentId() != null) {
-            Department parentDepartment = departmentRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Parent Department not found with id " + request.getParentId()));
-            if (!parentDepartment.getClinic().equals(clinic)) {
-                throw new BadRequestException("Parent department must belong to the same clinic.");
+        // 用于存储查找到的上级科室
+        Department parentDepartment = null;
+
+        // 2. 处理上级科室 (parentDepartmentName)
+        String parentName = departmentDTO.getParentDepartmentName();
+        if (parentName != null && !parentName.trim().isEmpty()) {
+            // 通过名称查找上级科室
+            Optional<Department> parentOpt = departmentRepository.findByName(parentName);
+
+            if (parentOpt.isPresent()) {
+                parentDepartment = parentOpt.get(); // 记录上级科室实体
+                newDepartment.setParentDepartment(parentDepartment);
+            } else {
+                // 如果上级科室名称存在, 但找不到对应的科室, 则抛出错误
+                throw new RuntimeException("上级科室不存在: " + parentName);
             }
-            department.setParentDepartment(parentDepartment);
-        }
-
-        return convertToResponseDto(departmentRepository.save(department));
-    }
-
-    @Transactional
-    public DepartmentResponse updateDepartment(Integer id, DepartmentUpdateRequest request) {
-        Department existingDepartment = departmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Department not found with id " + id));
-
-        Clinic clinic = null;
-        if (request.getClinicId() != null) {
-            clinic = clinicRepository.findById(request.getClinicId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Clinic not found with id " + request.getClinicId()));
-            existingDepartment.setClinic(clinic);
         } else {
-            clinic = existingDepartment.getClinic(); // 使用现有诊所进行名称唯一性检查
+            // parentDepartmentName 为空, parentDepartment 字段设为 null
+            newDepartment.setParentDepartment(null);
         }
 
-        if (request.getName() != null && !request.getName().equals(existingDepartment.getName())) {
-            if (departmentRepository.findByClinicAndName(clinic, request.getName()).isPresent()) {
-                throw new BadRequestException("Department with name '" + request.getName() + "' already exists in this clinic.");
-            }
-            existingDepartment.setName(request.getName());
-        }
+        // 3. 保存新科室
+        Department savedDepartment = departmentRepository.save(newDepartment);
 
-        if (request.getDescription() != null) existingDepartment.setDescription(request.getDescription());
-
-        if (request.getParentId() != null) {
-            Department parentDepartment = departmentRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Parent Department not found with id " + request.getParentId()));
-            if (!parentDepartment.getClinic().equals(existingDepartment.getClinic())) {
-                throw new BadRequestException("Parent department must belong to the same clinic.");
-            }
-            // 避免循环引用
-            if (parentDepartment.getDepartmentId().equals(existingDepartment.getDepartmentId())) {
-                throw new BadRequestException("A department cannot be its own parent.");
-            }
-            // 检查是否将自己设置为子部门的父部门
-            if (isAncestorOf(existingDepartment, parentDepartment)) {
-                throw new BadRequestException("Cannot set a descendant department as parent.");
-            }
-            existingDepartment.setParentDepartment(parentDepartment);
-        } else if (request.getParentId() != null && request.getParentId() == 0) { // 如果传入 0 或其他约定值表示解除父子关系
-            existingDepartment.setParentDepartment(null);
-        }
-
-        return convertToResponseDto(departmentRepository.save(existingDepartment));
+        // 4. 将保存的实体转换为 Response DTO，避免序列化问题
+        return convertToResponseDTO(savedDepartment, parentDepartment);
     }
 
+    /**
+     * 编辑科室的描述信息
+     * @param departmentDTO 包含科室名称和新的描述
+     * @return 更新成功的科室的响应DTO
+     * @throws RuntimeException 如果科室不存在
+     */
     @Transactional
-    public void deleteDepartment(Integer id) {
-        if (!departmentRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Department not found with id " + id);
+    public DepartmentResponseDTO updateDepartmentDescription(DepartmentDTO departmentDTO) {
+        String departmentName = departmentDTO.getName();
+        String newDescription = departmentDTO.getDescription();
+
+        // 1. 通过名称查找科室
+        Optional<Department> departmentOpt = departmentRepository.findByName(departmentName);
+
+        if (departmentOpt.isEmpty()) {
+            throw new RuntimeException("要编辑的科室不存在: " + departmentName);
         }
-        // TODO: Consider business logic for deleting departments with associated doctors or child departments.
-        // For now, let's allow it but in a real app, it would be restricted or require cascading deletion.
-        departmentRepository.deleteById(id);
+
+        Department departmentToUpdate = departmentOpt.get();
+
+        // 2. 更新描述信息
+        departmentToUpdate.setDescription(newDescription);
+
+        // 3. 保存更新
+        Department updatedDepartment = departmentRepository.save(departmentToUpdate);
+
+        // 4. 转换为 Response DTO 返回。需要传递当前的上级科室实体。
+        return convertToResponseDTO(updatedDepartment, updatedDepartment.getParentDepartment());
     }
 
-    // Helper method to convert Entity to Response DTO
-    public DepartmentResponse convertToResponseDto(Department department) {
-        DepartmentResponse response = new DepartmentResponse();
-        BeanUtils.copyProperties(department, response, "clinic", "parentDepartment", "childrenDepartments");
-        response.setClinic(clinicService.convertToResponseDto(department.getClinic()));
-        if (department.getParentDepartment() != null) {
-            response.setParentId(department.getParentDepartment().getDepartmentId());
-        }
-        return response;
-    }
+    /**
+     * 根据名称删除科室。
+     * 删除前将所有子科室的上级科室ID置为空（解除关联）。
+     * @param name 要删除的科室名称
+     * @throws RuntimeException 如果科室不存在
+     */
+    @Transactional
+    public void deleteDepartmentByName(String name) {
+        // 1. 查找科室
+        Optional<Department> departmentOpt = departmentRepository.findByName(name);
 
-    // Helper method to convert Entity to Hierarchy Response DTO (with nested children)
-    private DepartmentResponse convertToHierarchyResponseDto(Department department) {
-        DepartmentResponse response = new DepartmentResponse();
-        BeanUtils.copyProperties(department, response, "clinic", "parentDepartment", "childrenDepartments");
-        response.setClinic(clinicService.convertToResponseDto(department.getClinic()));
-        if (department.getParentDepartment() != null) {
-            response.setParentId(department.getParentDepartment().getDepartmentId());
+        if (departmentOpt.isEmpty()) {
+            throw new RuntimeException("要删除的科室不存在: " + name);
         }
 
-        Set<Department> children = department.getChildrenDepartments();
+        Department departmentToDelete = departmentOpt.get();
+
+        // 2. 强制初始化子科室集合，解决 LazyInitializationException
+        Set<Department> children = departmentToDelete.getChildrenDepartments();
+
+        // 强制加载集合 (如果 children 不为 null)
+        if (children != null) {
+            Hibernate.initialize(children); // <--- 关键修复点
+        }
+
+        // 3. 处理子科室 (解除关联)
         if (children != null && !children.isEmpty()) {
-            response.setChildrenDepartments(
-                    children.stream()
-                            .map(this::convertToHierarchyResponseDto) // 递归调用
-                            .sorted(Comparator.comparing(DepartmentResponse::getName))
-                            .collect(Collectors.toList())
-            );
-        } else {
-            response.setChildrenDepartments(List.of());
+            for (Department child : children) {
+                // 现在数据库允许 parent_id 为 NULL，所以这个操作应该成功
+                child.setParentDepartment(null);
+                departmentRepository.save(child);
+            }
         }
-        return response;
+
+        // 4. 删除科室
+        departmentRepository.delete(departmentToDelete);
     }
 
-    // 检查 targetDepartment 是否是 sourceDepartment 的祖先
-    private boolean isAncestorOf(Department sourceDepartment, Department targetDepartment) {
-        Department current = targetDepartment.getParentDepartment();
-        while (current != null) {
-            if (current.equals(sourceDepartment)) {
-                return true;
+    /**
+     * 查询科室列表（分页、过滤和排序）
+     * @param queryDTO 包含查询条件、分页和排序信息的DTO
+     * @return 分页结果的响应DTO Page<DepartmentResponseDTO>
+     */
+    @Transactional(readOnly = true) // 查询操作使用 readOnly 事务
+    public Page<DepartmentResponseDTO> queryDepartments(DepartmentQueryDTO queryDTO) {
+        // 1. 设置分页和排序参数
+        int page = queryDTO.getPage() != null ? queryDTO.getPage() : 0; // 默认页码 0
+        int size = queryDTO.getSize() != null ? queryDTO.getSize() : 10; // 默认每页 10 条
+        String sortBy = queryDTO.getSortBy() != null ? queryDTO.getSortBy() : "departmentId"; // 默认排序字段
+        Sort.Direction sortDirection = "desc".equalsIgnoreCase(queryDTO.getSortOrder()) ? Sort.Direction.DESC : Sort.Direction.ASC;
+
+        // 构建 Pageable 对象
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+
+        // 2. 构建查询条件 Specification
+        Specification<Department> spec = DepartmentSpecification.buildSpecification(queryDTO);
+
+        // 3. 执行查询
+        // JpaRepository.findAll(Specification, Pageable) 方法
+        Page<Department> departmentPage = departmentRepository.findAll(spec, pageable);
+
+        // 4. 转换实体 Page 为 Response DTO Page
+        return departmentPage.map(department -> {
+            // 在 Page.map 转换过程中，需要注意获取 ParentDepartment 的 Name。
+            // 实体转换时，需要确保 parentDepartment 已被加载，
+            // 否则在非事务方法中可能会引发 LazyInitializationException。
+            // 由于 findAll 是在 @Transactional(readOnly = true) 中执行的，
+            // 且 parentDepartment 是 FetchType.LAZY，最好的方式是通过 DTO 的构造器或
+            // 明确指定 JOIN FETCH。
+
+            // 简单处理：由于是在事务中，直接访问 getParentDepartment() 理论上是安全的。
+            // 但为了健壮性，若需要减少 N+1 查询，应考虑自定义 Repository 方法使用 JOIN FETCH。
+            // 这里我们沿用现有的 convertToResponseDTO 逻辑。
+
+            Department parent = department.getParentDepartment(); // 尝试获取上级科室
+
+            // 强制加载 parentDepartment 避免在 DTO 转换后可能发生的 LazyInitializationException
+            // 如果你使用的是 DTO 投影，则不需要手动加载
+            if (parent != null && !Hibernate.isInitialized(parent)) {
+                Hibernate.initialize(parent);
             }
-            current = current.getParentDepartment();
-        }
-        return false;
+
+            return convertToResponseDTO(department, parent);
+        });
     }
+
+    /**
+     * 将 Department 实体转换为 DepartmentResponseDTO
+     */
+    private DepartmentResponseDTO convertToResponseDTO(Department department, Department parentDepartment) {
+        DepartmentResponseDTO dto = new DepartmentResponseDTO();
+        dto.setDepartmentId(department.getDepartmentId());
+        dto.setName(department.getName());
+        dto.setDescription(department.getDescription());
+
+        // 设置上级科室信息
+        if (parentDepartment != null) {
+            dto.setParentDepartmentId(parentDepartment.getDepartmentId());
+            dto.setParentDepartmentName(parentDepartment.getName());
+        }
+
+        return dto;
+    }
+
 }
