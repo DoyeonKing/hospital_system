@@ -1,7 +1,9 @@
-package com.example.springboot.dto.patient; // 包名调整
+// 完善PatientUpdateRequest
+package com.example.springboot.dto.patient;
 
-import com.example.springboot.entity.enums.PatientStatus; // 导入路径调整
-import com.example.springboot.entity.enums.PatientType;   // 导入路径调整
+import com.example.springboot.entity.enums.PatientStatus;
+import com.example.springboot.entity.enums.PatientType;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -18,8 +20,15 @@ public class PatientUpdateRequest {
     @Size(max = 100, message = "姓名长度不能超过100个字符")
     private String fullName;
 
+    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号码格式不正确")
     @Size(max = 20, message = "电话号码长度不能超过20个字符")
     private String phoneNumber;
 
     private PatientStatus status;
+
+    @Size(max = 18, message = "身份证号长度不能超过18个字符")
+    private String idCardNumber;
+
+    private String allergies;
+    private String medicalHistory;
 }
