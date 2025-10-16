@@ -101,7 +101,7 @@ public class AdminService {
         adminRepository.deleteById(id);
     }
 
-    private AdminResponse convertToResponseDto(Admin admin) {
+    public AdminResponse convertToResponseDto(Admin admin) {
         AdminResponse response = new AdminResponse();
         BeanUtils.copyProperties(admin, response);
         if (admin.getRoles() != null) {
