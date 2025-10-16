@@ -33,4 +33,5 @@ public class PatientProfile {
     @Enumerated(EnumType.STRING)
     @Column(name = "blacklist_status", nullable = false)
     private BlacklistStatus blacklistStatus; // 黑名单状态
+
 }
