@@ -1,32 +1,21 @@
 package com.example.springboot.service;
 
 import com.example.springboot.dto.department.DepartmentDTO;
-import com.example.springboot.dto.department.DepartmentResponseDTO; // 引入Response DTO
-import com.example.springboot.entity.Department;
-import com.example.springboot.repository.DepartmentRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.util.Optional;
-import java.util.Set; // 引入 Set 用于处理子科室
-import org.hibernate.Hibernate; // <--- 引入 Hibernate
-import com.example.springboot.dto.department.DepartmentDTO;
 import com.example.springboot.dto.department.DepartmentResponseDTO;
-import com.example.springboot.dto.department.DepartmentQueryDTO; // <-- 引入查询 DTO
+import com.example.springboot.dto.department.DepartmentQueryDTO;
 import com.example.springboot.entity.Department;
 import com.example.springboot.repository.DepartmentRepository;
-import org.springframework.data.domain.Page; // <-- 引入 Page
-import org.springframework.data.domain.PageRequest; // <-- 引入 PageRequest
-import org.springframework.data.domain.Sort; // <-- 引入 Sort
-import org.springframework.data.jpa.domain.Specification; // <-- 引入 Specification
+import com.example.springboot.specifications.DepartmentSpecification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.hibernate.Hibernate;
+
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors; // <-- 引入 Collectors 用于 Page 转换
-import org.hibernate.Hibernate;
-import com.example.springboot.specifications.DepartmentSpecification;
-import com.example.springboot.dto.department.DepartmentQueryDTO; // 引入查询DTO
-import org.springframework.data.domain.Page; // 引入 Spring Data 的 Page 类型
 
 @Service
 public class DepartmentService {
@@ -39,6 +28,7 @@ public class DepartmentService {
 
     /**
      * 创建新科室
+     * 
      * @param departmentDTO 包含新科室信息的DTO
      * @return 创建成功的科室的响应DTO
      * @throws RuntimeException 如果科室名称已存在或上级科室不存在
@@ -84,6 +74,7 @@ public class DepartmentService {
 
     /**
      * 编辑科室的描述信息
+     * 
      * @param departmentDTO 包含科室名称和新的描述
      * @return 更新成功的科室的响应DTO
      * @throws RuntimeException 如果科室不存在
@@ -115,6 +106,7 @@ public class DepartmentService {
     /**
      * 根据名称删除科室。
      * 删除前将所有子科室的上级科室ID置为空（解除关联）。
+     * 
      * @param name 要删除的科室名称
      * @throws RuntimeException 如果科室不存在
      */
@@ -152,6 +144,7 @@ public class DepartmentService {
 
     /**
      * 查询科室列表（分页、过滤和排序）
+     * 
      * @param queryDTO 包含查询条件、分页和排序信息的DTO
      * @return 分页结果的响应DTO Page<DepartmentResponseDTO>
      */
@@ -161,7 +154,8 @@ public class DepartmentService {
         int page = queryDTO.getPage() != null ? queryDTO.getPage() : 0; // 默认页码 0
         int size = queryDTO.getSize() != null ? queryDTO.getSize() : 10; // 默认每页 10 条
         String sortBy = queryDTO.getSortBy() != null ? queryDTO.getSortBy() : "departmentId"; // 默认排序字段
-        Sort.Direction sortDirection = "desc".equalsIgnoreCase(queryDTO.getSortOrder()) ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Sort.Direction sortDirection = "desc".equalsIgnoreCase(queryDTO.getSortOrder()) ? Sort.Direction.DESC
+                : Sort.Direction.ASC;
 
         // 构建 Pageable 对象
         PageRequest pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
@@ -196,6 +190,31 @@ public class DepartmentService {
 
             return convertToResponseDTO(department, parent);
         });
+    }
+
+    /**
+     * 根据科室ID获取科室信息
+     * 
+     * @param departmentId 科室ID
+     * @return 科室响应DTO，如果不存在返回null
+     */
+    @Transactional(readOnly = true)
+    public DepartmentResponseDTO getDepartmentById(Integer departmentId) {
+        Optional<Department> departmentOpt = departmentRepository.findById(departmentId);
+
+        if (departmentOpt.isEmpty()) {
+            return null;
+        }
+
+        Department department = departmentOpt.get();
+        Department parentDepartment = department.getParentDepartment();
+
+        // 强制加载parentDepartment避免LazyInitializationException
+        if (parentDepartment != null && !Hibernate.isInitialized(parentDepartment)) {
+            Hibernate.initialize(parentDepartment);
+        }
+
+        return convertToResponseDTO(department, parentDepartment);
     }
 
     /**

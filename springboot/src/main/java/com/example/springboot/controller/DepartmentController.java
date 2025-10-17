@@ -9,11 +9,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List; // 【新增】导入List
+
 // ==========================================================
 // 【新增导入】
 import com.example.springboot.service.DoctorService;
 import com.example.springboot.dto.doctor.AddDoctorRequest;
 import com.example.springboot.dto.doctor.DoctorResponse; // 【注意】使用您提供的类名 DoctorResponse
+import com.example.springboot.dto.department.DepartmentDoctorsResponseDTO; // 【新增】科室医生列表响应DTO
 // ==========================================================
 
 @RestController
@@ -31,6 +34,7 @@ public class DepartmentController {
     /**
      * 创建新科室接口
      * 接收: { name: "新科室名", parentDepartmentName: "上级科室名", description: "描述" }
+     * 
      * @param departmentDTO 科室数据传输对象
      * @return 创建成功的科室信息
      */
@@ -56,6 +60,7 @@ public class DepartmentController {
      * 编辑科室描述信息接口
      * 接收: { name: "科室名", description: "新的描述" }
      * 使用 PUT /api/departments/description
+     * 
      * @param departmentDTO 包含科室名称和新描述的DTO
      * @return 更新成功的科室信息
      */
@@ -88,6 +93,7 @@ public class DepartmentController {
     /**
      * 删除科室接口
      * 使用 DELETE /api/departments/{name}
+     * 
      * @param name 要删除的科室名称，作为路径变量传入
      * @return 成功删除返回 204 No Content，失败时返回详细错误信息
      */
@@ -125,14 +131,15 @@ public class DepartmentController {
      * 往科室里插入医生接口 (对应前端“添加新成员”弹窗)
      * 【重要】由于 Doctor 实体是 ManyToOne 关系，此操作本质是更新 Doctor 的 department_id 字段。
      * 使用 POST /api/departments/{departmentId}/members
+     * 
      * @param departmentId 目标科室的ID
-     * @param request 包含医生工号、姓名、职称的请求体 DTO
+     * @param request      包含医生工号、姓名、职称的请求体 DTO
      * @return 成功返回更新后的医生信息 DoctorResponse
      */
     @PostMapping("/{departmentId}/members")
     public ResponseEntity<DoctorResponse> addDoctorToDepartment( // 【使用 DoctorResponse】
-                                                                 @PathVariable Integer departmentId,
-                                                                 @RequestBody AddDoctorRequest request) { // 【使用 AddDoctorRequest】
+            @PathVariable Integer departmentId,
+            @RequestBody AddDoctorRequest request) { // 【使用 AddDoctorRequest】
 
         // 实际项目中应使用 @Valid 配合全局异常处理
         if (request.getIdentifier() == null || request.getIdentifier().trim().isEmpty() ||
@@ -148,8 +155,7 @@ public class DepartmentController {
                     departmentId,
                     request.getIdentifier(),
                     request.getFullName(),
-                    request.getTitle()
-            );
+                    request.getTitle());
 
             // 2. 成功，返回 200 OK
             return new ResponseEntity<>(updatedDoctor, HttpStatus.OK);
@@ -179,8 +185,9 @@ public class DepartmentController {
      * 删除科室成员接口 (对应前端列表的删除按钮)
      * 【注意】这里假设删除操作是基于唯一的医生工号 (identifier) 进行的。
      * 使用 DELETE /api/departments/{departmentId}/members/{identifier}
+     * 
      * @param departmentId 目标科室的ID (可选参数，可用于权限或科室校验)
-     * @param identifier 要删除的医生的工号
+     * @param identifier   要删除的医生的工号
      * @return 成功删除返回 204 No Content
      */
     @DeleteMapping("/{departmentId}/members/{identifier}")
@@ -213,10 +220,62 @@ public class DepartmentController {
         }
     }
 
+    // ==========================================================
+    // 【新增功能接口】获取科室医生列表
+    // ==========================================================
+
+    /**
+     * 获取指定科室下的所有医生列表接口
+     * 对应前端"查看成员"按钮功能
+     * 使用 GET /api/departments/{departmentId}/doctors
+     * 
+     * @param departmentId 科室ID
+     * @return 包含科室信息和医生列表的响应对象
+     */
+    @GetMapping("/{departmentId}/doctors")
+    public ResponseEntity<?> getDepartmentDoctors(@PathVariable Integer departmentId) {
+        try {
+            // 1. 验证科室ID
+            if (departmentId == null) {
+                return new ResponseEntity<>("科室ID不能为空", HttpStatus.BAD_REQUEST);
+            }
+
+            // 2. 调用 DoctorService 获取该科室下的所有医生
+            List<DoctorResponse> doctors = doctorService.getDoctorsByDepartmentId(departmentId);
+
+            // 3. 获取科室信息
+            DepartmentResponseDTO department = departmentService.getDepartmentById(departmentId);
+            if (department == null) {
+                return new ResponseEntity<>("科室不存在", HttpStatus.NOT_FOUND);
+            }
+
+            // 4. 构建响应数据
+            DepartmentDoctorsResponseDTO response = new DepartmentDoctorsResponseDTO(
+                    department.getName(),
+                    departmentId,
+                    doctors);
+
+            // 5. 返回成功响应
+            return new ResponseEntity<>(response, HttpStatus.OK);
+
+        } catch (RuntimeException e) {
+            // 业务错误处理
+            String message = e.getMessage();
+            if (message != null && message.contains("不存在")) {
+                return new ResponseEntity<>(message, HttpStatus.NOT_FOUND); // 404
+            }
+            return new ResponseEntity<>(message != null ? message : "请求错误", HttpStatus.BAD_REQUEST); // 400
+        } catch (Exception e) {
+            // 未知内部错误
+            return new ResponseEntity<>("获取医生列表时发生内部错误: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR); // 500
+        }
+    }
 
     /**
      * 查询和分页获取科室列表接口 (支持按名称、描述搜索、分页和排序)
-     * 使用 GET /api/departments?page=0&size=10&name=内科&description=治疗&sortBy=departmentId&sortOrder=desc
+     * 使用 GET
+     * /api/departments?page=0&size=10&name=内科&description=治疗&sortBy=departmentId&sortOrder=desc
+     * 
      * @param queryDTO 包含查询条件、分页和排序信息的DTO，通过ModelAttribute自动绑定查询参数
      * @return 包含科室列表和分页信息的响应对象 Page<DepartmentResponseDTO>
      */
@@ -233,8 +292,7 @@ public class DepartmentController {
             // 这里为了符合您的期望调试方式，返回一个包含错误信息的 ResponseEntity<?>
             return new ResponseEntity(
                     "查询科室时发生内部错误: " + e.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR
-            );
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

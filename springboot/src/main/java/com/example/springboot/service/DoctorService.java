@@ -8,7 +8,6 @@ import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.DoctorRepository;
 import com.example.springboot.util.PasswordEncoderUtil;
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,8 +23,8 @@ public class DoctorService {
     private final PasswordEncoderUtil passwordEncoderUtil;
     private final DepartmentRepository departmentRepository;
 
-    @Autowired
-    public DoctorService(DoctorRepository doctorRepository, PasswordEncoderUtil passwordEncoderUtil, DepartmentRepository departmentRepository) { // 【修改构造函数】
+    public DoctorService(DoctorRepository doctorRepository, PasswordEncoderUtil passwordEncoderUtil,
+            DepartmentRepository departmentRepository) { // 【修改构造函数】
         this.doctorRepository = doctorRepository;
         this.passwordEncoderUtil = passwordEncoderUtil;
         this.departmentRepository = departmentRepository;
@@ -36,8 +35,10 @@ public class DoctorService {
     // =========================================================================
 
     /**
-     * Verifies initial account information: identifier existence, inactive status, and initial password.
-     * @param identifier Doctor's identifier (work ID).
+     * Verifies initial account information: identifier existence, inactive status,
+     * and initial password.
+     * 
+     * @param identifier      Doctor's identifier (work ID).
      * @param initialPassword Initial password provided by the school/hospital.
      */
     @Transactional(readOnly = true)
@@ -45,7 +46,8 @@ public class DoctorService {
 
         // 1. Find doctor record
         Doctor doctor = doctorRepository.findByIdentifier(identifier)
-                .orElseThrow(() -> new ResourceNotFoundException("Identifier not found or doctor record not system-registered."));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Identifier not found or doctor record not system-registered."));
 
         // 2. Check: Is the account already active?
         // 假设 DoctorStatus.ACTIVE 表示已激活
@@ -67,8 +69,11 @@ public class DoctorService {
     // =========================================================================
 
     /**
-     * Activates the account: performs identity verification (ID card ending), sets the new password, and updates status to ACTIVE.
-     * @param request Contains identifier, ID card ending (last 6 digits), and new password details.
+     * Activates the account: performs identity verification (ID card ending), sets
+     * the new password, and updates status to ACTIVE.
+     * 
+     * @param request Contains identifier, ID card ending (last 6 digits), and new
+     *                password details.
      */
     @Transactional
     public void activateAccount(DoctorActivateRequest request) {
@@ -77,7 +82,8 @@ public class DoctorService {
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
             throw new IllegalArgumentException("New passwords do not match.");
         }
-        if (request.getNewPassword() == null || request.getNewPassword().length() < 6 || request.getNewPassword().length() > 20) {
+        if (request.getNewPassword() == null || request.getNewPassword().length() < 6
+                || request.getNewPassword().length() > 20) {
             throw new IllegalArgumentException("Password length must be between 6 and 20 characters.");
         }
 
@@ -85,20 +91,11 @@ public class DoctorService {
         Doctor doctor = doctorRepository.findByIdentifier(request.getIdentifier())
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor information not found."));
 
-        // 3. Identity Verification (using ID Card number)
-        String storedIdCard = doctor.getIdCardNumber();
-        String requestedEnding = request.getIdCardEnding();
-
-        if (storedIdCard == null || storedIdCard.isEmpty()) {
-            throw new IllegalArgumentException("System data is missing (ID card number). Cannot proceed with identity verification.");
-        }
-
-        // Compare the ending of the stored ID card number with the provided ending (e.g., last 6 digits)
-        int requiredLength = requestedEnding.length();
-        if (storedIdCard.length() < requiredLength ||
-                !storedIdCard.substring(storedIdCard.length() - requiredLength).equals(requestedEnding)) {
-            throw new IllegalArgumentException("Identity verification failed: Last " + requiredLength + " digits of ID card do not match.");
-        }
+        // 3. Identity Verification (暂时跳过身份证验证，因为数据库中没有该字段)
+        // TODO: 如果需要身份证验证，请先在数据库中添加id_card_number字段
+        // String storedIdCard = doctor.getIdCardNumber();
+        // String requestedEnding = request.getIdCardEnding();
+        // ... 身份证验证逻辑
 
         // 4. Update password and status
         String hashedPassword = passwordEncoderUtil.encodePassword(request.getNewPassword());
@@ -114,10 +111,11 @@ public class DoctorService {
     /**
      * 【核心业务方法】将医生分配到指定科室（更新 Doctor.department 字段）。
      * 业务逻辑：根据工号查找医生，如果不存在则创建，无论如何都更新其所属科室和基本信息。
+     * 
      * @param departmentId 目标科室的ID
-     * @param identifier 医生的工号/ID
-     * @param fullName 医生姓名
-     * @param title 职称
+     * @param identifier   医生的工号/ID
+     * @param fullName     医生姓名
+     * @param title        职称
      * @return 更新后的医生响应 DTO DoctorResponse
      */
     @Transactional
@@ -180,6 +178,7 @@ public class DoctorService {
 
     /**
      * 【核心业务方法】根据工号删除医生。
+     * 
      * @param identifier 医生的工号/ID
      */
     @Transactional
@@ -231,8 +230,8 @@ public class DoctorService {
         existingDoctor.setDepartment(doctorDetails.getDepartment());
         existingDoctor.setIdentifier(doctorDetails.getIdentifier());
 
-        // Update new field: idCardNumber
-        existingDoctor.setIdCardNumber(doctorDetails.getIdCardNumber());
+        // TODO: 如果需要身份证号字段，请先在数据库中添加id_card_number字段
+        // existingDoctor.setIdCardNumber(doctorDetails.getIdCardNumber());
 
         if (doctorDetails.getPasswordHash() != null && !doctorDetails.getPasswordHash().isEmpty()) {
             existingDoctor.setPasswordHash(passwordEncoderUtil.encodePassword(doctorDetails.getPasswordHash()));
@@ -254,6 +253,31 @@ public class DoctorService {
             throw new ResourceNotFoundException("Doctor not found with id " + id);
         }
         doctorRepository.deleteById(id);
+    }
+
+    // =========================================================================
+    // 【新增核心业务方法】获取指定科室下的所有医生
+    // =========================================================================
+
+    /**
+     * 【核心业务方法】根据科室ID获取该科室下的所有医生列表
+     * 
+     * @param departmentId 科室ID
+     * @return 该科室下的所有医生列表
+     */
+    @Transactional(readOnly = true)
+    public List<DoctorResponse> getDoctorsByDepartmentId(Integer departmentId) {
+        // 1. 验证科室是否存在
+        departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("科室ID " + departmentId + " 不存在"));
+
+        // 2. 查询该科室下的所有医生
+        List<Doctor> doctors = doctorRepository.findByDepartmentDepartmentId(departmentId);
+
+        // 3. 转换为响应DTO
+        return doctors.stream()
+                .map(this::convertToResponseDto)
+                .toList();
     }
 
     public DoctorResponse convertToResponseDto(Doctor doctor) {

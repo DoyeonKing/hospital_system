@@ -14,7 +14,7 @@ export function getDepartmentPage(query) {
         page: query.page - 1,
         size: query.size,
         sortBy: query.sortBy,
-        // 💡 后端通常需要大写的 ASC/DESC 或全小写 asc/desc
+        // 💡 后端通常需要大写的 ASC/DESC 或全小写 asc/desc，具体看您的后端要求
         sortOrder: query.sortOrder === 'descending' ? 'DESC' : 'ASC',
     };
 
@@ -40,25 +40,13 @@ export function createDepartment(departmentData) {
 }
 
 /**
- * 更新科室信息
- * PUT /api/departments
- * 接收 DepartmentDTO (包含 id, name, parentDepartmentName, description)
+ * 获取指定科室下的所有医生列表
+ * GET /api/departments/{departmentId}/doctors
+ * 返回 DepartmentDoctorsResponseDTO
  */
-export function updateDepartment(departmentData) {
+export function getDepartmentDoctors(departmentId) {
     return request({
-        url: '/api/departments',
-        method: 'put', // 使用 PUT 方法更新资源
-        data: departmentData, // 将数据放在请求体中
-    });
-}
-
-/**
- * 删除指定ID的科室
- * DELETE /api/departments/{id}
- */
-export function deleteDepartment(id) {
-    return request({
-        url: `/api/departments/${id}`, // 使用模板字符串拼接ID
-        method: 'delete',
+        url: `/api/departments/${departmentId}/doctors`,
+        method: 'get',
     });
 }
