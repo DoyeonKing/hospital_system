@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -25,4 +26,6 @@ public interface DoctorRepository extends JpaRepository<Doctor, Integer>, JpaSpe
             @Param("id") String id,
             @Param("name") String name,
             Pageable pageable);
+    // 根据科室ID查找该科室下的所有医生
+    List<Doctor> findByDepartmentDepartmentId(Integer departmentId);
 }

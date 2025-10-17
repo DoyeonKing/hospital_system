@@ -102,8 +102,8 @@ import { Edit, Delete, View, Search, Refresh, Plus } from '@element-plus/icons-v
 import BackButton from '@/components/BackButton.vue';
 import { useRouter } from 'vue-router';
 
-// 1. 导入 API 服务
-import { getDepartmentPage } from '@/api/department';
+// 1. 导入 API 服务，新增 updateDepartmentDescription 和 deleteDepartmentByName
+import { getDepartmentPage, updateDepartmentDescription, deleteDepartmentByName } from '@/api/department';
 
 const router = useRouter();
 
@@ -259,7 +259,7 @@ const handleCurrentChange = (val) => {
 };
 
 
-// 6. 编辑、删除逻辑（需要改成调用后端 API，这里只做刷新处理）
+// 6. 编辑、删除逻辑
 const editDialogVisible = ref(false);
 const currentEditDepartment = reactive({ departmentId: null, name: '', description: '' });
 
@@ -268,19 +268,34 @@ const handleEdit = (row) => {
   editDialogVisible.value = true;
 };
 
+// ***** 完善编辑逻辑：调用更新 API *****
 const submitEdit = async () => {
   try {
-    // ⚠️ 实际逻辑：在这里调用后端更新 API (例如：await updateDepartment(currentEditDepartment);)
-    // 假设更新成功：
+    // 1. 构造请求体：根据 API 图片和 currentEditDepartment 的数据结构，构造请求体
+    const payload = {
+      departmentId: currentEditDepartment.departmentId, // 必传，定位要修改的科室
+      name: currentEditDepartment.name,
+      description: currentEditDepartment.description,
+      // 保持与 API 示例的字段匹配，parentDepartmentName 设为空字符串
+      parentDepartmentName: '', //
+    };
 
+    // 2. 调用后端更新 API
+    await updateDepartmentDescription(payload); //
+
+    // 3. 假设更新成功：
     editDialogVisible.value = false;
     ElMessage.success('科室信息更新成功！');
     fetchDepartments(); // 刷新列表
   } catch (error) {
-    ElMessage.error('更新失败，请检查后端服务。');
+    // 捕获 API 调用失败时的错误
+    console.error('更新科室信息失败:', error);
+    ElMessage.error('更新失败，请检查后端服务或数据格式。');
   }
 };
+// **********************************************
 
+// ***** 完善删除逻辑：调用删除 API *****
 const handleDelete = (row) => {
   ElMessageBox.confirm(
       `您确定要删除科室【${row.name}】吗？此操作不可逆！`,
@@ -288,16 +303,20 @@ const handleDelete = (row) => {
       { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
   ).then(async () => {
     try {
-      // ⚠️ 实际逻辑：在这里调用后端删除 API (例如：await deleteDepartment(row.id);)
-      // 假设删除成功：
+      // 1. 调用后端删除 API，传入科室名称作为路径参数
+      await deleteDepartmentByName(row.name); //
 
-      ElMessage.success('删除成功！');
+      // 2. 假设删除成功：
+      ElMessage.success('科室删除成功！');
       fetchDepartments(); // 刷新列表
     } catch (error) {
+      console.error('删除科室失败:', error);
       ElMessage.error('删除失败，请检查后端服务。');
     }
   });
 };
+// **********************************************
+
 
 const handleViewDetails = (row) => {
     router.push({ path: `/departments/members/${row.departmentId}` });

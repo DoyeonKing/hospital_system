@@ -41,7 +41,7 @@ export function createDepartment(departmentData) {
 
 /**
  * 获取所有科室列表（不分页）
- * GET /api/departments/all
+ * GET /api/departments
  * 用于下拉选择等场景
  */
 export function getAllDepartments() {
@@ -52,5 +52,69 @@ export function getAllDepartments() {
             page: 0,
             size: 1000 // 获取大量数据，相当于获取全部
         }
+    });
+}
+
+/**
+ * 获取指定科室下的所有医生列表
+ * GET /api/departments/{departmentId}/doctors
+ * 返回 DepartmentDoctorsResponseDTO
+ */
+export function getDepartmentDoctors(departmentId) {
+    return request({
+        url: `/api/departments/${departmentId}/doctors`,
+        method: 'get',
+    });
+}
+
+/**
+ * 为指定科室添加新成员
+ * POST /api/departments/{departmentId}/members
+ * @param {string|number} departmentId - 科室的ID
+ * @param {object} memberData - 要添加的成员信息 (例如 { identifier, fullName, title })
+ */
+export function addDepartmentMember(departmentId, memberData) {
+    return request({
+        url: `/api/departments/${departmentId}/members`,
+        method: 'post',
+        data: memberData, // 将成员信息放在请求体中
+    });
+}
+
+/**
+ * 从指定科室删除一个成员
+ * DELETE /api/departments/{departmentId}/members/{identifier}
+ * @param {string|number} departmentId - 科室的ID
+ * @param {string} memberIdentifier - 要删除的成员的ID (医生工号)
+ */
+export function deleteDepartmentMember(departmentId, memberIdentifier) {
+    return request({
+        url: `/api/departments/${departmentId}/members/${memberIdentifier}`,
+        method: 'delete',
+    });
+}
+
+/**
+ * 更新科室信息
+ * PUT /api/departments/description
+ * 接收 DepartmentUpdateDTO (包含 departmentId, name, description, parentDepartmentName)
+ */
+export function updateDepartmentDescription(departmentData) {
+    return request({
+        url: '/api/departments/description',
+        method: 'put',
+        data: departmentData,
+    });
+}
+
+/**
+ * 删除科室
+ * DELETE /api/departments/{name}
+ * @param {string} departmentName - 要删除的科室名称
+ */
+export function deleteDepartmentByName(departmentName) {
+    return request({
+        url: `/api/departments/${departmentName}`,
+        method: 'delete',
     });
 }
