@@ -27,12 +27,34 @@ request.interceptors.response.use(
     return res;
   },
   error => {
+    console.error('请求错误详情:', error)
+    
+    if (!error.response) {
+      ElMessage.error('网络连接失败，请检查后端服务是否启动')
+      return Promise.reject(error)
+    }
+    
     if (error.response.status === 404) {
-      ElMessage.error('未找到请求接口')
+      ElMessage.error('未找到请求接口: ' + error.config.url)
     } else if (error.response.status === 500) {
       ElMessage.error('系统异常，请查看后端控制台报错')
+    } else if (error.response.status === 400) {
+      // 处理 400 错误，可能包含后端返回的错误信息
+      const errorData = error.response.data
+      if (typeof errorData === 'string') {
+        try {
+          const parsed = JSON.parse(errorData)
+          ElMessage.error(parsed.error || '请求参数错误')
+        } catch {
+          ElMessage.error(errorData || '请求参数错误')
+        }
+      } else if (errorData && errorData.error) {
+        ElMessage.error(errorData.error)
+      } else {
+        ElMessage.error('请求参数错误')
+      }
     } else {
-      console.error(error.message)
+      ElMessage.error(error.message || '请求失败')
     }
     return Promise.reject(error)
   }

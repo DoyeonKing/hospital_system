@@ -341,46 +341,6 @@ const handleLogin = async () => {
 
   loading.value = true
 
-  // 临时测试账号，方便调试
-  const testAccounts = {
-    'D001': '123456',
-    'doctor': 'doctor123',
-    'test': 'test123'
-  }
-
-  // 检查是否为测试账号
-  if (testAccounts[loginForm.identifier] === loginForm.password) {
-    // 模拟登录成功
-    const mockResponse = {
-      code: '200',
-      msg: '登录成功',
-      data: {
-        token: 'mock-doctor-token-' + Date.now(),
-        doctorInfo: {
-          doctorId: loginForm.identifier,
-          name: '测试医生',
-          department: '内科',
-          position: '主治医师',
-          phone: '13900139000'
-        }
-      }
-    }
-
-    // 保存登录信息到store
-    doctorStore.loginSuccess(mockResponse.data, {
-      identifier: loginForm.identifier,
-      token: mockResponse.data.token
-    })
-
-    ElMessage.success('登录成功（测试模式）')
-    
-    // 立即跳转到医生工作台
-    router.push('/doctor-dashboard')
-    
-    loading.value = false
-    return
-  }
-
   try {
     const response = await request({
       url: '/api/doctor/login',
@@ -426,43 +386,36 @@ const handleActivationStep1 = async () => {
 
   loading.value = true
 
-  // 临时测试账号，方便调试
-  const testActivationAccounts = {
-    'D002': '123456',
-    'activate': 'activate123'
-  }
-
-  // 检查是否为测试激活账号
-  if (testActivationAccounts[activationForm.identifier] === activationForm.initialPassword) {
-    // 模拟验证成功
-    activationForm.idCard = '110***********5678'
-    activationStep.value = 2
-    ElMessage.success('验证成功（测试模式）')
-    loading.value = false
-    return
-  }
-
   try {
     const response = await request({
-      url: '/api/doctor/verify-initial-login',
+      url: '/api/doctor/auth/verify',
       method: 'POST',
       data: {
         identifier: activationForm.identifier,
-        password: activationForm.initialPassword
+        initialPassword: activationForm.initialPassword
       }
     })
 
-    if (response.code === '200') {
-      // 保存医生信息，用于后续验证
-      activationForm.idCard = response.data.idCard
+    // 后端返回的是简单的 JSON 对象，不是标准的 response 格式
+    // 成功返回: {"message": "初始信息验证成功，请继续身份验证"}
+    // 失败返回: {"error": "错误信息"}
+    console.log('第一步验证响应:', response)
+    
+    if (response && response.message) {
+      // 验证成功，进入第二步
       activationStep.value = 2
-      ElMessage.success('验证成功')
+      ElMessage.success('初始信息验证成功')
+    } else if (response && response.error) {
+      ElMessage.error(response.error)
     } else {
-      ElMessage.error(response.msg || '验证失败')
+      ElMessage.error('验证失败，响应格式错误')
     }
   } catch (error) {
     console.error('验证请求失败:', error)
-    ElMessage.error('网络错误，请稍后重试')
+    // 错误已经在响应拦截器中处理过了，这里不需要再显示
+    if (!error.response) {
+      ElMessage.error('无法连接到服务器，请检查后端是否启动')
+    }
   } finally {
     loading.value = false
   }
@@ -483,27 +436,38 @@ const handleActivationStep2 = async () => {
 
   try {
     const response = await request({
-      url: '/api/doctor/verify-identity',
+      url: '/api/doctor/auth/activate',
       method: 'POST',
       data: {
         identifier: activationForm.identifier,
-        idCardLast6: activationForm.idCardInput,  // 发送用户输入的后6位
-        newPassword: activationForm.newPassword
+        idCardEnding: activationForm.idCardInput,  // 发送用户输入的后6位
+        newPassword: activationForm.newPassword,
+        confirmPassword: activationForm.confirmPassword
       }
     })
 
-    if (response.code === '200') {
-      ElMessage.success('激活成功！请使用新密码登录。')
+    // 后端返回的是简单的 JSON 对象
+    // 成功返回: {"message": "账户激活成功，请返回登录"}
+    // 失败返回: {"error": "错误信息"}
+    console.log('第二步激活响应:', response)
+    
+    if (response && response.message) {
+      ElMessage.success('账户激活成功！请使用新密码登录。')
       // 返回登录界面
       setTimeout(() => {
         switchToLogin()
       }, 2000)
+    } else if (response && response.error) {
+      ElMessage.error(response.error)
     } else {
-      ElMessage.error(response.msg || '身份证验证失败')
+      ElMessage.error('激活失败，响应格式错误')
     }
   } catch (error) {
     console.error('激活请求失败:', error)
-    ElMessage.error('网络错误，请稍后重试')
+    // 错误已经在响应拦截器中处理过了，这里不需要再显示
+    if (!error.response) {
+      ElMessage.error('无法连接到服务器，请检查后端是否启动')
+    }
   } finally {
     loading.value = false
   }
