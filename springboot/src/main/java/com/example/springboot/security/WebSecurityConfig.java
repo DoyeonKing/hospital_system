@@ -30,7 +30,7 @@ public class WebSecurityConfig {
                 // 3. 授权配置
                 .authorizeHttpRequests(authorize -> authorize
 
-                        // 💥 关键修改：明确放行所有 OPTIONS 请求 (CORS Preflight Request)
+                        // 明确放行所有 OPTIONS 请求 (CORS Preflight Request)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         // 允许所有 /api/** 路径
@@ -46,14 +46,13 @@ public class WebSecurityConfig {
         return http.build();
     }
 
-    // 4. CORS 配置源 Bean (修复了 allowedOrigins)
+    // 4. CORS 配置源 Bean (关键修改)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 💡 关键修复点：将 '*' 替换为精确的前端地址 http://localhost:5173
-        // 解决了 allowCredentials(true) 与 allowedOrigins('*') 冲突导致的启动异常
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
+        // 💡 关键修复点：将两个前端应用的地址都添加到允许列表中
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:5174"));
 
         // 允许常用方法 (GET, POST, PUT, DELETE, OPTIONS)
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
