@@ -82,7 +82,7 @@ public class WaitlistService {
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + request.getScheduleId()));
 
         // 检查患者是否已在黑名单
-        if (patient.getPatientProfile() != null && patient.getPatientProfile().getBlacklistStatus() == BlacklistStatus.BLACKLISTED) {
+        if (patient.getPatientProfile() != null && patient.getPatientProfile().getBlacklistStatus() == BlacklistStatus.blacklisted) {
             throw new BadRequestException("Patient is blacklisted and cannot join waitlist.");
         }
         // 检查患者是否已有该排班的预约
@@ -148,7 +148,7 @@ public class WaitlistService {
         for (Waitlist waitlist : pendingWaitlists) {
             Patient patient = waitlist.getPatient();
             // 再次检查患者状态和是否已预约
-            if (patient.getPatientProfile() != null && patient.getPatientProfile().getBlacklistStatus() == BlacklistStatus.BLACKLISTED) {
+            if (patient.getPatientProfile() != null && patient.getPatientProfile().getBlacklistStatus() == BlacklistStatus.blacklisted) {
                 waitlist.setStatus(WaitlistStatus.REJECTED); // 标记为拒绝，跳过
                 waitlistRepository.save(waitlist);
                 continue;

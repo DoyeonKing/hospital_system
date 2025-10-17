@@ -6,6 +6,8 @@ import com.example.springboot.dto.user.UserUpdateRequest;
 import com.example.springboot.util.PasswordEncoderUtil;
 import org.springframework.data.domain.Pageable;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import com.example.springboot.dto.admin.AdminResponse;
 import com.example.springboot.dto.common.PageResponse;
 import com.example.springboot.dto.user.UserCreateRequest;
@@ -272,6 +274,10 @@ public class UserServiceImpl implements UserService {
     public PageResponse<UserResponse> searchDoctors(String id, String name, Integer departmentId, int page, int pageSize) {
         Pageable pageable = PageRequest.of(page - 1, pageSize);
 
+        // 调试：先尝试查询所有医生
+        long totalDoctors = doctorRepository.count();
+        System.out.println("数据库中医生总数: " + totalDoctors);
+
         // 医生查询条件构建
         Page<Doctor> doctorPage = doctorRepository.findAll((Specification<Doctor>) (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -286,13 +292,18 @@ public class UserServiceImpl implements UserService {
                 predicates.add(cb.like(root.get("fullName"), "%" + name + "%"));
             }
 
-            // 科室ID精确查询
+            // 科室ID精确查询 - 修复：使用JOIN来避免NPE
             if (departmentId != null) {
-                predicates.add(cb.equal(root.get("department").get("departmentId"), departmentId));
+                Join<Doctor, Department> departmentJoin = root.join("department", JoinType.LEFT);
+                predicates.add(cb.equal(departmentJoin.get("departmentId"), departmentId));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
         }, pageable);
+
+        // 调试：输出查询结果
+        System.out.println("医生查询结果: " + doctorPage.getTotalElements() + " 条");
+        System.out.println("当前页医生数量: " + doctorPage.getContent().size());
 
         // 转换为响应DTO（确保包含所有字段）
         List<UserResponse> userResponses = doctorPage.getContent().stream()
@@ -326,6 +337,10 @@ public class UserServiceImpl implements UserService {
         // 构建分页参数 (页码从0开始)
         Pageable pageable = PageRequest.of(page - 1, pageSize);
 
+        // 调试：先尝试查询所有患者
+        long totalPatients = patientRepository.count();
+        System.out.println("数据库中患者总数: " + totalPatients);
+
         // 查询患者: 使用 JPA Specification 进行动态查询。
         Page<Patient> patientPage = patientRepository.findAll((Specification<Patient>) (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -339,6 +354,10 @@ public class UserServiceImpl implements UserService {
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         }, pageable);
+
+        // 调试：输出查询结果
+        System.out.println("患者查询结果: " + patientPage.getTotalElements() + " 条");
+        System.out.println("当前页患者数量: " + patientPage.getContent().size());
 
         // 转换为UserResponse列表
         List<UserResponse> userResponses = patientPage.getContent().stream()
@@ -424,7 +443,7 @@ public class UserServiceImpl implements UserService {
         response.setIdCard(updatedProfile.getIdCardNumber());
         response.setPastMedicalHistory(updatedProfile.getMedicalHistory());
         response.setAllergyHistory(updatedProfile.getAllergies());
-        response.setBlacklisted(updatedProfile.getBlacklistStatus() == BlacklistStatus.BLACKLISTED);
+        response.setIsBlacklisted(updatedProfile.getBlacklistStatus() == BlacklistStatus.blacklisted);
 
         return response;
     }

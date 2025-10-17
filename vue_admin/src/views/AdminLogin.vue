@@ -135,7 +135,7 @@ const handleLogin = async () => {
       ElMessage.success('登录成功')
       
       // 立即跳转到主页
-      router.push('/admin')
+      router.push('/')
     } else {
       ElMessage.error(response.msg || '登录失败')
     }
@@ -150,7 +150,7 @@ const handleLogin = async () => {
 // 页面加载时检查是否已登录
 onMounted(() => {
   if (adminStore.isAuthenticated) {
-    router.push('/admin')
+    router.push('/')
   }
 })
 </script>

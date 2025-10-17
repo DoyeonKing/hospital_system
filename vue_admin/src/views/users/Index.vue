@@ -22,9 +22,13 @@
       <router-link to="/users/create" class="feature-card-link">
         <div class="feature-card"><div class="icon-wrapper"><el-icon :size="32"><Plus /></el-icon></div><h3>创建账户</h3></div>
       </router-link>
-      <!-- 新增：批量导入用户卡片 -->
-      <router-link to="/users/import" class="feature-card-link">
-        <div class="feature-card"><div class="icon-wrapper" style="background-color: #fef4e6; color: #f59e0b;"><el-icon :size="32"><Upload /></el-icon></div><h3>批量导入用户</h3></div>
+      <!-- 批量导入患者 -->
+      <router-link to="/users/import-patient" class="feature-card-link">
+        <div class="feature-card"><div class="icon-wrapper" style="background-color: #e6f7ff; color: #1890ff;"><el-icon :size="32"><Upload /></el-icon></div><h3>批量导入患者</h3><p style="font-size: 12px; color: #999; margin: 4px 0 0;">支持学生/教师/职工</p></div>
+      </router-link>
+      <!-- 批量导入医生 -->
+      <router-link to="/users/import-doctor" class="feature-card-link">
+        <div class="feature-card"><div class="icon-wrapper" style="background-color: #fef4e6; color: #f59e0b;"><el-icon :size="32"><Upload /></el-icon></div><h3>批量导入医生</h3><p style="font-size: 12px; color: #999; margin: 4px 0 0;">支持职称/专长</p></div>
       </router-link>
       <router-link to="/users/search" class="feature-card-link">
         <div class="feature-card"><div class="icon-wrapper"><el-icon :size="32"><Search /></el-icon></div><h3>用户信息搜索</h3></div>

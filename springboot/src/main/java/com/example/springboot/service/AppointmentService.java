@@ -76,7 +76,7 @@ public class AppointmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id " + request.getPatientId()));
 
         // Check patient blacklist status
-        if (patient.getPatientProfile() != null && patient.getPatientProfile().getBlacklistStatus() == BlacklistStatus.BLACKLISTED) {
+        if (patient.getPatientProfile() != null && patient.getPatientProfile().getBlacklistStatus() == BlacklistStatus.blacklisted) {
             throw new BadRequestException("Patient is blacklisted and cannot make appointments.");
         }
 
@@ -136,7 +136,7 @@ public class AppointmentService {
                 if (patient.getPatientProfile() != null) {
                     patient.getPatientProfile().setNoShowCount(patient.getPatientProfile().getNoShowCount() + 1);
                     if (patient.getPatientProfile().getNoShowCount() >= Constants.MAX_NO_SHOW_COUNT) {
-                        patient.getPatientProfile().setBlacklistStatus(BlacklistStatus.BLACKLISTED);
+                        patient.getPatientProfile().setBlacklistStatus(BlacklistStatus.blacklisted);
                     }
                     patientService.savePatientProfile(patient.getPatientProfile()); // 更新患者档案
                 }

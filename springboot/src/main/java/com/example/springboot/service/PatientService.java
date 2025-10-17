@@ -455,6 +455,12 @@ public class PatientService {
             pageSize = 10;
         }
 
+        // 调试：检查数据库中患者总数
+        long totalPatients = patientRepository.count();
+        System.out.println("=== 病历历史查询调试 ===");
+        System.out.println("数据库中患者总数: " + totalPatients);
+        System.out.println("查询参数 - 页码: " + page + ", 页大小: " + pageSize);
+
         // 构建分页参数（JPA页码从0开始）
         Pageable pageable = PageRequest.of(page - 1, pageSize);
 
@@ -480,16 +486,20 @@ public class PatientService {
                         response.setPastMedicalHistory(profile.getMedicalHistory());
                         response.setAllergyHistory(profile.getAllergies());
                         // 关键修改：根据BlacklistStatus枚举判断是否拉黑
-                        response.setBlacklisted(profile.getBlacklistStatus() == BlacklistStatus.BLACKLISTED);
+                        response.setIsBlacklisted(profile.getBlacklistStatus() == BlacklistStatus.blacklisted);
+                        System.out.println("患者 " + patient.getFullName() + " 有档案，过敏史: " + profile.getAllergies());
                     } else {
                         // 处理无档案的情况
                         response.setPastMedicalHistory("");
                         response.setAllergyHistory("");
-                        response.setBlacklisted(false); // 无档案默认未拉黑
+                        response.setIsBlacklisted(false); // 无档案默认未拉黑
+                        System.out.println("患者 " + patient.getFullName() + " 无档案");
                     }
                     return response;
                 })
                 .collect(Collectors.toList());
+        
+        System.out.println("转换后的病历记录数量: " + content.size());
 
         // 构建分页响应
         return new PageResponse<>(

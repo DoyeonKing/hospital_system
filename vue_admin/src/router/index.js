@@ -170,7 +170,8 @@ import DepartmentMembers from '@/views/departments/Members.vue'; // 保留：科
 // 导入用户管理页面组件
 import UserIndex from '@/views/users/Index.vue';
 import CreateUser from '@/views/users/Create.vue';
-import ImportUser from '@/views/users/Import.vue';
+import ImportPatient from '@/views/users/ImportPatient.vue';
+import ImportDoctor from '@/views/users/ImportDoctor.vue';
 import SearchUser from '@/views/users/Search.vue';
 import EditUser from '@/views/users/Edit.vue';
 import UserHistory from '@/views/users/History.vue';
@@ -239,10 +240,16 @@ const routes = [
         component: CreateUser
     },
     {
-        path: '/users/import',
-        name: 'ImportUser',
-        meta: { title: '批量导入用户', requiresAuth: true },
-        component: ImportUser
+        path: '/users/import-patient',
+        name: 'ImportPatient',
+        meta: { title: '批量导入患者', requiresAuth: true },
+        component: ImportPatient
+    },
+    {
+        path: '/users/import-doctor',
+        name: 'ImportDoctor',
+        meta: { title: '批量导入医生', requiresAuth: true },
+        component: ImportDoctor
     },
     {
         path: '/users/search',

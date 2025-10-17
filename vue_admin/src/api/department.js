@@ -38,3 +38,19 @@ export function createDepartment(departmentData) {
         data: departmentData, // 将数据放在请求体中
     });
 }
+
+/**
+ * 获取所有科室列表（不分页）
+ * GET /api/departments/all
+ * 用于下拉选择等场景
+ */
+export function getAllDepartments() {
+    return request({
+        url: '/api/departments',
+        method: 'get',
+        params: {
+            page: 0,
+            size: 1000 // 获取大量数据，相当于获取全部
+        }
+    });
+}
