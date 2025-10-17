@@ -3,23 +3,19 @@
     <div class="back-area" style="margin-bottom: 12px;">
       <BackButton />
     </div>
-    <el-card shadow="always">
-      <template #header>
-        <div class="card-header">
-          <span>科室成员管理</span>
-        </div>
-      </template>
-      <p>在这里，您可以为每个科室添加或移除医生信息。</p>
 
-      <!-- 科室列表循环 -->
-      <div v-for="dept in departments" :key="dept.id" class="department-section">
-        <div class="department-header">
-          <h3 class="department-name">{{ dept.name }}</h3>
-          <el-button type="primary" :icon="Plus" @click="openAddDialog(dept.id)">
+    <el-card shadow="always" v-if="currentDepartment">
+      <template #header>
+        <div class="card-header-title">
+          <h2 class="department-name-title">{{ currentDepartment.name }}</h2>
+          <el-button type="primary" :icon="Plus" @click="openAddDialog(currentDepartment.id)">
             添加成员
           </el-button>
         </div>
-        <el-table :data="dept.members" border stripe>
+      </template>
+
+      <div class="member-management-section">
+        <el-table :data="currentDepartment.members" border stripe>
           <el-table-column prop="id" label="医生ID" width="150" />
           <el-table-column prop="name" label="医生姓名" width="180" />
           <el-table-column prop="title" label="职称" />
@@ -29,18 +25,20 @@
                   type="danger"
                   size="small"
                   :icon="Delete"
-                  @click="handleDelete(dept.id, row.id)"
+                  @click="handleDelete(currentDepartment.id, row.id)"
               >
                 删除
               </el-button>
             </template>
           </el-table-column>
         </el-table>
-        <el-empty v-if="!dept.members || dept.members.length === 0" description="该科室暂无成员" />
+        <el-empty v-if="!currentDepartment.members || currentDepartment.members.length === 0" description="该科室暂无成员" />
       </div>
     </el-card>
 
-    <!-- 添加新成员的对话框 -->
+    <el-empty v-else description="未找到指定的科室信息" />
+
+
     <el-dialog v-model="addDialogVisible" title="添加新成员" width="500px">
       <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="80px">
         <el-form-item label="医生ID" prop="id">
@@ -62,44 +60,69 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { Plus, Delete } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import BackButton from '@/components/BackButton.vue';
+import { useRoute } from 'vue-router';
 
+const route = useRoute();
 const addFormRef = ref(null);
 
-// 模拟的科室及成员数据
-const departments = ref([
+// 模拟的科室及成员数据 (ID 与 Index.vue 保持同步)
+const allDepartmentsData = ref([
+  // 有成员的科室 (子科室)
   {
-    id: 'DEPT_001',
+    id: 101, // 对应 Index.vue 中的心血管内科
     name: '心血管内科',
     members: [
-      { id: 'DOC_101', name: '王伟', title: '主任医师' },
-      { id: 'DOC_102', name: '李静', title: '副主任医师' }
+      { id: 'DOC_101', name: '王伟', title: '主任医师' }, // 对应 image_5cc57d.png
+      { id: 'DOC_102', name: '李静', title: '副主任医师' } // 对应 image_5cc57d.png
     ]
   },
   {
-    id: 'DEPT_002',
+    id: 102, // 对应 Index.vue 中的神经外科
     name: '神经外科',
     members: [
       { id: 'DOC_201', name: '张磊', title: '主治医师' }
     ]
   },
   {
-    id: 'DEPT_003',
+    id: 201, // 对应 Index.vue 中的儿科
     name: '儿科',
-    members: []
+    members: [
+        { id: 'DOC_301', name: '赵小琴', title: '儿科医师' }
+    ]
   },
+  // 无成员的科室 (根科室)
+  { id: 1, name: '总院行政部', description: '负责总院的行政管理', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
+  { id: 2, name: '门诊部', description: '负责日常门诊接待和初步诊断', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
+  { id: 3, name: '后勤保障部', description: '负责设备维护和物资采购', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
+  { id: 4, name: '财务部', description: '负责医院财务核算与管理', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
+  { id: 202, name: '皮肤科', members: [] },
 ]);
+
+
+const deptIdFromRoute = ref(route.params.id);
+
+watch(
+    () => route.params.id,
+    (newId) => {
+        deptIdFromRoute.value = newId;
+    }
+);
+
+const currentDepartment = computed(() => {
+    // 查找科室，ID可能为字符串（路由参数）或数字（模拟数据），使用 == 比较
+    return allDepartmentsData.value.find(d => d.id == deptIdFromRoute.value);
+});
+
 
 // 添加成员对话框相关
 const addDialogVisible = ref(false);
 const currentDeptId = ref(null);
 const addForm = reactive({
-  id: '',
-  name: '',
-  title: ''
+  id: '', name: '', title: ''
 });
 const addRules = reactive({
   id: [{ required: true, message: '医生ID不能为空', trigger: 'blur' }],
@@ -107,25 +130,22 @@ const addRules = reactive({
   title: [{ required: true, message: '医生职称不能为空', trigger: 'blur' }]
 });
 
-// 打开添加对话框
 const openAddDialog = (deptId) => {
   currentDeptId.value = deptId;
-  // 重置表单
-  if(addFormRef.value) {
-    addFormRef.value.resetFields();
-  }
-  addForm.id = '';
-  addForm.name = '';
-  addForm.title = '';
+  if(addFormRef.value) addFormRef.value.resetFields();
+  Object.assign(addForm, { id: '', name: '', title: '' });
   addDialogVisible.value = true;
 };
 
-// 确认添加成员
 const handleAddMember = () => {
   addFormRef.value.validate((valid) => {
     if (valid) {
-      const department = departments.value.find(d => d.id === currentDeptId.value);
+      const department = allDepartmentsData.value.find(d => d.id == currentDeptId.value);
       if (department) {
+        if (department.members.some(m => m.id === addForm.id)) {
+             ElMessage.error('该医生ID已存在于本科室！');
+             return;
+        }
         department.members.push({ ...addForm });
         ElMessage.success('成员添加成功！');
         addDialogVisible.value = false;
@@ -136,50 +156,33 @@ const handleAddMember = () => {
   });
 };
 
-// 删除成员
 const handleDelete = (deptId, memberId) => {
   ElMessageBox.confirm(
       '确定要从该科室移除这位成员吗？',
       '警告',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      }
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
   ).then(() => {
-    const department = departments.value.find(d => d.id === deptId);
+    const department = allDepartmentsData.value.find(d => d.id == deptId);
     if (department) {
       department.members = department.members.filter(m => m.id !== memberId);
       ElMessage.success('成员删除成功！');
     }
-  }).catch(() => {
-    // 用户取消操作
   });
 };
 </script>
 
 <style scoped>
-.app-container {
-  padding: 20px;
-}
-.card-header {
-  font-size: 18px;
-  font-weight: bold;
-}
-.department-section {
-  margin-bottom: 30px;
-}
-.department-header {
+.app-container { padding: 20px; }
+.card-header-title {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #ebeef5;
 }
-.department-name {
+.department-name-title {
   margin: 0;
-  font-size: 1.1em;
+  font-size: 18px;
+  font-weight: bold;
   color: #303133;
 }
+.member-management-section { margin-top: 10px; }
 </style>
