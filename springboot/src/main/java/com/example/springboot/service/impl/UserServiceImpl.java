@@ -172,67 +172,129 @@ public class UserServiceImpl implements UserService {
      * 查询医生函数。
      * 依赖 DoctorRepository 继承 JpaSpecificationExecutor 来支持此处的 findAll 方法。
      */
+//    @Override
+//    @Transactional(readOnly = true)
+//    public PageResponse<UserResponse> searchUsers(String id, String name, int page, int pageSize) {
+//        // 构建分页参数 (注意页码从0开始，前端传1时需要减1)
+//        Pageable pageable = PageRequest.of(page - 1, pageSize);
+//
+//        // 1. 查询患者
+//        Page<Patient> patientPage = patientRepository.findAll((Specification<Patient>) (root, query, cb) -> {
+//            List<Predicate> predicates = new ArrayList<>();
+//            if (id != null && !id.isEmpty()) {
+//                predicates.add(cb.like(root.get("identifier"), "%" + id + "%"));
+//            }
+//            if (name != null && !name.isEmpty()) {
+//                predicates.add(cb.like(root.get("fullName"), "%" + name + "%"));
+//            }
+//            return cb.and(predicates.toArray(new Predicate[0]));
+//        }, pageable);
+//
+//        // 2. 查询医生
+//        // 查询医生: 使用 JPA Specification 进行动态查询。
+//        Page<Doctor> doctorPage = doctorRepository.findAll((Specification<Doctor>) (root, query, cb) -> {
+//            List<Predicate> predicates = new ArrayList<>();
+//            // 按工号 (identifier) 模糊查询
+//            if (id != null && !id.isEmpty()) {
+//                predicates.add(cb.like(root.get("identifier"), "%" + id + "%"));
+//            }
+//            // 按姓名 (fullName) 模糊查询
+//            if (name != null && !name.isEmpty()) {
+//                predicates.add(cb.like(root.get("fullName"), "%" + name + "%"));
+//            }
+//            return cb.and(predicates.toArray(new Predicate[0]));
+//        }, pageable);
+//
+//        // 3. 查询管理员
+//        Page<Admin> adminPage = adminRepository.findAll((Specification<Admin>) (root, query, cb) -> {
+//            List<Predicate> predicates = new ArrayList<>();
+//            if (id != null && !id.isEmpty()) {
+//                predicates.add(cb.like(root.get("username"), "%" + id + "%"));
+//            }
+//            if (name != null && !name.isEmpty()) {
+//                predicates.add(cb.like(root.get("fullName"), "%" + name + "%"));
+//            }
+//            return cb.and(predicates.toArray(new Predicate[0]));
+//        }, pageable);
+//
+//        // 4. 合并结果并转换为UserResponse
+//        List<UserResponse> userResponses = new ArrayList<>();
+//
+//        // 添加患者
+//        userResponses.addAll(patientPage.getContent().stream()
+//                .map(patient -> {
+//                    UserResponse response = new UserResponse();
+//                    response.setRole("PATIENT");
+//                    response.setUserDetails(patientService.convertToResponseDto(patient));
+//                    return response;
+//                })
+//                .collect(Collectors.toList()));
+//
+//        // 添加医生
+//        userResponses.addAll(doctorPage.getContent().stream()
+//        // 转换为UserResponse列表
+//        List<UserResponse> userResponses = doctorPage.getContent().stream()
+//                .map(doctor -> {
+//                    UserResponse response = new UserResponse();
+//                    response.setRole("DOCTOR");
+//                    response.setUserDetails(doctorService.convertToResponseDto(doctor));
+//                    return response;
+//                })
+//                .collect(Collectors.toList()));
+//
+//        // 添加管理员
+//        userResponses.addAll(adminPage.getContent().stream()
+//                .map(admin -> {
+//                    UserResponse response = new UserResponse();
+//                    response.setRole("ADMIN");
+//                    response.setUserDetails(adminService.convertToResponseDto(admin));
+//                    return response;
+//                })
+//                .collect(Collectors.toList()));
+//
+//        // 计算总条数
+//        long totalElements = patientPage.getTotalElements() + doctorPage.getTotalElements() + adminPage.getTotalElements();
+//        // 计算总页数
+//        int totalPages = (int) Math.ceil((double) totalElements / pageSize);
+//
+//        return new PageResponse<>(
+//                userResponses,
+//                totalElements,
+//                totalPages,
+//                page,
+//                pageSize
+//        );
+//    }
+
+// 替换原注释的 searchUsers 方法为 searchDoctors 实现
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<UserResponse> searchUsers(String id, String name, int page, int pageSize) {
-        // 构建分页参数 (注意页码从0开始，前端传1时需要减1)
+    public PageResponse<UserResponse> searchDoctors(String id, String name, Integer departmentId, int page, int pageSize) {
         Pageable pageable = PageRequest.of(page - 1, pageSize);
 
-        // 1. 查询患者
-        Page<Patient> patientPage = patientRepository.findAll((Specification<Patient>) (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            if (id != null && !id.isEmpty()) {
-                predicates.add(cb.like(root.get("identifier"), "%" + id + "%"));
-            }
-            if (name != null && !name.isEmpty()) {
-                predicates.add(cb.like(root.get("fullName"), "%" + name + "%"));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        }, pageable);
-
-        // 2. 查询医生
-        // 查询医生: 使用 JPA Specification 进行动态查询。
+        // 医生查询条件构建
         Page<Doctor> doctorPage = doctorRepository.findAll((Specification<Doctor>) (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            // 按工号 (identifier) 模糊查询
+
+            // 工号模糊查询
             if (id != null && !id.isEmpty()) {
                 predicates.add(cb.like(root.get("identifier"), "%" + id + "%"));
             }
-            // 按姓名 (fullName) 模糊查询
+
+            // 姓名模糊查询
             if (name != null && !name.isEmpty()) {
                 predicates.add(cb.like(root.get("fullName"), "%" + name + "%"));
             }
+
+            // 科室ID精确查询
+            if (departmentId != null) {
+                predicates.add(cb.equal(root.get("department").get("departmentId"), departmentId));
+            }
+
             return cb.and(predicates.toArray(new Predicate[0]));
         }, pageable);
 
-        // 3. 查询管理员
-        Page<Admin> adminPage = adminRepository.findAll((Specification<Admin>) (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            if (id != null && !id.isEmpty()) {
-                predicates.add(cb.like(root.get("username"), "%" + id + "%"));
-            }
-            if (name != null && !name.isEmpty()) {
-                predicates.add(cb.like(root.get("fullName"), "%" + name + "%"));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        }, pageable);
-
-        // 4. 合并结果并转换为UserResponse
-        List<UserResponse> userResponses = new ArrayList<>();
-
-        // 添加患者
-        userResponses.addAll(patientPage.getContent().stream()
-                .map(patient -> {
-                    UserResponse response = new UserResponse();
-                    response.setRole("PATIENT");
-                    response.setUserDetails(patientService.convertToResponseDto(patient));
-                    return response;
-                })
-                .collect(Collectors.toList()));
-
-        // 添加医生
-        userResponses.addAll(doctorPage.getContent().stream()
-        // 转换为UserResponse列表
+        // 转换为响应DTO（确保包含所有字段）
         List<UserResponse> userResponses = doctorPage.getContent().stream()
                 .map(doctor -> {
                     UserResponse response = new UserResponse();
@@ -240,31 +302,18 @@ public class UserServiceImpl implements UserService {
                     response.setUserDetails(doctorService.convertToResponseDto(doctor));
                     return response;
                 })
-                .collect(Collectors.toList()));
+                .collect(Collectors.toList());
 
-        // 添加管理员
-        userResponses.addAll(adminPage.getContent().stream()
-                .map(admin -> {
-                    UserResponse response = new UserResponse();
-                    response.setRole("ADMIN");
-                    response.setUserDetails(adminService.convertToResponseDto(admin));
-                    return response;
-                })
-                .collect(Collectors.toList()));
-
-        // 计算总条数
-        long totalElements = patientPage.getTotalElements() + doctorPage.getTotalElements() + adminPage.getTotalElements();
-        // 计算总页数
-        int totalPages = (int) Math.ceil((double) totalElements / pageSize);
-
+        // 构建分页响应
         return new PageResponse<>(
                 userResponses,
-                totalElements,
-                totalPages,
+                doctorPage.getTotalElements(),
+                doctorPage.getTotalPages(),
                 page,
                 pageSize
         );
     }
+
 
     /**
      * 实现 UserService 接口中的抽象方法 searchPatients。

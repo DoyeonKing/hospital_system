@@ -67,23 +67,24 @@ public class UserController {
         return ResponseEntity.ok(result);
     }
 
-    // 医生信息查询接口
     @GetMapping("/doctorInfo")
     public ResponseEntity<PageResponse<UserResponse>> searchDoctors(
             @RequestParam(required = false, defaultValue = "1") Integer page,
             @RequestParam(required = false, defaultValue = "10") Integer pageSize,
             @RequestParam(required = false) String id,
-            @RequestParam(required = false) String name) {
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Integer departmentId) { // 新增departmentId参数
 
         // 校验分页参数
         if (page < 1) {
             page = 1;
         }
         if (pageSize < 1 || pageSize > 100) {
-            pageSize = 10; // 限制最大每页条数
+            pageSize = 10;
         }
 
-        PageResponse<UserResponse> response = userService.searchDoctors(id, name, page, pageSize);
+        // 调用修改后的searchDoctors方法，传入departmentId
+        PageResponse<UserResponse> response = userService.searchDoctors(id, name, departmentId, page, pageSize);
         return ResponseEntity.ok(response);
     }
 
@@ -133,14 +134,19 @@ public class UserController {
     @GetMapping("/medical-history")
     public ResponseEntity<PageResponse<MedicalHistoryResponse>> getMedicalHistories(
             @RequestParam(required = false, defaultValue = "1") Integer page,
-            @RequestParam(required = false, defaultValue = "10") Integer pageSize) {  // 忽略pageSize参数
+            @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
 
-        // 强制页码至少为1
+        // 校验分页参数
         if (page < 1) {
             page = 1;
         }
+        // 补充pageSize的校验（可选，确保不小于1）
+        if (pageSize < 1 || pageSize > 100) {
+            pageSize = 10;
+        }
 
-        PageResponse<MedicalHistoryResponse> response = userService.getMedicalHistories(page, null);
+        // 关键修复：传入正确的pageSize，而非null
+        PageResponse<MedicalHistoryResponse> response = userService.getMedicalHistories(page, pageSize);
         return ResponseEntity.ok(response);
     }
 }

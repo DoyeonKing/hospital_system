@@ -18,7 +18,7 @@ public interface UserService {
     //PageResponse<UserResponse> searchUsers(String id, String name, int page, int pageSize);
 
     // 新增医生信息查询接口
-    PageResponse<UserResponse> searchDoctors(String id, String name, int page, int pageSize);
+    PageResponse<UserResponse> searchDoctors(String id, String name, Integer departmentId, int page, int pageSize);
 
     // 新增患者信息查询接口
     PageResponse<UserResponse> searchPatients(String id, String name, int page, int pageSize);

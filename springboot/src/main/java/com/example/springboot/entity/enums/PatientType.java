@@ -1,5 +1,5 @@
 package com.example.springboot.entity.enums; // 包名调整
 
 public enum PatientType {
-    STUDENT, teacher, staff
+    student, teacher, staff
 }
