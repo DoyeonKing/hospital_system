@@ -343,7 +343,7 @@ const handleLogin = async () => {
 
   try {
     const response = await request({
-      url: '/api/doctor/login',
+      url: '/api/doctor/auth/login',
       method: 'POST',
       data: {
         identifier: loginForm.identifier,
@@ -353,9 +353,9 @@ const handleLogin = async () => {
 
     if (response.code === '200') {
       // 保存登录信息到store
+      const loginData = response.data
       doctorStore.loginSuccess(response.data, {
-        identifier: loginForm.identifier,
-        token: response.data.token
+        identifier: loginForm.identifier
       })
 
       ElMessage.success('登录成功')

@@ -1,5 +1,6 @@
 package com.example.springboot.service;
 
+import com.example.springboot.dto.auth.LoginResponse;
 import com.example.springboot.dto.doctor.DoctorActivateRequest;
 import com.example.springboot.dto.doctor.DoctorResponse;
 import com.example.springboot.entity.Doctor;
@@ -12,7 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import com.example.springboot.entity.Department;
 import com.example.springboot.repository.DepartmentRepository;
@@ -29,6 +32,54 @@ public class DoctorService {
         this.doctorRepository = doctorRepository;
         this.passwordEncoderUtil = passwordEncoderUtil;
         this.departmentRepository = departmentRepository;
+    }
+
+    // =========================================================================
+    // 【医生登录】
+    // =========================================================================
+
+    /**
+     * 医生登录
+     * @param identifier 医生工号
+     * @param password 密码
+     * @return 登录响应
+     */
+    @Transactional(readOnly = true)
+    public LoginResponse login(String identifier, String password) {
+        // 1. 查找医生
+        Doctor doctor = doctorRepository.findByIdentifier(identifier)
+                .orElseThrow(() -> new IllegalArgumentException("工号或密码错误"));
+
+        // 2. 验证密码
+        if (!passwordEncoderUtil.matches(password, doctor.getPasswordHash())) {
+            throw new IllegalArgumentException("工号或密码错误");
+        }
+
+        // 3. 检查账户状态
+        if (doctor.getStatus() == DoctorStatus.inactive) {
+            throw new IllegalArgumentException("账户未激活，请先激活账户");
+        }
+        
+        if (doctor.getStatus() == DoctorStatus.locked) {
+            throw new IllegalArgumentException("账户已被锁定，请联系管理员");
+        }
+
+        // 4. 构建用户信息
+        Map<String, Object> doctorInfo = new HashMap<>();
+        doctorInfo.put("doctorId", doctor.getDoctorId());
+        doctorInfo.put("identifier", doctor.getIdentifier());
+        doctorInfo.put("fullName", doctor.getFullName());
+        doctorInfo.put("title", doctor.getTitle());
+        doctorInfo.put("phoneNumber", doctor.getPhoneNumber());
+        doctorInfo.put("departmentName", doctor.getDepartment() != null ? doctor.getDepartment().getName() : null);
+        doctorInfo.put("status", doctor.getStatus().name());
+
+        // 5. 返回登录响应
+        return LoginResponse.builder()
+                .token(null) // 暂不使用token
+                .userType("doctor")
+                .userInfo(doctorInfo)
+                .build();
     }
 
     // =========================================================================

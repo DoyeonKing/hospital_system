@@ -6,11 +6,11 @@ import { post, get } from '../utils/request.js'
 
 /**
  * 患者正常登录
+ * 对应后端：POST /api/auth/patient/login
  * @param {Object} data - { identifier, password }
- * 注意：此接口后端暂未实现，需要后续添加
  */
 export function loginPatient(data) {
-	return post('/api/patient/login', data)
+	return post('/api/auth/patient/login', data)
 }
 
 /**

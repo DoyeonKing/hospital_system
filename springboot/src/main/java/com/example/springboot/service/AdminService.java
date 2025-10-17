@@ -5,9 +5,11 @@ import com.example.springboot.dto.admin.AdminResponse;
 import com.example.springboot.dto.admin.AdminUpdateRequest;
 import com.example.springboot.dto.admin.PermissionResponse;
 import com.example.springboot.dto.admin.RoleResponse;
+import com.example.springboot.dto.auth.LoginResponse;
 import com.example.springboot.entity.Admin;
 import com.example.springboot.entity.Permission;
 import com.example.springboot.entity.Role;
+import com.example.springboot.entity.enums.AdminStatus;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.AdminRepository;
 import com.example.springboot.repository.RoleRepository;
@@ -18,8 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,6 +39,57 @@ public class AdminService {
         this.adminRepository = adminRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoderUtil = passwordEncoderUtil;
+    }
+
+    // =========================================================================
+    // 【管理员登录】
+    // =========================================================================
+
+    /**
+     * 管理员登录
+     * @param username 管理员用户名
+     * @param password 密码
+     * @return 登录响应
+     */
+    @Transactional(readOnly = true)
+    public LoginResponse login(String username, String password) {
+        // 1. 查找管理员
+        Admin admin = adminRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("用户名或密码错误"));
+
+        // 2. 验证密码
+        if (!passwordEncoderUtil.matches(password, admin.getPasswordHash())) {
+            throw new IllegalArgumentException("用户名或密码错误");
+        }
+
+        // 3. 检查账户状态
+        if (admin.getStatus() == AdminStatus.inactive) {
+            throw new IllegalArgumentException("账户未激活，请联系系统管理员");
+        }
+        
+        if (admin.getStatus() == AdminStatus.locked) {
+            throw new IllegalArgumentException("账户已被锁定，请联系系统管理员");
+        }
+
+        // 4. 获取角色列表
+        List<String> roles = admin.getRoles().stream()
+                .map(Role::getRoleName)
+                .collect(Collectors.toList());
+
+        // 5. 构建用户信息
+        Map<String, Object> adminInfo = new HashMap<>();
+        adminInfo.put("adminId", admin.getAdminId());
+        adminInfo.put("username", admin.getUsername());
+        adminInfo.put("fullName", admin.getFullName());
+        adminInfo.put("status", admin.getStatus().name());
+        adminInfo.put("roles", roles);
+
+        // 6. 返回登录响应
+        return LoginResponse.builder()
+                .token(null) // 暂不使用token
+                .userType("admin")
+                .userInfo(adminInfo)
+                .build();
     }
 
     @Transactional(readOnly = true)

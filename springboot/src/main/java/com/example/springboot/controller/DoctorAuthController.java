@@ -1,5 +1,8 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.common.Result;
+import com.example.springboot.dto.auth.LoginRequest;
+import com.example.springboot.dto.auth.LoginResponse;
 import com.example.springboot.dto.doctor.DoctorActivateRequest;
 import com.example.springboot.dto.doctor.DoctorVerifyRequest;
 import com.example.springboot.service.DoctorService;
@@ -17,6 +20,22 @@ public class DoctorAuthController {
     @Autowired
     public DoctorAuthController(DoctorService doctorService) {
         this.doctorService = doctorService;
+    }
+
+    /**
+     * 医生登录
+     * URL: POST /api/doctor/auth/login
+     */
+    @PostMapping("/login")
+    public ResponseEntity<Result> login(@RequestBody LoginRequest request) {
+        try {
+            LoginResponse response = doctorService.login(request.getIdentifier(), request.getPassword());
+            return ResponseEntity.ok(Result.success(response));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(Result.error("500", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Result.error("500", "登录失败：" + e.getMessage()));
+        }
     }
 
     /**

@@ -1,8 +1,12 @@
 package com.example.springboot.controller;
 
 // 确保您的 DTO 路径正确，如果放在 patient 包下，请使用正确的路径
+import com.example.springboot.common.Result;
+import com.example.springboot.dto.auth.LoginRequest;
+import com.example.springboot.dto.auth.LoginResponse;
 import com.example.springboot.dto.patient.VerifyRequest;
 import com.example.springboot.dto.patient.ActivateRequest;
+import com.example.springboot.service.AdminService;
 import com.example.springboot.service.PatientService;
 import com.example.springboot.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,10 +18,44 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final PatientService patientService;
+    private final AdminService adminService;
 
     @Autowired
-    public AuthController(PatientService patientService) {
+    public AuthController(PatientService patientService, AdminService adminService) {
         this.patientService = patientService;
+        this.adminService = adminService;
+    }
+
+    /**
+     * 患者登录
+     * URL: POST /api/auth/patient/login
+     */
+    @PostMapping("/patient/login")
+    public ResponseEntity<Result> patientLogin(@RequestBody LoginRequest request) {
+        try {
+            LoginResponse response = patientService.login(request.getIdentifier(), request.getPassword());
+            return ResponseEntity.ok(Result.success(response));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(Result.error("500", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Result.error("500", "登录失败：" + e.getMessage()));
+        }
+    }
+
+    /**
+     * 管理员登录
+     * URL: POST /api/auth/admin/login
+     */
+    @PostMapping("/admin/login")
+    public ResponseEntity<Result> adminLogin(@RequestBody LoginRequest request) {
+        try {
+            LoginResponse response = adminService.login(request.getIdentifier(), request.getPassword());
+            return ResponseEntity.ok(Result.success(response));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(Result.error("500", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Result.error("500", "登录失败：" + e.getMessage()));
+        }
     }
 
     /**

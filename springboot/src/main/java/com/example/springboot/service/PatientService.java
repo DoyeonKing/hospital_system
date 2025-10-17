@@ -186,6 +186,7 @@
 package com.example.springboot.service;
 
 // 导入 Spring Boot 核心组件和实体/DTO
+import com.example.springboot.dto.auth.LoginResponse;
 import com.example.springboot.dto.common.PageResponse; // 导入新增方法所需的DTO
 import com.example.springboot.dto.patient.MedicalHistoryResponse; // 导入新增方法所需的DTO
 import com.example.springboot.dto.patient.MedicalHistoryUpdateRequest; // 导入新增方法所需的DTO
@@ -204,7 +205,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -221,6 +224,54 @@ public class PatientService {
         this.patientProfileRepository = patientProfileRepository;
         this.passwordEncoderUtil = passwordEncoderUtil;
     }
+
+    // =========================================================================
+    // 【患者登录】
+    // =========================================================================
+
+    /**
+     * 患者登录
+     * @param identifier 学号/工号
+     * @param password 密码
+     * @return 登录响应
+     */
+    @Transactional(readOnly = true)
+    public LoginResponse login(String identifier, String password) {
+        // 1. 查找患者
+        Patient patient = patientRepository.findByIdentifier(identifier)
+                .orElseThrow(() -> new IllegalArgumentException("学号/工号或密码错误"));
+
+        // 2. 验证密码
+        if (!passwordEncoderUtil.matches(password, patient.getPasswordHash())) {
+            throw new IllegalArgumentException("学号/工号或密码错误");
+        }
+
+        // 3. 检查账户状态
+        if (patient.getStatus() == PatientStatus.inactive) {
+            throw new IllegalArgumentException("账户未激活，请先激活账户");
+        }
+        
+        if (patient.getStatus() == PatientStatus.locked) {
+            throw new IllegalArgumentException("账户已被锁定，请联系管理员");
+        }
+
+        // 4. 构建用户信息
+        Map<String, Object> patientInfo = new HashMap<>();
+        patientInfo.put("patientId", patient.getPatientId());
+        patientInfo.put("identifier", patient.getIdentifier());
+        patientInfo.put("fullName", patient.getFullName());
+        patientInfo.put("phoneNumber", patient.getPhoneNumber());
+        patientInfo.put("patientType", patient.getPatientType().name());
+        patientInfo.put("status", patient.getStatus().name());
+
+        // 5. 返回登录响应
+        return LoginResponse.builder()
+                .token(null) // 暂不使用token
+                .userType("patient")
+                .userInfo(patientInfo)
+                .build();
+    }
+
     // =========================================================================
     // 【修改】账户激活功能 - 接口 1: 验证初始信息和密码
     // =========================================================================

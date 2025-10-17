@@ -115,65 +115,21 @@ const handleLogin = async () => {
 
   loading.value = true
 
-  // 临时测试账号，方便调试
-  const testAccounts = {
-    'admin': '123456',
-    'test': 'test123',
-    'demo': 'demo123'
-  }
-
-  // 检查是否为测试账号
-  if (testAccounts[loginForm.adminId] === loginForm.password) {
-    // 模拟登录成功
-    const mockResponse = {
-      code: '200',
-      msg: '登录成功',
-      data: {
-        token: 'mock-token-' + Date.now(),
-        adminInfo: {
-          adminId: loginForm.adminId,
-          name: '测试管理员',
-          permissionLevel: 'super',
-          serviceArea: '全院',
-          currentPosition: '系统管理员'
-        }
-      }
-    }
-
-    // 保存登录信息到store
-    adminStore.loginSuccess(mockResponse.data, {
-      adminId: loginForm.adminId,
-      token: mockResponse.data.token
-    })
-
-    ElMessage.success('登录成功（测试模式）')
-    
-    // 调试信息
-    console.log('登录状态:', adminStore.isAuthenticated)
-    console.log('准备跳转到 /admin')
-    
-    // 立即跳转到主页
-    router.push('/admin')
-    
-    loading.value = false
-    return
-  }
-
   try {
     const response = await request({
-      url: '/api/admin/login',
+      url: '/api/auth/admin/login',
       method: 'POST',
       data: {
-        adminId: loginForm.adminId,
+        identifier: loginForm.adminId,
         password: loginForm.password
       }
     })
 
     if (response.code === '200') {
       // 保存登录信息到store
+      const loginData = response.data
       adminStore.loginSuccess(response.data, {
-        adminId: loginForm.adminId,
-        token: response.data.token
+        adminId: loginForm.adminId
       })
 
       ElMessage.success('登录成功')
