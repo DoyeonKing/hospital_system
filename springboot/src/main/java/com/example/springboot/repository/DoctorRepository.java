@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor; // 关键：新增导入
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -15,4 +16,7 @@ public interface DoctorRepository extends JpaRepository<Doctor, Integer>, JpaSpe
 
     // 检查工号是否存在
     boolean existsByIdentifier(String identifier);
+
+    // 根据科室ID查找该科室下的所有医生
+    List<Doctor> findByDepartmentDepartmentId(Integer departmentId);
 }

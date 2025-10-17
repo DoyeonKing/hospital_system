@@ -38,3 +38,15 @@ export function createDepartment(departmentData) {
         data: departmentData, // 将数据放在请求体中
     });
 }
+
+/**
+ * 获取指定科室下的所有医生列表
+ * GET /api/departments/{departmentId}/doctors
+ * 返回 DepartmentDoctorsResponseDTO
+ */
+export function getDepartmentDoctors(departmentId) {
+    return request({
+        url: `/api/departments/${departmentId}/doctors`,
+        method: 'get',
+    });
+}

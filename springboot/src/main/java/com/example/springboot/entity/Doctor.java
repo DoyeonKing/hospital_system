@@ -34,10 +34,6 @@ public class Doctor {
     @Column(name = "full_name", nullable = false, length = 100)
     private String fullName; // 真实姓名
 
-    // 【新增字段】身份证号
-    @Column(name = "id_card_number", unique = true, length = 18)
-    private String idCardNumber; // 身份证号, 建议应用层加密存储
-
     @Column(name = "phone_number", unique = true, length = 20)
     private String phoneNumber; // 存储E.164标准格式
 
