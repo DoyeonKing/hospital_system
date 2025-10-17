@@ -33,7 +33,6 @@ public class AppointmentService {
     private final PatientService patientService; // For updating patient profile (no-show count)
     private final DoctorService doctorService; // To get Doctor details for response
     private final DepartmentService departmentService; // To get Department details for response
-    private final ClinicService clinicService; // To get Clinic details for response
     private final TimeSlotService timeSlotService; // To get TimeSlot details for response
     private final ScheduleService scheduleService;
 
@@ -45,7 +44,6 @@ public class AppointmentService {
                               PatientService patientService,
                               DoctorService doctorService,
                               DepartmentService departmentService,
-                              ClinicService clinicService,
                               TimeSlotService timeSlotService,
                               ScheduleService scheduleService) {
         this.appointmentRepository = appointmentRepository;
@@ -54,7 +52,6 @@ public class AppointmentService {
         this.patientService = patientService;
         this.doctorService = doctorService;
         this.departmentService = departmentService;
-        this.clinicService = clinicService;
         this.timeSlotService = timeSlotService;
         this.scheduleService = scheduleService;
     }

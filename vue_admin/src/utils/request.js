@@ -24,15 +24,27 @@ request.interceptors.response.use(
     if (typeof res === 'string') {
       res = res ? JSON.parse(res) : res
     }
+
+    // 【核心修复：在数据返回前进行深拷贝，阻止响应式污染】
+    try {
+        if (res && typeof res === 'object') {
+             // 强制转换为纯净的 JavaScript 对象，解除所有引用
+             res = JSON.parse(JSON.stringify(res));
+        }
+    } catch (e) {
+        console.error("Deep copy failed in request interceptor:", e);
+    }
+
     return res;
   },
   error => {
-    if (error.response.status === 404) {
+    if (error.response && error.response.status === 404) {
       ElMessage.error('未找到请求接口')
-    } else if (error.response.status === 500) {
+    } else if (error.response && error.response.status === 500) {
       ElMessage.error('系统异常，请查看后端控制台报错')
     } else {
       console.error(error.message)
+      ElMessage.error(error.message || '请求失败，请检查网络');
     }
     return Promise.reject(error)
   }

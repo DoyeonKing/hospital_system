@@ -1,69 +1,48 @@
 <template>
-  <div class="member-management-dashboard">
-    <!-- 左侧科室导航 -->
-    <div class="department-sidebar">
-      <el-menu :default-active="activeParent" class="department-menu" @select="handleParentSelect">
-        <el-menu-item v-for="parent in departments" :key="parent.id" :index="parent.id">
-          <span>{{ parent.name }}</span>
-        </el-menu-item>
-      </el-menu>
+  <div class="app-container">
+    <div class="back-area" style="margin-bottom: 12px;">
+      <BackButton />
+    </div>
 
-      <div class="sub-department-panel" v-if="subDepartments.length > 0">
-        <div v-for="sub in subDepartments" :key="sub.id" class="sub-department-item" :class="{ 'active': activeSub === sub.id }" @click="handleSubSelect(sub.id)">
-          {{ sub.name }}
+    <el-card shadow="always" v-if="currentDepartment">
+      <template #header>
+        <div class="card-header-title">
+          <h2 class="department-name-title">{{ currentDepartment.name }}</h2>
+          <el-button type="primary" :icon="Plus" @click="openAddDialog(currentDepartment.id)">
+            添加成员
+          </el-button>
         </div>
+      </template>
+
+      <div class="member-management-section">
+        <el-table :data="currentDepartment.members" border stripe>
+          <el-table-column prop="id" label="医生ID" width="150" />
+          <el-table-column prop="name" label="医生姓名" width="180" />
+          <el-table-column prop="title" label="职称" />
+          <el-table-column label="操作" width="120" align="center">
+            <template #default="{ row }">
+              <el-button
+                  type="danger"
+                  size="small"
+                  :icon="Delete"
+                  @click="handleDelete(currentDepartment.id, row.id)"
+              >
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!currentDepartment.members || currentDepartment.members.length === 0" description="该科室暂无成员" />
       </div>
     </div>
 
-    <!-- 右侧成员展示区 -->
-    <div class="member-content">
-      <el-card shadow="always" class="member-card">
-        <template #header>
-          <div class="card-header">
-            <span>{{ selectedDepartmentName }} - 成员列表</span>
-            <el-button type="primary" :icon="Plus" @click="openAddDialog" :disabled="!activeSub">添加新成员</el-button>
-          </div>
-        </template>
+    <el-empty v-else description="未找到指定的科室信息" />
 
-        <div v-if="activeSub" class="doctor-grid">
-          <el-card v-for="doc in currentDoctors" :key="doc.id" class="doctor-profile-card">
-            <div class="doctor-card-header">
-              <img :src="doc.gender === 'male' ? doctorMaleImg : doctorFemaleImg" class="doctor-avatar">
-              <div class="doctor-info">
-                <span class="doctor-name">{{ doc.full_name }}</span>
-                <span class="doctor-title">{{ doc.title }}</span>
-              </div>
-              <el-tag :type="doc.status === 'active' ? 'success' : 'danger'" size="small" class="status-tag">{{ doc.status }}</el-tag>
-            </div>
-            <div class="doctor-details">
-              <div class="detail-item"><strong>医生工号:</strong> {{ doc.identifier }}</div>
-              <div class="detail-item"><strong>专业领域:</strong> {{ doc.specialty }}</div>
-            </div>
-            <div class="card-actions">
-              <el-button type="danger" :icon="Delete" size="small" @click="handleDelete(doc)">移除</el-button>
-            </div>
-          </el-card>
-          <el-empty v-if="!currentDoctors.length" description="该科室暂无成员" />
-        </div>
-        <div v-else class="placeholder">
-          <el-empty description="请在左侧选择一个科室以查看成员" />
-        </div>
 
-      </el-card>
-    </div>
-
-    <!-- 添加新成员弹窗 -->
-    <el-dialog v-model="dialogVisible" title="添加新成员" width="500px">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
-        <el-form-item label="医生工号" prop="identifier"><el-input v-model="form.identifier" placeholder="例如：D001" /></el-form-item>
-        <el-form-item label="医生姓名" prop="full_name"><el-input v-model="form.full_name" placeholder="请输入医生姓名" /></el-form-item>
-        <el-form-item label="职称" prop="title"><el-input v-model="form.title" placeholder="例如：主任医师" /></el-form-item>
-        <el-form-item label="专业领域" prop="specialty"><el-input v-model="form.specialty" placeholder="例如：呼吸系统疾病" /></el-form-item>
-        <el-form-item label="性别" prop="gender">
-          <el-radio-group v-model="form.gender">
-            <el-radio label="male">男</el-radio>
-            <el-radio label="female">女</el-radio>
-          </el-radio-group>
+    <el-dialog v-model="addDialogVisible" title="添加新成员" width="500px">
+      <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="80px">
+        <el-form-item label="医生ID" prop="id">
+          <el-input v-model="addForm.id" placeholder="请输入医生工号" />
         </el-form-item>
         <el-form-item label="账户状态" prop="status">
           <el-radio-group v-model="form.status">
@@ -81,6 +60,7 @@
 </template>
 
 <script setup>
+<<<<<<< HEAD
 import { ref, reactive, computed, onMounted } from 'vue';
 import { Plus, Delete } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -104,6 +84,71 @@ const membersData = ref({
   '3': [ // 妇产科
     {id: 203, department_id: 3, identifier: 'D003', full_name: '孙医生', title: '主治医师', specialty: '全科诊疗', gender: 'female', status: 'inactive'}
   ],
+=======
+import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { Plus, Delete } from '@element-plus/icons-vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import BackButton from '@/components/BackButton.vue';
+import { useRoute } from 'vue-router';
+
+const route = useRoute();
+const addFormRef = ref(null);
+
+// 模拟的科室及成员数据 (ID 与 Index.vue 保持同步)
+const allDepartmentsData = ref([
+  // 有成员的科室 (子科室)
+  {
+    id: 101, // 对应 Index.vue 中的心血管内科
+    name: '心血管内科',
+    members: [
+      { id: 'DOC_101', name: '王伟', title: '主任医师' }, // 对应 image_5cc57d.png
+      { id: 'DOC_102', name: '李静', title: '副主任医师' } // 对应 image_5cc57d.png
+    ]
+  },
+  {
+    id: 102, // 对应 Index.vue 中的神经外科
+    name: '神经外科',
+    members: [
+      { id: 'DOC_201', name: '张磊', title: '主治医师' }
+    ]
+  },
+  {
+    id: 201, // 对应 Index.vue 中的儿科
+    name: '儿科',
+    members: [
+        { id: 'DOC_301', name: '赵小琴', title: '儿科医师' }
+    ]
+  },
+  // 无成员的科室 (根科室)
+  { id: 1, name: '总院行政部', description: '负责总院的行政管理', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
+  { id: 2, name: '门诊部', description: '负责日常门诊接待和初步诊断', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
+  { id: 3, name: '后勤保障部', description: '负责设备维护和物资采购', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
+  { id: 4, name: '财务部', description: '负责医院财务核算与管理', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
+  { id: 202, name: '皮肤科', members: [] },
+]);
+
+
+const deptIdFromRoute = ref(route.params.id);
+
+watch(
+    () => route.params.id,
+    (newId) => {
+        deptIdFromRoute.value = newId;
+    }
+);
+
+const currentDepartment = computed(() => {
+    // 查找科室，ID可能为字符串（路由参数）或数字（模拟数据），使用 == 比较
+    return allDepartmentsData.value.find(d => d.id == deptIdFromRoute.value);
+});
+
+
+// 添加成员对话框相关
+const addDialogVisible = ref(false);
+const currentDeptId = ref(null);
+const addForm = reactive({
+  id: '', name: '', title: ''
+>>>>>>> origin/qiuyuying
 });
 // --- 模拟数据结束 ---
 
@@ -132,6 +177,7 @@ const subDepartments = computed(() => {
   return parent ? parent.children : [];
 });
 
+<<<<<<< HEAD
 const selectedDepartmentName = computed(() => {
   if (!activeSub.value) return '请选择科室';
   const parentAsSub = departments.value.find(p => p.id === activeSub.value);
@@ -154,6 +200,28 @@ const handleParentSelect = (index) => {
   if (parent) {
     if (parent.children && parent.children.length > 0) {
       activeSub.value = parent.children[0].id;
+=======
+const openAddDialog = (deptId) => {
+  currentDeptId.value = deptId;
+  if(addFormRef.value) addFormRef.value.resetFields();
+  Object.assign(addForm, { id: '', name: '', title: '' });
+  addDialogVisible.value = true;
+};
+
+const handleAddMember = () => {
+  addFormRef.value.validate((valid) => {
+    if (valid) {
+      const department = allDepartmentsData.value.find(d => d.id == currentDeptId.value);
+      if (department) {
+        if (department.members.some(m => m.id === addForm.id)) {
+             ElMessage.error('该医生ID已存在于本科室！');
+             return;
+        }
+        department.members.push({ ...addForm });
+        ElMessage.success('成员添加成功！');
+        addDialogVisible.value = false;
+      }
+>>>>>>> origin/qiuyuying
     } else {
       activeSub.value = parent.id;
     }
@@ -185,6 +253,7 @@ const handleAddMember = () => {
   });
 };
 
+<<<<<<< HEAD
 const handleDelete = (doctor) => {
   ElMessageBox.confirm(`确定要从科室移除医生 "${doctor.full_name}" 吗？`, '警告', {
     confirmButtonText: '确定',
@@ -200,6 +269,20 @@ const handleDelete = (doctor) => {
       }
     }
   }).catch(() => {});
+=======
+const handleDelete = (deptId, memberId) => {
+  ElMessageBox.confirm(
+      '确定要从该科室移除这位成员吗？',
+      '警告',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+  ).then(() => {
+    const department = allDepartmentsData.value.find(d => d.id == deptId);
+    if (department) {
+      department.members = department.members.filter(m => m.id !== memberId);
+      ElMessage.success('成员删除成功！');
+    }
+  });
+>>>>>>> origin/qiuyuying
 };
 
 onMounted(() => {
@@ -210,6 +293,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
+<<<<<<< HEAD
 .member-management-dashboard {
   display: flex;
   height: calc(100vh - 50px);
@@ -253,10 +337,15 @@ onMounted(() => {
   height: 100%;
 }
 .card-header {
+=======
+.app-container { padding: 20px; }
+.card-header-title {
+>>>>>>> origin/qiuyuying
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+<<<<<<< HEAD
 .placeholder {
   display: flex;
   justify-content: center;
@@ -307,6 +396,12 @@ onMounted(() => {
 }
 .doctor-details {
   font-size: 14px;
+=======
+.department-name-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+>>>>>>> origin/qiuyuying
   color: #303133;
   line-height: 1.6;
 }
@@ -319,5 +414,10 @@ onMounted(() => {
   padding-top: 12px;
   margin-top: 16px;
 }
+<<<<<<< HEAD
 </style>
 
+=======
+.member-management-section { margin-top: 10px; }
+</style>
+>>>>>>> origin/qiuyuying
