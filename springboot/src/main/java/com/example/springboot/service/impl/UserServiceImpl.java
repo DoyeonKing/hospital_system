@@ -3,18 +3,11 @@ package com.example.springboot.service.impl;
 import com.example.springboot.dto.doctor.DoctorUpdateRequest;
 import com.example.springboot.dto.patient.*;
 import com.example.springboot.dto.user.UserUpdateRequest;
-import com.example.springboot.entity.enums.PatientType;
 import com.example.springboot.util.PasswordEncoderUtil;
 import org.springframework.data.domain.Pageable;
 import jakarta.persistence.criteria.Predicate;
-import org.springframework.data.domain.PageRequest;
-import com.example.springboot.dto.admin.AdminCreateRequest;
 import com.example.springboot.dto.admin.AdminResponse;
 import com.example.springboot.dto.common.PageResponse;
-import com.example.springboot.dto.doctor.DoctorCreateRequest;
-import com.example.springboot.dto.doctor.DoctorResponse;
-import com.example.springboot.dto.patient.PatientCreateRequest;
-import com.example.springboot.dto.patient.PatientResponse;
 import com.example.springboot.dto.user.UserCreateRequest;
 import com.example.springboot.dto.user.UserImportResponse;
 import com.example.springboot.dto.user.UserResponse;
@@ -34,7 +27,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -45,7 +37,7 @@ public class UserServiceImpl implements UserService {
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
     private final AdminRepository adminRepository;
-    private final ClinicRepository clinicRepository;
+    // private final ClinicRepository clinicRepository;
     private final DepartmentRepository departmentRepository;
     private final PatientProfileRepository patientProfileRepository;
     private final PatientService patientService;
@@ -105,19 +97,7 @@ public class UserServiceImpl implements UserService {
             throw new BadRequestException("身份证号已存在: " + request.getId_card());
         }
 
-        // 转换为患者创建请求
-        PatientCreateRequest patientRequest = new PatientCreateRequest();
-        patientRequest.setIdentifier(request.getId()); // id -> identifier
-        patientRequest.setPassword(request.getPassword());
-        patientRequest.setFullName(request.getName()); // name -> fullName
-        patientRequest.setPhoneNumber(request.getPhone()); // phone -> phoneNumber
-        patientRequest.setPatientType(request.getPatientType());
-        patientRequest.setStatus(request.getPatientStatus());
-        patientRequest.setIdCardNumber(request.getId_card()); // id_card -> idCardNumber
-        patientRequest.setAllergies(request.getAllergy_history()); // allergy_history -> allergies
-        patientRequest.setMedicalHistory(request.getPast_medical_history()); // past_medical_history -> medicalHistory
-
-        // 创建患者(使用正确的转换逻辑)
+        // 创建患者
         Patient patient = new Patient();
         patient.setIdentifier(request.getId());
         patient.setPasswordHash(request.getPassword());
@@ -146,38 +126,22 @@ public class UserServiceImpl implements UserService {
     }
 
     private UserResponse createDoctorUser(UserCreateRequest request) {
-        DoctorCreateRequest doctorRequest = new DoctorCreateRequest();
-        doctorRequest.setClinicId(request.getClinicId());
-        doctorRequest.setDepartmentId(request.getDepartmentId());
-        doctorRequest.setIdentifier(request.getId()); // id -> identifier
-        doctorRequest.setPassword(request.getPassword());
-        doctorRequest.setFullName(request.getName()); // name -> fullName
-        doctorRequest.setPhoneNumber(request.getPhone()); // phone -> phoneNumber
-        doctorRequest.setTitle(request.getTitle());
-        doctorRequest.setSpecialty(request.getSpecialty());
-        doctorRequest.setBio(request.getBio());
-        doctorRequest.setPhotoUrl(request.getPhotoUrl());
-        doctorRequest.setStatus(request.getDoctorStatus());
-
-        Clinic clinic = clinicRepository.findById(doctorRequest.getClinicId())
-                .orElseThrow(() -> new ResourceNotFoundException("Clinic not found with id: " + doctorRequest.getClinicId()));
-        Department department = departmentRepository.findById(doctorRequest.getDepartmentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Department not found with id: " + doctorRequest.getDepartmentId()));
-
+        // 医生实体现在只关联 Department
+        Department department = departmentRepository.findById(request.getDepartmentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found with id: " + request.getDepartmentId()));
 
         // 创建医生
         Doctor doctor = new Doctor();
-        doctor.setClinic(clinic);          // 关键：设置诊所关联
-        doctor.setDepartment(department);  // 关键：设置科室关联
-        doctor.setIdentifier(doctorRequest.getIdentifier());
-        doctor.setPasswordHash(doctorRequest.getPassword());
-        doctor.setFullName(doctorRequest.getFullName());
-        doctor.setPhoneNumber(doctorRequest.getPhoneNumber());
-        doctor.setTitle(doctorRequest.getTitle());
-        doctor.setSpecialty(doctorRequest.getSpecialty());
-        doctor.setBio(doctorRequest.getBio());
-        doctor.setPhotoUrl(doctorRequest.getPhotoUrl());
-        doctor.setStatus(doctorRequest.getStatus());
+        doctor.setDepartment(department);  // 设置科室关联
+        doctor.setIdentifier(request.getId());
+        doctor.setPasswordHash(request.getPassword());
+        doctor.setFullName(request.getName());
+        doctor.setPhoneNumber(request.getPhone());
+        doctor.setTitle(request.getTitle());
+        doctor.setSpecialty(request.getSpecialty());
+        doctor.setBio(request.getBio());
+        doctor.setPhotoUrl(request.getPhotoUrl());
+        doctor.setStatus(request.getDoctorStatus());
 
         Doctor savedDoctor = doctorService.createDoctor(doctor);
 
@@ -204,6 +168,10 @@ public class UserServiceImpl implements UserService {
 //    }
 
     // 实现搜索方法
+    /**
+     * 查询医生函数。
+     * 依赖 DoctorRepository 继承 JpaSpecificationExecutor 来支持此处的 findAll 方法。
+     */
     @Override
     @Transactional(readOnly = true)
     public PageResponse<UserResponse> searchUsers(String id, String name, int page, int pageSize) {
@@ -223,11 +191,14 @@ public class UserServiceImpl implements UserService {
         }, pageable);
 
         // 2. 查询医生
+        // 查询医生: 使用 JPA Specification 进行动态查询。
         Page<Doctor> doctorPage = doctorRepository.findAll((Specification<Doctor>) (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            // 按工号 (identifier) 模糊查询
             if (id != null && !id.isEmpty()) {
                 predicates.add(cb.like(root.get("identifier"), "%" + id + "%"));
             }
+            // 按姓名 (fullName) 模糊查询
             if (name != null && !name.isEmpty()) {
                 predicates.add(cb.like(root.get("fullName"), "%" + name + "%"));
             }
@@ -261,6 +232,8 @@ public class UserServiceImpl implements UserService {
 
         // 添加医生
         userResponses.addAll(doctorPage.getContent().stream()
+        // 转换为UserResponse列表
+        List<UserResponse> userResponses = doctorPage.getContent().stream()
                 .map(doctor -> {
                     UserResponse response = new UserResponse();
                     response.setRole("DOCTOR");
@@ -291,5 +264,193 @@ public class UserServiceImpl implements UserService {
                 page,
                 pageSize
         );
+    }
+
+    /**
+     * 实现 UserService 接口中的抽象方法 searchPatients。
+     * 查询患者函数。
+     * 依赖 PatientRepository 继承 JpaSpecificationExecutor 来支持此处的 findAll 方法。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<UserResponse> searchPatients(String id, String name, int page, int pageSize) {
+        // 构建分页参数 (页码从0开始)
+        Pageable pageable = PageRequest.of(page - 1, pageSize);
+
+        // 查询患者: 使用 JPA Specification 进行动态查询。
+        Page<Patient> patientPage = patientRepository.findAll((Specification<Patient>) (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            // 按学号/工号/ID (identifier) 模糊查询
+            if (id != null && !id.isEmpty()) {
+                predicates.add(cb.like(root.get("identifier"), "%" + id + "%"));
+            }
+            // 按姓名 (fullName) 模糊查询
+            if (name != null && !name.isEmpty()) {
+                predicates.add(cb.like(root.get("fullName"), "%" + name + "%"));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        }, pageable);
+
+        // 转换为UserResponse列表
+        List<UserResponse> userResponses = patientPage.getContent().stream()
+                .map(patient -> {
+                    UserResponse response = new UserResponse();
+                    response.setRole("PATIENT");
+                    // 假设 patientService 提供了 convertToResponseDto(Patient) 方法
+                    response.setUserDetails(patientService.convertToResponseDto(patient));
+                    return response;
+                })
+                .collect(Collectors.toList());
+
+        // 构建分页响应
+        return new PageResponse<>(
+                userResponses,
+                patientPage.getTotalElements(),
+                patientPage.getTotalPages(),
+                page,
+                pageSize
+        );
+    }
+
+
+    @Override
+    @Transactional
+    public UserResponse updateUser(Long patient_id, Integer doctor_id, UserUpdateRequest request) {  // 参数类型改为Integer
+        // 根据角色更新不同类型的用户
+        return switch (request.getRole().toUpperCase()) {
+            case "PATIENT" -> updatePatientUser(patient_id, request.getPatientUpdateRequest());
+            case "DOCTOR" -> updateDoctorUser(doctor_id, request.getDoctorUpdateRequest());
+            default -> throw new BadRequestException("不支持的用户角色: " + request.getRole());
+        };
+    }
+
+    /**
+     * 修复错误 1: 实现 UserService 接口中的抽象方法 getMedicalHistories
+     * 将查询任务委托给 PatientService。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<MedicalHistoryResponse> getMedicalHistories(Integer page, Integer pageSize) {
+        // 委托给 patientService
+        return patientService.getMedicalHistories(page, pageSize);
+    }
+
+    /**
+     * 修复错误 3: 实现 UserService 接口中的抽象方法 updateMedicalHistory
+     * 暂时抛出异常，直到 PatientService 接口中也添加了对应的方法，以消除编译错误。
+     */
+    @Override
+    @Transactional
+    public PageResponse<MedicalHistoryResponse> updateMedicalHistory(Long id, MedicalHistoryUpdateRequest request) {
+        // 核心逻辑应委托给 patientService:
+        // return patientService.updateMedicalHistory(id, request);
+
+        // 临时占位，满足 UserService 接口要求。
+        throw new UnsupportedOperationException("updateMedicalHistory not fully implemented because PatientService is missing the required method.");
+    }
+
+
+    // 修改患者更新方法
+    private UserResponse updatePatientUser(Long patientId, PatientUpdateRequest request) {
+        // 查找患者（使用ID而非identifier）
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("患者不存在: " + patientId));
+
+        // 更新患者信息
+        if (request.getIdentifier() != null) {
+            patient.setIdentifier(request.getIdentifier());
+        }
+        if (request.getPatientType() != null) {
+            patient.setPatientType(request.getPatientType());
+        }
+        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+            patient.setPasswordHash(passwordEncoderUtil.encodePassword(request.getPassword()));
+        }
+        if (request.getFullName() != null) {
+            patient.setFullName(request.getFullName());
+        }
+        if (request.getPhoneNumber() != null) {
+            patient.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getStatus() != null) {
+            patient.setStatus(request.getStatus());
+        }
+
+        Patient updatedPatient = patientRepository.save(patient);
+
+        // 更新患者档案
+        if (request.getIdCardNumber() != null || request.getAllergies() != null || request.getMedicalHistory() != null) {
+            PatientProfile profile = patientProfileRepository.findById(patientId)
+                    .orElse(new PatientProfile());
+
+            profile.setPatient(updatedPatient);
+            if (request.getIdCardNumber() != null) {
+                profile.setIdCardNumber(request.getIdCardNumber());
+            }
+            if (request.getAllergies() != null) {
+                profile.setAllergies(request.getAllergies());
+            }
+            if (request.getMedicalHistory() != null) {
+                profile.setMedicalHistory(request.getMedicalHistory());
+            }
+
+            patientProfileRepository.save(profile);
+        }
+
+        UserResponse response = new UserResponse();
+        response.setRole("PATIENT");
+        response.setUserDetails(patientService.convertToResponseDto(updatedPatient));
+        return response;
+    }
+
+    // 修改医生更新方法
+    private UserResponse updateDoctorUser(Integer doctorId, DoctorUpdateRequest request) {
+        // 查找医生（使用ID而非identifier）
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new ResourceNotFoundException("医生不存在: " + doctorId));
+
+        // 关键：确保这里没有任何对 clinic 的引用
+        if (request.getDepartmentId() != null) {
+            Department department = departmentRepository.findById(request.getDepartmentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("科室不存在: " + request.getDepartmentId()));
+            doctor.setDepartment(department);
+        }
+
+        // 更新医生基本信息
+        if (request.getIdentifier() != null) {
+            doctor.setIdentifier(request.getIdentifier());
+        }
+        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+            doctor.setPasswordHash(passwordEncoderUtil.encodePassword(request.getPassword()));
+        }
+        if (request.getFullName() != null) {
+            doctor.setFullName(request.getFullName());
+        }
+        if (request.getPhoneNumber() != null) {
+            doctor.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getTitle() != null) {
+            doctor.setTitle(request.getTitle());
+        }
+        if (request.getSpecialty() != null) {
+            doctor.setSpecialty(request.getSpecialty());
+        }
+        if (request.getBio() != null) {
+            doctor.setBio(request.getBio());
+        }
+        if (request.getPhotoUrl() != null) {
+            doctor.setPhotoUrl(request.getPhotoUrl());
+        }
+        if (request.getStatus() != null) {
+            doctor.setStatus(request.getStatus());
+        }
+
+
+        Doctor updatedDoctor = doctorRepository.save(doctor);
+
+        UserResponse response = new UserResponse();
+        response.setRole("DOCTOR");
+        response.setUserDetails(doctorService.convertToResponseDto(updatedDoctor));
+        return response;
     }
 }

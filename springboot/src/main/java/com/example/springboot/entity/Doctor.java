@@ -1,4 +1,4 @@
-package com.example.springboot.entity; // 包名调整
+package com.example.springboot.entity;
 
 import com.example.springboot.entity.enums.DoctorStatus; // 导入路径调整
 import jakarta.persistence.*;
@@ -9,7 +9,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 /**
- * 医生表
+ * 医生表 (与最新 SQL CREATE 语句匹配)
  */
 @Entity
 @Table(name = "doctors")
@@ -17,37 +17,47 @@ import java.time.LocalDateTime;
 public class Doctor {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "doctor_id") // 明确指定列名
     private Integer doctorId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "clinic_id", nullable = false)
-    private Clinic clinic; // 所属校医院/诊所
-
+    // 根据最新 SQL，只保留了 department_id
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id", nullable = false)
-    private Department department; // 所属科室
+    private Department department; // 外键, 所属科室
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(name = "identifier", nullable = false, unique = true, length = 100)
     private String identifier; // 医生的工号
 
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash; // 哈希加盐后的密码
 
     @Column(name = "full_name", nullable = false, length = 100)
     private String fullName; // 真实姓名
 
+    // 【新增字段】身份证号
+    @Column(name = "id_card_number", unique = true, length = 18)
+    private String idCardNumber; // 身份证号, 建议应用层加密存储
+
     @Column(name = "phone_number", unique = true, length = 20)
     private String phoneNumber; // 存储E.164标准格式
 
+    @Column(name = "title", length = 100)
     private String title; // 职称 (如：“主治医师”)
+
+    @Lob // 适用于 TEXT 类型
+    @Column(name = "specialty")
     private String specialty; // 擅长领域描述
+
+    @Lob // 适用于 TEXT 类型
+    @Column(name = "bio")
     private String bio; // 个人简介
 
-    @Column(name = "photo_url")
+    @Column(name = "photo_url", length = 255)
     private String photoUrl; // 头像照片URL
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    // 明确列名和约束，虽然 ENUM 类型 JPA 可能需要 columnDefinition
+    @Column(name = "status", nullable = false)
     private DoctorStatus status; // 账户状态
 
     @CreationTimestamp
