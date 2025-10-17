@@ -1,6 +1,7 @@
 package com.example.springboot.service;
 
 import com.example.springboot.dto.auth.LoginResponse;
+import com.example.springboot.dto.department.DepartmentDTO;
 import com.example.springboot.dto.doctor.DoctorActivateRequest;
 import com.example.springboot.dto.doctor.DoctorResponse;
 import com.example.springboot.entity.Doctor;
@@ -308,12 +309,16 @@ public class DoctorService {
     }
 
     public DoctorResponse convertToResponseDto(Doctor doctor) {
-        if (doctor == null) {
-            return null;
-        }
+        DoctorResponse dto = new DoctorResponse();
+        BeanUtils.copyProperties(doctor, dto);
 
-        DoctorResponse response = new DoctorResponse();
-        BeanUtils.copyProperties(doctor, response);
-        return response;
+        // 处理科室信息转换
+        if (doctor.getDepartment() != null) {
+            DepartmentDTO deptDto = new DepartmentDTO();
+            deptDto.setDepartmentId(doctor.getDepartment().getDepartmentId());
+            deptDto.setName(doctor.getDepartment().getName());
+            dto.setDepartment(deptDto);
+        }
+        return dto;
     }
 }
