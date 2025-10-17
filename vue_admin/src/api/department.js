@@ -76,3 +76,28 @@ export function deleteDepartmentMember(departmentId, memberIdentifier) {
         method: 'delete',
     });
 }
+/**
+ * 更新科室信息 (根据图片接口)
+ * PUT /api/departments/description
+ * 接收 DepartmentUpdateDTO (包含 departmentId, name, description, parentDepartmentName)
+ * ⚠️ 注意：此处假设请求体需要包含 departmentId，但图片示例中未列出。
+ */
+export function updateDepartmentDescription(departmentData) {
+    return request({
+        // 接口路径根据图片 URL 确定
+        url: '/api/departments/description',
+        method: 'put', // 使用 PUT 方法进行更新
+        data: departmentData, // 将更新数据放在请求体中
+    });
+}
+
+/**
+ * 【新增】删除科室 (根据图片接口 DELETE /api/departments/{name})
+ * @param {string} departmentName - 要删除的科室名称
+ */
+export function deleteDepartmentByName(departmentName) {
+    return request({
+        url: `/api/departments/${departmentName}`, // 路径参数是科室名称
+        method: 'delete', // 使用 DELETE 方法删除资源
+    });
+}
