@@ -38,12 +38,12 @@
           :data="pagedDepartments"
           border
           style="width: 100%; margin-top: 15px;"
-          row-key="id"
+          row-key="departmentId"
           :tree-props="{ children: 'children' }"
           @sort-change="handleSortChange"
       >
         <el-table-column prop="name" label="科室名称" width="220" sortable="custom" />
-        <el-table-column prop="id" label="科室编号" width="120" sortable="custom" />
+        <el-table-column prop="departmentId" label="科室编号" width="120" sortable="custom" />
         <el-table-column prop="description" label="职能描述" />
 
         <el-table-column label="操作" width="320" fixed="right" align="center">
@@ -189,16 +189,16 @@ const buildTree = (list) => {
     list.forEach(dept => {
       // ⚠️ map[id] 处的 { ...dept } 是浅拷贝，如果 dept 的属性值是对象，则仍是引用。
       // 但由于上层已经进行了深拷贝，这里的风险已降到最低。
-      map[dept.id] = { ...dept, children: [] };
+      map[dept.departmentId] = { ...dept, children: [] };
     });
 
     // 第二次遍历：构建树
     list.forEach(dept => {
-      const node = map[dept.id];
-      // 确保这里使用的字段名 (parent_id) 与后端返回的字段名一致！
-      if (dept.parent_id && map[dept.parent_id]) {
-        map[dept.parent_id].children.push(node);
-      } else if (!dept.parent_id) { // 根节点
+      const node = map[dept.departmentId];
+      // 确保这里使用的字段名 (parentDepartmentId) 与后端返回的字段名一致！
+      if (dept.parentDepartmentId && map[dept.parentDepartmentId]) {
+        map[dept.parentDepartmentId].children.push(node);
+      } else if (!dept.parentDepartmentId) { // 根节点
         tree.push(node);
       }
     });
@@ -261,7 +261,7 @@ const handleCurrentChange = (val) => {
 
 // 6. 编辑、删除逻辑（需要改成调用后端 API，这里只做刷新处理）
 const editDialogVisible = ref(false);
-const currentEditDepartment = reactive({ id: null, name: '', description: '' });
+const currentEditDepartment = reactive({ departmentId: null, name: '', description: '' });
 
 const handleEdit = (row) => {
   Object.assign(currentEditDepartment, row);
@@ -300,7 +300,7 @@ const handleDelete = (row) => {
 };
 
 const handleViewDetails = (row) => {
-    router.push({ path: `/departments/members/${row.id}` });
+    router.push({ path: `/departments/members/${row.departmentId}` });
 };
 </script>
 
