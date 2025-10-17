@@ -13,28 +13,10 @@
           <el-input v-model="departmentForm.name" placeholder="请输入科室名称"></el-input>
         </el-form-item>
 
-        <!-- 所属诊所 -> 改为选择框 -->
-        <el-form-item label="所属诊所" prop="clinic_id">
-          <el-select
-              v-model="departmentForm.clinic_id"
-              placeholder="请选择所属诊所"
-              style="width: 100%;"
-              filterable
-              clearable
-          >
-            <el-option
-                v-for="clinic in clinicList"
-                :key="clinic.id"
-                :label="clinic.name"
-                :value="clinic.id"
-            />
-          </el-select>
-        </el-form-item>
 
-        <!-- 新增：上级科室 -->
-        <el-form-item label="上级科室" prop="parent_id">
+        <el-form-item label="上级科室" prop="parentDepartmentName">
           <el-select
-              v-model="departmentForm.parent_id"
+              v-model="departmentForm.parentDepartmentName"
               placeholder="请选择上级科室 (可不选)"
               style="width: 100%;"
               filterable
@@ -44,8 +26,7 @@
                 v-for="department in departmentList"
                 :key="department.id"
                 :label="department.name"
-                :value="department.id"
-            />
+                :value="department.name" />
           </el-select>
         </el-form-item>
 
@@ -70,15 +51,17 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
+import { useRouter } from 'vue-router'; // 导入路由，用于提交成功后跳转
+import { createDepartment, getDepartmentPage } from '@/api/department'; // 导入新增接口和列表接口（用于获取下拉数据）
 
+const router = useRouter();
 // 表单的引用
 const departmentFormRef = ref(null);
 
 // 表单数据模型
 const departmentForm = reactive({
   name: '',
-  clinic_id: null, // 改为null以匹配选择器
-  parent_id: null, // 新增
+  parentDepartmentName: null, // 匹配 API 字段，用 null 初始化
   description: '',
 });
 
@@ -87,59 +70,59 @@ const rules = reactive({
   name: [
     { required: true, message: '请输入科室名称', trigger: 'blur' },
   ],
-  clinic_id: [
-    { required: true, message: '请选择所属诊所', trigger: 'change' },
-  ],
-  // 上级科室和描述为非必填项
+  // parentDepartmentName 和 description 留空即为非必填
 });
 
 // --- 数据部分 ---
-// 用于存储从后端获取的诊所列表
-const clinicList = ref([]);
+// 移除 clinicList 和 fetchClinics 的模拟代码
 // 用于存储从后端获取的科室列表 (用于选择上级科室)
 const departmentList = ref([]);
 
-// 模拟从后端API获取数据
-const fetchClinics = async () => {
-  // === 在这里编写您调用后端API获取诊所列表的真实代码 ===
-  // const response = await yourApi.getClinics();
-  // clinicList.value = response.data;
-
-  // 目前使用模拟数据
-  console.log("正在获取诊所列表...");
-  clinicList.value = [
-    { id: 'CLI_A', name: 'A诊所 (总院)' },
-    { id: 'CLI_B', name: 'B诊所 (南校区)' },
-    { id: 'CLI_C', name: 'C诊所 (北校区)' },
-  ];
-};
-
+// 真实从后端API获取所有科室列表
 const fetchDepartments = async () => {
-  // === 在这里编写您调用后端API获取科室列表的真实代码 ===
-  // const response = await yourApi.getDepartments();
-  // departmentList.value = response.data;
+    try {
+        // 调用分页接口获取所有数据（或使用一个专门获取全列表的接口）
+        // 假设获取第一页，每页大小设置较大以获取所有科室
+        const response = await getDepartmentPage({ page: 1, size: 100 });
 
-  console.log("正在获取科室列表...");
-  departmentList.value = [
-    { id: 'DEPT_001', name: '心血管内科' },
-    { id: 'DEPT_002', name: '神经外科' },
-    { id: 'DEPT_003', name: '儿科' },
-  ];
+        // ⚠️ 关键：这里需要获取所有科室的扁平列表
+        // 考虑到列表页面有数据污染问题，这里暂时直接使用原始返回的 content
+        departmentList.value = response.content || [];
+
+    } catch (error) {
+        console.error("获取科室列表失败:", error);
+        // ElMessage.error('获取上级科室列表失败'); // 避免重复提示
+    }
 };
 
 // 在组件挂载后，自动获取下拉框所需的数据
 onMounted(() => {
-  fetchClinics();
   fetchDepartments();
 });
 
 
 // 提交表单的方法
 const submitForm = () => {
-  departmentFormRef.value.validate((valid) => {
+  departmentFormRef.value.validate(async (valid) => {
     if (valid) {
-      console.log('提交的表单数据:', departmentForm);
-      ElMessage.success('科室创建成功 (模拟)');
+      // 构造符合后端API要求的DTO
+      const departmentDTO = {
+        name: departmentForm.name,
+        // 如果 parentDepartmentName 为 null 或空字符串，则传 null
+        parentDepartmentName: departmentForm.parentDepartmentName || null,
+        description: departmentForm.description,
+      };
+
+      try {
+        await createDepartment(departmentDTO); // 调用新增接口
+        ElMessage.success('科室创建成功！');
+        // 成功后跳转回列表页
+        router.push({ path: '/departments' });
+      } catch (error) {
+        // 错误处理由 request.js 拦截器和 Promise 捕获负责
+        console.error("创建科室失败:", error);
+      }
+
     } else {
       ElMessage.error('请检查必填项！');
       return false;
