@@ -4,7 +4,7 @@
       <BackButton />
     </div>
 
-    <el-card shadow="always" v-if="currentDepartment">
+    <el-card shadow="always" v-if="currentDepartment" v-loading="loading">
       <template #header>
         <div class="card-header-title">
           <h2 class="department-name-title">{{ currentDepartment.name }}</h2>
@@ -36,8 +36,7 @@
       </div>
     </el-card>
 
-    <el-empty v-else description="未找到指定的科室信息" />
-
+    <el-empty v-else-if="!loading" description="未找到指定的科室信息" />
 
     <el-dialog v-model="addDialogVisible" title="添加新成员" width="500px">
       <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="80px">
@@ -65,43 +64,14 @@ import { Plus, Delete } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import BackButton from '@/components/BackButton.vue';
 import { useRoute } from 'vue-router';
+import { getDepartmentDoctors } from '@/api/department';
 
 const route = useRoute();
 const addFormRef = ref(null);
 
-// 模拟的科室及成员数据 (ID 与 Index.vue 保持同步)
-const allDepartmentsData = ref([
-  // 有成员的科室 (子科室)
-  {
-    id: 101, // 对应 Index.vue 中的心血管内科
-    name: '心血管内科',
-    members: [
-      { id: 'DOC_101', name: '王伟', title: '主任医师' }, // 对应 image_5cc57d.png
-      { id: 'DOC_102', name: '李静', title: '副主任医师' } // 对应 image_5cc57d.png
-    ]
-  },
-  {
-    id: 102, // 对应 Index.vue 中的神经外科
-    name: '神经外科',
-    members: [
-      { id: 'DOC_201', name: '张磊', title: '主治医师' }
-    ]
-  },
-  {
-    id: 201, // 对应 Index.vue 中的儿科
-    name: '儿科',
-    members: [
-        { id: 'DOC_301', name: '赵小琴', title: '儿科医师' }
-    ]
-  },
-  // 无成员的科室 (根科室)
-  { id: 1, name: '总院行政部', description: '负责总院的行政管理', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
-  { id: 2, name: '门诊部', description: '负责日常门诊接待和初步诊断', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
-  { id: 3, name: '后勤保障部', description: '负责设备维护和物资采购', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
-  { id: 4, name: '财务部', description: '负责医院财务核算与管理', parent_id: null, members: [] }, // 对应 image_5c4cdd.png
-  { id: 202, name: '皮肤科', members: [] },
-]);
-
+// 当前科室信息
+const currentDepartment = ref(null);
+const loading = ref(false);
 
 const deptIdFromRoute = ref(route.params.id);
 
@@ -109,14 +79,42 @@ watch(
     () => route.params.id,
     (newId) => {
         deptIdFromRoute.value = newId;
+        if (newId) {
+            fetchDepartmentDoctors();
+        }
     }
 );
 
-const currentDepartment = computed(() => {
-    // 查找科室，ID可能为字符串（路由参数）或数字（模拟数据），使用 == 比较
-    return allDepartmentsData.value.find(d => d.id == deptIdFromRoute.value);
-});
+// 获取科室医生列表
+const fetchDepartmentDoctors = async () => {
+    if (!deptIdFromRoute.value) return;
 
+    loading.value = true;
+    try {
+        const response = await getDepartmentDoctors(deptIdFromRoute.value);
+        currentDepartment.value = {
+            id: response.data.departmentId,
+            name: response.data.departmentName,
+            members: response.data.doctors.map(doctor => ({
+                id: doctor.identifier,
+                name: doctor.fullName,
+                title: doctor.title
+            }))
+        };
+    } catch (error) {
+        console.error('获取科室医生列表失败:', error);
+        ElMessage.error('获取科室医生列表失败');
+        currentDepartment.value = null;
+    } finally {
+        loading.value = false;
+    }
+};
+
+onMounted(() => {
+    if (deptIdFromRoute.value) {
+        fetchDepartmentDoctors();
+    }
+});
 
 // 添加成员对话框相关
 const addDialogVisible = ref(false);
@@ -124,6 +122,7 @@ const currentDeptId = ref(null);
 const addForm = reactive({
   id: '', name: '', title: ''
 });
+
 const addRules = reactive({
   id: [{ required: true, message: '医生ID不能为空', trigger: 'blur' }],
   name: [{ required: true, message: '医生姓名不能为空', trigger: 'blur' }],
@@ -172,7 +171,9 @@ const handleDelete = (deptId, memberId) => {
 </script>
 
 <style scoped>
-.app-container { padding: 20px; }
+.app-container {
+  padding: 20px;
+}
 .card-header-title {
   display: flex;
   justify-content: space-between;
@@ -183,6 +184,9 @@ const handleDelete = (deptId, memberId) => {
   font-size: 18px;
   font-weight: bold;
   color: #303133;
+  line-height: 1.6;
 }
-.member-management-section { margin-top: 10px; }
+.member-management-section {
+  margin-top: 10px;
+}
 </style>

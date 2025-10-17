@@ -52,7 +52,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router'; // 导入路由，用于提交成功后跳转
-import { createDepartment, getDepartmentPage } from '@/api/department'; // 导入新增接口和列表接口（用于获取下拉数据）
+import { createDepartment, getDepartmentPage } from '@/api/department'; // 导入新增接口和列表接口
 
 const router = useRouter();
 // 表单的引用
@@ -61,8 +61,10 @@ const departmentFormRef = ref(null);
 // 表单数据模型
 const departmentForm = reactive({
   name: '',
-  parentDepartmentName: null, // 匹配 API 字段，用 null 初始化
+  // 匹配 API 字段：parentDepartmentName
+  parentDepartmentName: null,
   description: '',
+  // 移除了 clinic_id 和 parent_id
 });
 
 // 表单验证规则
@@ -70,28 +72,24 @@ const rules = reactive({
   name: [
     { required: true, message: '请输入科室名称', trigger: 'blur' },
   ],
-  // parentDepartmentName 和 description 留空即为非必填
+  // 移除了 clinic_id 的校验。parentDepartmentName 和 description 为非必填项
 });
 
 // --- 数据部分 ---
-// 移除 clinicList 和 fetchClinics 的模拟代码
 // 用于存储从后端获取的科室列表 (用于选择上级科室)
 const departmentList = ref([]);
 
 // 真实从后端API获取所有科室列表
 const fetchDepartments = async () => {
     try {
-        // 调用分页接口获取所有数据（或使用一个专门获取全列表的接口）
-        // 假设获取第一页，每页大小设置较大以获取所有科室
-        const response = await getDepartmentPage({ page: 1, size: 100 });
+        // 调用分页接口获取所有数据（假设 size 足够大，或使用专门的全列表接口）
+        const response = await getDepartmentPage({ page: 1, size: 100, name: '', description: '' });
 
-        // ⚠️ 关键：这里需要获取所有科室的扁平列表
-        // 考虑到列表页面有数据污染问题，这里暂时直接使用原始返回的 content
+        // 只获取原始的扁平列表
         departmentList.value = response.content || [];
 
     } catch (error) {
         console.error("获取科室列表失败:", error);
-        // ElMessage.error('获取上级科室列表失败'); // 避免重复提示
     }
 };
 
@@ -114,7 +112,7 @@ const submitForm = () => {
       };
 
       try {
-        await createDepartment(departmentDTO); // 调用新增接口
+        await createDepartment(departmentDTO); // <--- 调用新增接口
         ElMessage.success('科室创建成功！');
         // 成功后跳转回列表页
         router.push({ path: '/departments' });
@@ -133,7 +131,11 @@ const submitForm = () => {
 // 重置表单的方法
 const resetForm = () => {
   departmentFormRef.value.resetFields();
+  // 重置字段为 null
+  departmentForm.parentDepartmentName = null;
 };
+
+// 移除了 fetchClinics 的模拟代码
 </script>
 
 <style scoped>
