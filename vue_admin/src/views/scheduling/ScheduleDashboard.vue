@@ -41,7 +41,21 @@
             </thead>
             <tbody>
             <tr v-for="shift in ['上午', '下午']" :key="shift">
-              <td>{{ shift }}</td>
+              <td class="time-slot-column" @dragover.prevent @drop="onDrop($event, null, shift)">
+                <div class="shift-label">{{ shift }}</div>
+                <!-- 时间段卡片区域 - 只显示在这个列中 -->
+                <div class="time-slot-cards">
+                  <div v-for="timeSlot in getTimeSlotsForShift(shift)" :key="timeSlot.slot_id"
+                       class="time-slot-card" draggable="true" 
+                       @dragstart="onDragStart($event, { type: 'timeSlot', data: timeSlot })">
+                    <div class="time-slot-card-content">
+                      <div class="time-slot-name">{{ timeSlot.slot_name }}</div>
+                      <div class="time-slot-time">{{ timeSlot.start_time }} - {{ timeSlot.end_time }}</div>
+                    </div>
+                    <el-icon class="remove-icon" @click="removeTimeSlotFromColumn(timeSlot, shift)"><Close /></el-icon>
+                  </div>
+                </div>
+              </td>
               <td v-for="day in weekDates" :key="day.fullDate + '-' + shift"
                   @dragover.prevent @drop="onDrop($event, day.fullDate, shift)">
                 <div class="shift-cell">
@@ -94,6 +108,26 @@
           </div>
         </el-card>
 
+        <!-- 时间段卡片列表 -->
+        <el-card shadow="always" class="draggable-list-card">
+          <template #header>
+            <div class="card-header">
+              <span>时间段卡片 (拖拽到上方进行排班)</span>
+            </div>
+          </template>
+          <div class="draggable-list time-slot-list">
+            <div v-for="timeSlot in timeSlots" :key="timeSlot.slot_id"
+                 class="time-slot-card" draggable="true" @dragstart="onDragStart($event, { type: 'timeSlot', data: timeSlot })">
+              <el-icon :size="20" class="time-slot-icon"><Clock /></el-icon>
+              <div class="time-slot-info">
+                <span class="time-slot-name">{{ timeSlot.slot_name }}</span>
+                <span class="time-slot-time">{{ timeSlot.start_time }} - {{ timeSlot.end_time }}</span>
+              </div>
+            </div>
+            <el-empty v-if="!timeSlots.length" description="暂无时间段" :image-size="60"/>
+          </div>
+        </el-card>
+
         <!-- 可用办公地点列表 -->
         <el-card shadow="always" class="draggable-list-card">
           <template #header>
@@ -122,7 +156,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 // [新增] 导入 CircleCloseFilled 图标
-import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFilled } from '@element-plus/icons-vue';
+import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFilled, Clock } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import doctorMaleImg from '@/assets/doctor.jpg';
 import doctorFemaleImg from '@/assets/doctor1.jpg';
@@ -152,11 +186,37 @@ const availableLocations = ref([
   { location_id: 201, name: '住院部A栋-101', building: '住院部A栋', floor: '一层', room_number: '101' },
 ]);
 
+// 时间段数据
+const timeSlots = ref([
+  { slot_id: 1, slot_name: '上午08:00-08:30', start_time: '08:00:00', end_time: '08:30:00', period: '上午' },
+  { slot_id: 2, slot_name: '上午08:30-09:00', start_time: '08:30:00', end_time: '09:00:00', period: '上午' },
+  { slot_id: 3, slot_name: '上午09:00-09:30', start_time: '09:00:00', end_time: '09:30:00', period: '上午' },
+  { slot_id: 4, slot_name: '上午09:30-10:00', start_time: '09:30:00', end_time: '10:00:00', period: '上午' },
+  { slot_id: 5, slot_name: '上午10:00-10:30', start_time: '10:00:00', end_time: '10:30:00', period: '上午' },
+  { slot_id: 6, slot_name: '上午10:30-11:00', start_time: '10:30:00', end_time: '11:00:00', period: '上午' },
+  { slot_id: 7, slot_name: '上午11:00-11:30', start_time: '11:00:00', end_time: '11:30:00', period: '上午' },
+  { slot_id: 8, slot_name: '上午11:30-12:00', start_time: '11:30:00', end_time: '12:00:00', period: '上午' },
+  { slot_id: 9, slot_name: '下午14:00-14:30', start_time: '14:00:00', end_time: '14:30:00', period: '下午' },
+  { slot_id: 10, slot_name: '下午14:30-15:00', start_time: '14:30:00', end_time: '15:00:00', period: '下午' },
+  { slot_id: 11, slot_name: '下午15:00-15:30', start_time: '15:00:00', end_time: '15:30:00', period: '下午' },
+  { slot_id: 12, slot_name: '下午15:30-16:00', start_time: '15:30:00', end_time: '16:00:00', period: '下午' },
+  { slot_id: 13, slot_name: '下午16:00-16:30', start_time: '16:00:00', end_time: '16:30:00', period: '下午' },
+  { slot_id: 14, slot_name: '下午16:30-17:00', start_time: '16:30:00', end_time: '17:00:00', period: '下午' },
+  { slot_id: 15, slot_name: '下午17:00-17:30', start_time: '17:00:00', end_time: '17:30:00', period: '下午' },
+  { slot_id: 16, slot_name: '下午17:30-18:00', start_time: '17:30:00', end_time: '18:00:00', period: '下午' },
+]);
+
 
 const scheduleData = ref({
   'p3': [
     { date: '2025-10-21', shift: '上午', doctors: [{id: 6, name: '王莉', location: null}] },
   ]
+});
+
+// 存储拖拽到时段列中的时间段卡片
+const timeSlotColumns = ref({
+  '上午': [],
+  '下午': []
 });
 
 // --- 状态管理 ---
@@ -211,12 +271,19 @@ const changeWeek = (offset) => {
     newDate.setDate(newDate.getDate() + (offset * 7));
     currentMonday.value = newDate;
   }
+  // 切换周次时清空时间段列
+  clearTimeSlotColumns();
 };
 
 const getDoctorsForShift = (date, shift) => {
   if (!activeSub.value || !scheduleData.value[activeSub.value]) return [];
   const entry = scheduleData.value[activeSub.value].find(item => item.date === date && item.shift === shift);
   return entry ? entry.doctors : [];
+};
+
+// 获取指定时段的时间段卡片（只显示在时段列中）
+const getTimeSlotsForShift = (shift) => {
+  return timeSlotColumns.value[shift] || [];
 };
 
 const getDoctorAvatar = (doctorId) => {
@@ -248,6 +315,8 @@ const onDrop = (event, toDate, toShift) => {
     handleDoctorDrop(dragData, toDate, toShift);
   } else if (dragData.type === 'location') {
     handleLocationDrop(dragData, toDate, toShift, event.target);
+  } else if (dragData.type === 'timeSlot') {
+    handleTimeSlotDrop(dragData, toDate, toShift);
   }
 };
 
@@ -298,6 +367,48 @@ const handleLocationDrop = (dragData, toDate, toShift, targetElement) => {
   }
 };
 
+const handleTimeSlotDrop = (dragData, toDate, toShift) => {
+  const { data: timeSlot } = dragData;
+  
+  // 如果拖拽到时段列（toDate为null），将时间段添加到时段列中
+  if (toDate === null) {
+    // 检查时间段是否已存在于该时段列中
+    if (!timeSlotColumns.value[toShift].some(ts => ts.slot_id === timeSlot.slot_id)) {
+      timeSlotColumns.value[toShift].push({ ...timeSlot });
+      ElMessage.success(`已将时间段 "${timeSlot.slot_name}" 添加到 ${toShift} 时段列中`);
+    } else {
+      ElMessage.warning(`时间段 "${timeSlot.slot_name}" 已存在于 ${toShift} 时段列中`);
+    }
+    return;
+  }
+  
+  // 如果拖拽到具体日期，则存储数据
+  if (!activeSub.value) {
+    console.log('No activeSub, returning');
+    return;
+  }
+  
+  if (!scheduleData.value[activeSub.value]) {
+    scheduleData.value[activeSub.value] = [];
+    console.log('Initialized scheduleData for:', activeSub.value);
+  }
+
+  let shiftEntry = scheduleData.value[activeSub.value].find(s => s.date === toDate && s.shift === toShift);
+  if (!shiftEntry) {
+    shiftEntry = { date: toDate, shift: toShift, doctors: [], timeSlots: [] };
+    scheduleData.value[activeSub.value].push(shiftEntry);
+    console.log('Created new shiftEntry:', shiftEntry);
+  }
+
+  // 检查时间段是否已存在
+  if (!shiftEntry.timeSlots.some(ts => ts.slot_id === timeSlot.slot_id)) {
+    shiftEntry.timeSlots.push({ ...timeSlot });
+    console.log('Added timeSlot to shiftEntry:', shiftEntry.timeSlots);
+    ElMessage.success(`已将时间段 "${timeSlot.slot_name}" 排班到 ${toDate} ${toShift}`);
+  } else {
+    ElMessage.warning(`时间段 "${timeSlot.slot_name}" 已在该班次中。`);
+  }
+};
 
 // --- 数据操作方法 ---
 const addDoctorToShift = (doctor, date, shift) => {
@@ -334,7 +445,24 @@ const removeDoctorFromShift = (doctor, date, shift, showMessage = true) => {
 const clearLocation = (doctor) => {
   const oldLocation = doctor.location;
   doctor.location = null;
-  ElMessage.info(`已取消【${doctor.name}】医生的地点“${oldLocation}”`);
+  ElMessage.info(`已取消【${doctor.name}】医生的地点"${oldLocation}"`);
+};
+
+// 从时段列中移除时间段
+const removeTimeSlotFromColumn = (timeSlot, shift) => {
+  const timeSlotIndex = timeSlotColumns.value[shift].findIndex(ts => ts.slot_id === timeSlot.slot_id);
+  if (timeSlotIndex > -1) {
+    timeSlotColumns.value[shift].splice(timeSlotIndex, 1);
+    ElMessage.success(`已从 ${shift} 时段列中移除时间段 "${timeSlot.slot_name}"`);
+  }
+};
+
+// 清空时间段列的方法
+const clearTimeSlotColumns = () => {
+  timeSlotColumns.value = {
+    '上午': [],
+    '下午': []
+  };
 };
 
 // --- 侧边栏选择逻辑 ---
@@ -350,10 +478,14 @@ const handleParentSelect = (index) => {
   } else {
     activeSub.value = null;
   }
+  // 切换科室时清空时间段列
+  clearTimeSlotColumns();
 };
 
 const handleSubSelect = (id) => {
   activeSub.value = id;
+  // 切换科室时清空时间段列
+  clearTimeSlotColumns();
 };
 
 onMounted(() => {
@@ -518,7 +650,7 @@ onMounted(() => {
 
 .bottom-panels {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 20px;
 }
 .draggable-list-card {
@@ -599,6 +731,133 @@ onMounted(() => {
 .location-desc {
   font-size: 12px;
   color: #909399;
+}
+
+/* 时间段卡片样式 */
+.time-slot-column {
+  width: 250px;
+  vertical-align: top;
+  background-color: #f8f9fa;
+  min-height: 120px;
+}
+
+.shift-label {
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.time-slot-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.time-slot-card {
+  background-color: #e6f7ff;
+  border: 1px solid #91d5ff;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: grab;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.time-slot-card:hover {
+  border-color: #1890ff;
+  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.time-slot-card:hover .remove-icon {
+  display: inline-flex;
+}
+
+.time-slot-card:active {
+  cursor: grabbing;
+}
+
+.time-slot-card-content {
+  flex: 1;
+}
+
+.time-slot-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1890ff;
+  margin-bottom: 2px;
+}
+
+.time-slot-time {
+  font-size: 10px;
+  color: #8c8c8c;
+}
+
+.time-slot-card .remove-icon {
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  color: #f56c6c;
+  padding: 2px;
+}
+
+/* 底部面板的时间段卡片样式 */
+.time-slot-list {
+  gap: 10px;
+}
+
+.time-slot-card {
+  display: flex;
+  align-items: center;
+  background-color: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 10px;
+  cursor: grab;
+  transition: box-shadow 0.2s;
+  width: calc(50% - 5px);
+}
+
+.time-slot-card:hover {
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.time-slot-icon {
+  color: #0ea5e9;
+  margin-right: 12px;
+}
+
+.time-slot-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.time-slot-name {
+  font-weight: 500;
+  color: #0c4a6e;
+  font-size: 13px;
+}
+
+.time-slot-time {
+  font-size: 11px;
+  color: #64748b;
 }
 </style>
 
