@@ -27,5 +27,5 @@ public interface UserService {
 
     PageResponse<MedicalHistoryResponse> getMedicalHistories(Integer page, Integer pageSize);
 
-    PageResponse<MedicalHistoryResponse> updateMedicalHistory(Long id, MedicalHistoryUpdateRequest request);
+    MedicalHistoryResponse updateMedicalHistory(Long id, MedicalHistoryUpdateRequest request);
 }

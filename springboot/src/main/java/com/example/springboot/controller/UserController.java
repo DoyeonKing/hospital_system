@@ -89,11 +89,11 @@ public class UserController {
     }
 
     @PutMapping("/{id}/medical-history")
-    public ResponseEntity<PageResponse<MedicalHistoryResponse>> updateMedicalHistory(
+    public ResponseEntity<MedicalHistoryResponse> updateMedicalHistory(
             @PathVariable Long id,
             @RequestBody MedicalHistoryUpdateRequest request) {
 
-        PageResponse<MedicalHistoryResponse> response = userService.updateMedicalHistory(id, request);
+        MedicalHistoryResponse response = userService.updateMedicalHistory(id, request);
         return ResponseEntity.ok(response);
     }
 

@@ -390,14 +390,44 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     @Transactional
-    public PageResponse<MedicalHistoryResponse> updateMedicalHistory(Long id, MedicalHistoryUpdateRequest request) {
-        // 核心逻辑应委托给 patientService:
-        // return patientService.updateMedicalHistory(id, request);
+    public MedicalHistoryResponse updateMedicalHistory(Long patientId, MedicalHistoryUpdateRequest request) {
+        // 1. 查找患者
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("患者不存在，ID: " + patientId));
 
-        // 临时占位，满足 UserService 接口要求。
-        throw new UnsupportedOperationException("updateMedicalHistory not fully implemented because PatientService is missing the required method.");
+        // 2. 查找或创建患者档案
+        PatientProfile profile = patientProfileRepository.findById(patientId)
+                .orElseGet(() -> {
+                    PatientProfile newProfile = new PatientProfile();
+                    newProfile.setPatient(patient);
+                    return newProfile;
+                });
+
+        // 3. 更新病史信息
+        if (request.getPastMedicalHistory() != null) {
+            profile.setMedicalHistory(request.getPastMedicalHistory());
+        }
+        if (request.getAllergyHistory() != null) {
+            profile.setAllergies(request.getAllergyHistory());
+        }
+        if (request.getBlacklistStatus() != null) {
+            profile.setBlacklistStatus(request.getBlacklistStatus());
+        }
+
+        // 4. 保存更新后的档案
+        PatientProfile updatedProfile = patientProfileRepository.save(profile);
+
+        // 5. 转换为响应DTO
+        MedicalHistoryResponse response = new MedicalHistoryResponse();
+        response.setId(patient.getPatientId());
+        response.setName(patient.getFullName());
+        response.setIdCard(updatedProfile.getIdCardNumber());
+        response.setPastMedicalHistory(updatedProfile.getMedicalHistory());
+        response.setAllergyHistory(updatedProfile.getAllergies());
+        response.setBlacklisted(updatedProfile.getBlacklistStatus() == BlacklistStatus.BLACKLISTED);
+
+        return response;
     }
-
 
     // 修改患者更新方法
     private UserResponse updatePatientUser(Long patientId, PatientUpdateRequest request) {
