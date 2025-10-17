@@ -50,3 +50,29 @@ export function getDepartmentDoctors(departmentId) {
         method: 'get',
     });
 }
+/**
+ * 为指定科室添加新成员
+ * POST /api/departments/{departmentId}/members
+ * @param {string|number} departmentId - 科室的ID
+ * @param {object} memberData - 要添加的成员信息 (例如 { identifier, fullName, title })
+ */
+export function addDepartmentMember(departmentId, memberData) {
+    return request({
+        url: `/api/departments/${departmentId}/members`,
+        method: 'post',
+        data: memberData, // 将成员信息放在请求体中
+    });
+}
+
+/**
+ * 【新增】从指定科室删除一个成员
+ * DELETE /api/departments/{departmentId}/members/{identifier}
+ * @param {string|number} departmentId - 科室的ID
+ * @param {string} memberIdentifier - 要删除的成员的ID (医生工号)
+ */
+export function deleteDepartmentMember(departmentId, memberIdentifier) {
+    return request({
+        url: `/api/departments/${departmentId}/members/${memberIdentifier}`,
+        method: 'delete',
+    });
+}

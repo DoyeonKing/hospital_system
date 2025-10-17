@@ -64,38 +64,29 @@ import { Plus, Delete } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import BackButton from '@/components/BackButton.vue';
 import { useRoute } from 'vue-router';
-import { getDepartmentDoctors } from '@/api/department';
+// 1. 导入新增的 deleteDepartmentMember API 函数
+import { getDepartmentDoctors, addDepartmentMember, deleteDepartmentMember } from '@/api/department';
 
 const route = useRoute();
 const addFormRef = ref(null);
 const currentDepartment = ref(null);
 const loading = ref(true);
+const departmentId = route.params.id;
 
-const fetchDepartmentDoctors = async (departmentId) => {
-  if (!departmentId) {
+// 获取成员列表函数 (保持不变)
+const fetchDepartmentDoctors = async (deptId) => {
+  if (!deptId) {
     loading.value = false;
     ElMessage.error('无效的科室ID');
     return;
   }
-
   loading.value = true;
   try {
-    const response = await getDepartmentDoctors(departmentId);
-
-    // --- 关键调试步骤 ---
-    // 在浏览器控制台查看API的真实返回值
-    console.log("API 返回的原始 response:", response);
-
-    // 检查并处理返回的数据
-    // 许多axios封装会直接返回data，所以我们先检查 response.data 是否存在
-    // 如果不存在，我们再尝试直接使用 response
+    const response = await getDepartmentDoctors(deptId);
     const departmentData = response.data || response;
-
     if (!departmentData || !departmentData.departmentId) {
-      // 如果数据格式不正确或为空，则抛出错误
       throw new Error("返回的数据格式不正确或为空");
     }
-
     currentDepartment.value = {
       id: departmentData.departmentId,
       name: departmentData.departmentName,
@@ -106,7 +97,6 @@ const fetchDepartmentDoctors = async (departmentId) => {
       }))
     };
   } catch (error) {
-    // 这里的日志会更详细
     console.error('获取科室医生列表失败:', error);
     ElMessage.error('获取科室医生列表失败，详情请查看控制台');
     currentDepartment.value = null;
@@ -116,17 +106,15 @@ const fetchDepartmentDoctors = async (departmentId) => {
 };
 
 onMounted(() => {
-  const departmentId = route.params.id;
   if (departmentId) {
     fetchDepartmentDoctors(departmentId);
   } else {
     loading.value = false;
-    console.error("未能从URL中获取到 departmentId");
     ElMessage.error('页面路由参数不正确，无法加载科室信息');
   }
 });
 
-// 添加成员对话框... (以下逻辑与之前相同)
+// 添加成员逻辑 (保持不变)
 const addDialogVisible = ref(false);
 const addForm = reactive({ id: '', name: '', title: '' });
 const addRules = reactive({
@@ -134,40 +122,51 @@ const addRules = reactive({
   name: [{ required: true, message: '医生姓名不能为空', trigger: 'blur' }],
   title: [{ required: true, message: '医生职称不能为空', trigger: 'blur' }]
 });
-
 const openAddDialog = () => {
-  if (addFormRef.value) {
-    addFormRef.value.resetFields();
-  }
+  if (addFormRef.value) addFormRef.value.resetFields();
   Object.assign(addForm, { id: '', name: '', title: '' });
   addDialogVisible.value = true;
 };
-
 const handleAddMember = () => {
-  addFormRef.value.validate((valid) => {
+  addFormRef.value.validate(async (valid) => {
     if (valid) {
-      if (currentDepartment.value) {
-        if (currentDepartment.value.members.some(m => m.id === addForm.id)) {
-          ElMessage.error('该医生ID已存在于本科室！');
-          return;
-        }
-        currentDepartment.value.members.push({ ...addForm });
+      const payload = {
+        identifier: addForm.id,
+        fullName: addForm.name,
+        title: addForm.title
+      };
+      try {
+        await addDepartmentMember(departmentId, payload);
         ElMessage.success('成员添加成功！');
         addDialogVisible.value = false;
+        await fetchDepartmentDoctors(departmentId);
+      } catch (error) {
+        console.error("添加成员失败:", error);
       }
     }
   });
 };
 
+// 2. ***** 核心修改：改造 handleDelete 函数以对接API *****
 const handleDelete = (memberId) => {
   ElMessageBox.confirm('确定要从该科室移除这位成员吗？', '警告', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    if (currentDepartment.value) {
-      currentDepartment.value.members = currentDepartment.value.members.filter(m => m.id !== memberId);
+  }).then(async () => { // 将回调函数改为 async
+    try {
+      // 3. 调用删除API，传入科室ID和成员ID
+      await deleteDepartmentMember(departmentId, memberId);
+
       ElMessage.success('成员删除成功！');
+
+      // 4. 【关键】删除成功后，重新获取列表数据以刷新页面
+      await fetchDepartmentDoctors(departmentId);
+
+    } catch (error) {
+      // API请求失败时的错误处理
+      console.error("删除成员失败:", error);
+      // request 工具库通常会自动弹出消息，这里可以留空或添加额外日志
     }
   });
 };

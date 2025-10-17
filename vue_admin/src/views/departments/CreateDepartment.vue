@@ -51,20 +51,22 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { useRouter } from 'vue-router'; // 导入路由，用于提交成功后跳转
-import { createDepartment, getDepartmentPage } from '@/api/department'; // 导入新增接口和列表接口
+import { useRouter } from 'vue-router'; // 导入路由，用于创建成功后跳转
+
+// 导入 API 服务
+import { createDepartment, getDepartmentPage } from '@/api/department';
 
 const router = useRouter();
+
 // 表单的引用
 const departmentFormRef = ref(null);
 
 // 表单数据模型
 const departmentForm = reactive({
   name: '',
-  // 匹配 API 字段：parentDepartmentName
-  parentDepartmentName: null,
+  // clinic_id: null, // 移除：模板中没有该字段
+  parent_id: null, // 上级科室ID
   description: '',
-  // 移除了 clinic_id 和 parent_id
 });
 
 // 表单验证规则
@@ -72,25 +74,32 @@ const rules = reactive({
   name: [
     { required: true, message: '请输入科室名称', trigger: 'blur' },
   ],
-  // 移除了 clinic_id 的校验。parentDepartmentName 和 description 为非必填项
+  // 移除 clinic_id 的规则
+  // 上级科室和描述为非必填项
 });
 
 // --- 数据部分 ---
 // 用于存储从后端获取的科室列表 (用于选择上级科室)
 const departmentList = ref([]);
 
-// 真实从后端API获取所有科室列表
+// 核心方法：从后端获取所有科室列表 (用于“上级科室”下拉框)
 const fetchDepartments = async () => {
-    try {
-        // 调用分页接口获取所有数据（假设 size 足够大，或使用专门的全列表接口）
-        const response = await getDepartmentPage({ page: 1, size: 100, name: '', description: '' });
+  console.log("正在获取所有科室列表...");
+  try {
+    // 调用分页接口，但请求 size 很大，以获取所有数据（假设最多 9999 个科室）
+    const response = await getDepartmentPage({ page: 1, size: 9999 });
 
-        // 只获取原始的扁平列表
-        departmentList.value = response.content || [];
+    // 假设后端返回的数据包含 departmentId 和 name 字段
+    departmentList.value = response.content.map(dept => ({
+        // 将后端返回的 departmentId 映射到 el-option 需要的 value (id)
+        id: dept.departmentId,
+        name: dept.name
+    })) || [];
 
-    } catch (error) {
-        console.error("获取科室列表失败:", error);
-    }
+  } catch (error) {
+    // 错误处理已在 request.js 中统一处理
+    console.error("获取科室列表失败:", error);
+  }
 };
 
 // 在组件挂载后，自动获取下拉框所需的数据
@@ -103,22 +112,26 @@ onMounted(() => {
 const submitForm = () => {
   departmentFormRef.value.validate(async (valid) => {
     if (valid) {
-      // 构造符合后端API要求的DTO
-      const departmentDTO = {
-        name: departmentForm.name,
-        // 如果 parentDepartmentName 为 null 或空字符串，则传 null
-        parentDepartmentName: departmentForm.parentDepartmentName || null,
-        description: departmentForm.description,
-      };
-
+      console.log('提交的表单数据:', departmentForm);
       try {
-        await createDepartment(departmentDTO); // <--- 调用新增接口
+        // 构造发送给后端的数据 (parent_id 为 null 时不影响)
+        const submitData = {
+          name: departmentForm.name,
+          description: departmentForm.description,
+          // ⚠️ 确保后端能正确处理 parent_id (null 或 number)
+          parent_id: departmentForm.parent_id,
+        };
+
+        // 调用创建 API
+        await createDepartment(submitData);
+
         ElMessage.success('科室创建成功！');
-        // 成功后跳转回列表页
+        // 跳转回列表页 /departments
         router.push({ path: '/departments' });
+
       } catch (error) {
-        // 错误处理由 request.js 拦截器和 Promise 捕获负责
-        console.error("创建科室失败:", error);
+        // 错误信息已由 request.js 统一处理
+        console.error('创建科室失败:', error);
       }
 
     } else {
@@ -131,11 +144,7 @@ const submitForm = () => {
 // 重置表单的方法
 const resetForm = () => {
   departmentFormRef.value.resetFields();
-  // 重置字段为 null
-  departmentForm.parentDepartmentName = null;
 };
-
-// 移除了 fetchClinics 的模拟代码
 </script>
 
 <style scoped>
