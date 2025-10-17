@@ -192,13 +192,18 @@ import com.example.springboot.dto.patient.MedicalHistoryUpdateRequest; // 导入
 import com.example.springboot.dto.patient.PatientResponse;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.PatientProfile;
+import com.example.springboot.entity.enums.BlacklistStatus;
 import com.example.springboot.entity.enums.PatientStatus; // <<<<<< 确保导入您的 PatientStatus 枚举
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.PatientRepository;
 import com.example.springboot.repository.PatientProfileRepository;
 import com.example.springboot.util.PasswordEncoderUtil; // 导入您的密码工具类
+import jakarta.persistence.criteria.JoinType;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
@@ -206,6 +211,7 @@ import org.springframework.data.domain.PageRequest;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class PatientService {
@@ -390,18 +396,59 @@ public class PatientService {
      */
     @Transactional(readOnly = true)
     public PageResponse<MedicalHistoryResponse> getMedicalHistories(Integer page, Integer pageSize) {
-        // 实际应用中，这里应该调用 MedicalHistoryRepository 进行分页查询。
+        // 校验分页参数
+        if (page == null || page < 1) {
+            page = 1;
+        }
+        if (pageSize == null || pageSize < 1 || pageSize > 100) {
+            pageSize = 10;
+        }
 
-        // 临时实现：返回空列表
+        // 构建分页参数（JPA页码从0开始）
+        Pageable pageable = PageRequest.of(page - 1, pageSize);
+
+        // 分页查询患者及其关联的档案信息（使用JOIN FETCH优化关联查询）
+        Page<Patient> patientPage = patientRepository.findAll((Specification<Patient>) (root, query, cb) -> {
+            root.fetch("patientProfile", JoinType.LEFT); // 关联查询患者档案，避免N+1问题
+            query.distinct(true);
+            return cb.conjunction();
+        }, pageable);
+
+        // 转换为MedicalHistoryResponse
+        List<MedicalHistoryResponse> content = patientPage.getContent().stream()
+                .map(patient -> {
+                    MedicalHistoryResponse response = new MedicalHistoryResponse();
+                    // 设置患者ID和姓名
+                    response.setId(patient.getPatientId());
+                    response.setName(patient.getFullName());
+
+                    // 从患者档案中获取病史、过敏史和黑名单状态
+                    PatientProfile profile = patient.getPatientProfile();
+                    if (profile != null) {
+                        response.setIdCard(profile.getIdCardNumber());
+                        response.setPastMedicalHistory(profile.getMedicalHistory());
+                        response.setAllergyHistory(profile.getAllergies());
+                        // 关键修改：根据BlacklistStatus枚举判断是否拉黑
+                        response.setBlacklisted(profile.getBlacklistStatus() == BlacklistStatus.BLACKLISTED);
+                    } else {
+                        // 处理无档案的情况
+                        response.setPastMedicalHistory("");
+                        response.setAllergyHistory("");
+                        response.setBlacklisted(false); // 无档案默认未拉黑
+                    }
+                    return response;
+                })
+                .collect(Collectors.toList());
+
+        // 构建分页响应
         return new PageResponse<>(
-                Collections.emptyList(),
-                0L, // Total elements
-                0,  // Total pages
+                content,
+                patientPage.getTotalElements(),
+                patientPage.getTotalPages(),
                 page,
                 pageSize
         );
     }
-
     /**
      * 【新增】更新指定病历记录的方法。
      * * 注意：由于缺少 MedicalHistory 实体，此方法暂时抛出异常，
