@@ -23,6 +23,12 @@ import UserHistory from '@/views/users/History.vue';
 // ===== 新增：导入排班管理页面组件 =====
 import ShiftManagement from '@/views/scheduling/ShiftManagement.vue';
 import ScheduleDashboard from '@/views/scheduling/ScheduleDashboard.vue';
+import ScheduleFeeManagement from '@/views/scheduling/ScheduleFeeManagement.vue';
+
+// ===== 新增：导入就医规范管理页面组件 =====
+import RegulationIndex from '@/views/regulations/Index.vue';
+import CreateRegulation from '@/views/regulations/Create.vue';
+import EditRegulation from '@/views/regulations/Edit.vue';
 
 // 通用视图组件导入
 const NotFoundView = () => import('../views/404.vue');
@@ -127,6 +133,33 @@ const routes = [
         name: 'ScheduleDashboard',
         meta: { title: '排班看板', requiresAuth: true },
         component: ScheduleDashboard
+    },
+    {
+        path: '/scheduling/fee-management',
+        name: 'ScheduleFeeManagement',
+        meta: { title: '号别管理', requiresAuth: true },
+        component: ScheduleFeeManagement
+    },
+    // =======================================================
+
+    // ===== 新增：就医规范管理相关路由 =====
+    {
+        path: '/regulations',
+        name: 'RegulationIndex',
+        meta: { title: '就医规范管理', requiresAuth: true },
+        component: RegulationIndex
+    },
+    {
+        path: '/regulations/create',
+        name: 'CreateRegulation',
+        meta: { title: '新增就医规范', requiresAuth: true },
+        component: CreateRegulation
+    },
+    {
+        path: '/regulations/edit/:id',
+        name: 'EditRegulation',
+        meta: { title: '编辑就医规范', requiresAuth: true },
+        component: EditRegulation
     },
     // =======================================================
 

@@ -57,13 +57,35 @@
           <p>定义医生班次与安排工作日程</p>
         </div>
       </router-link>
+
+      <!-- 新增：号别管理入口 -->
+      <router-link to="/scheduling/fee-management" class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #FFF5E6;">
+            <el-icon :size="32" color="#F59E0B"><Money /></el-icon>
+          </div>
+          <h3>号别管理</h3>
+          <p>管理排班费用与号源限额</p>
+        </div>
+      </router-link>
+
+      <!-- 新增：就医规范管理入口 -->
+      <router-link to="/regulations" class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #FFF0F6;">
+            <el-icon :size="32" color="#EC4899"><Document /></el-icon>
+          </div>
+          <h3>就医规范管理</h3>
+          <p>编辑和管理就医规范与流程</p>
+        </div>
+      </router-link>
     </div>
   </div>
 </template>
 
 <script setup>
-// 修改：增加了 Calendar 图标的导入
-import { Tickets, UserFilled, Calendar } from '@element-plus/icons-vue';
+// 修改：增加了 Calendar, Money 和 Document 图标的导入
+import { Tickets, UserFilled, Calendar, Money, Document } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 // 导入本地图片

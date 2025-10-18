@@ -1,5 +1,8 @@
 <template>
   <div class="app-container">
+    <div class="back-area" style="margin-bottom: 12px;">
+      <BackButton />
+    </div>
     <el-card shadow="always">
       <template #header>
         <div class="card-header">
@@ -46,6 +49,7 @@
 import { ref, reactive, computed } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Edit, Delete } from '@element-plus/icons-vue';
+import BackButton from '@/components/BackButton.vue';
 
 // 模拟班次模板数据
 const shiftTemplates = ref([

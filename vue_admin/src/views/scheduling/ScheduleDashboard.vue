@@ -1,5 +1,8 @@
 <template>
   <div class="schedule-dashboard">
+    <div class="back-area" style="margin-bottom: 12px;">
+      <BackButton />
+    </div>
     <!-- 左侧科室导航 -->
     <div class="department-sidebar">
       <el-menu :default-active="activeParent" class="department-menu" @select="handleParentSelect">
@@ -160,6 +163,7 @@ import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFill
 import { ElMessage } from 'element-plus';
 import doctorMaleImg from '@/assets/doctor.jpg';
 import doctorFemaleImg from '@/assets/doctor1.jpg';
+import BackButton from '@/components/BackButton.vue';
 
 // --- 模拟数据 ---
 const departments = ref([
