@@ -47,7 +47,7 @@
         </div>
       </router-link>
 
-      <!-- 新增：排班管理入口 -->
+      <!-- 排班管理入口 -->
       <router-link to="/scheduling/dashboard" class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #f0e6ff;">
@@ -58,7 +58,7 @@
         </div>
       </router-link>
 
-      <!-- 新增：号别管理入口 -->
+      <!-- 号别管理入口 -->
       <router-link to="/scheduling/fee-management" class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #FFF5E6;">
@@ -69,7 +69,7 @@
         </div>
       </router-link>
 
-      <!-- 新增：就医规范管理入口 -->
+      <!-- 就医规范管理入口 -->
       <router-link to="/regulations" class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #FFF0F6;">
@@ -79,19 +79,26 @@
           <p>编辑和管理就医规范与流程</p>
         </div>
       </router-link>
+
+      <!-- 费用规则管理入口 -->
+      <router-link to="/fees" class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #fff0e6;">
+            <el-icon :size="32" color="#ff8c42"><Money /></el-icon>
+          </div>
+          <h3>费用规则管理</h3>
+          <p>为不同号别设置挂号费用</p>
+        </div>
+      </router-link>
     </div>
   </div>
 </template>
 
 <script setup>
-// 修改：增加了 Calendar, Money 和 Document 图标的导入
 import { Tickets, UserFilled, Calendar, Money, Document } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-// 导入本地图片
 import doctorImage from '@/assets/doctor.jpg';
-// BackButton 组件在此页面未使用，可以按需移除
-// import BackButton from '@/components/BackButton.vue';
 import { useAdminStore } from '@/stores/adminStore';
 
 const router = useRouter();
@@ -109,11 +116,8 @@ const handleLogout = async () => {
         }
     );
 
-    // 清除登录状态
     adminStore.logout();
     ElMessage.success('已退出登录');
-
-    // 跳转到登录页面
     router.push('/login');
   } catch {
     // 用户取消操作
@@ -122,7 +126,7 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
-/* 增加了顶部导航栏的样式 */
+/* 样式部分保持不变 */
 .top-navbar {
   background-color: #fff;
   padding: 0 24px;

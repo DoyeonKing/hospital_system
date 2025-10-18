@@ -18,75 +18,107 @@
       </div>
     </div>
 
-    <!-- 右侧内容区 -->
-    <div class="schedule-content">
-      <el-card shadow="always" class="schedule-card">
-        <template #header>
-          <div class="card-header">
-            <span>{{ selectedDepartmentName }} - 一周排班表</span>
-            <div>
-              <el-button-group>
-                <el-button :icon="ArrowLeft" @click="changeWeek(-1)">上一周</el-button>
-                <el-button @click="changeWeek(0)">本周</el-button>
-                <el-button :icon="ArrowRight" @click="changeWeek(1)">下一周</el-button>
-              </el-button-group>
-            </div>
-          </div>
-        </template>
+     <!-- 右侧内容区 -->
+     <div class="schedule-content">
+       <el-card shadow="always" class="schedule-card">
+         <template #header>
+           <div class="card-header">
+             <span>{{ selectedDepartmentName }} - 排班管理</span>
+             <div class="header-controls">
+               <!-- 视图切换按钮 -->
+               <el-button-group class="view-switcher">
+                 <el-button 
+                   :type="currentView === 'day' ? 'primary' : ''" 
+                   @click="changeView('day')">
+                   日视图
+                 </el-button>
+                 <el-button 
+                   :type="currentView === 'week' ? 'primary' : ''" 
+                   @click="changeView('week')">
+                   周视图
+                 </el-button>
+                 <el-button 
+                   :type="currentView === 'month' ? 'primary' : ''" 
+                   @click="changeView('month')">
+                   月视图
+                 </el-button>
+               </el-button-group>
+               <!-- 周视图导航按钮 -->
+               <el-button-group v-if="currentView === 'week'">
+                 <el-button :icon="ArrowLeft" @click="changeWeek(-1)">上一周</el-button>
+                 <el-button @click="changeWeek(0)">本周</el-button>
+                 <el-button :icon="ArrowRight" @click="changeWeek(1)">下一周</el-button>
+               </el-button-group>
+             </div>
+           </div>
+         </template>
 
-        <div v-if="activeSub">
-          <table class="schedule-table">
-            <thead>
-            <tr>
-              <th>门诊时段</th>
-              <th v-for="day in weekDates" :key="day.fullDate">{{ day.date }} ({{ day.dayOfWeek }})</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr v-for="shift in ['上午', '下午']" :key="shift">
-              <td class="time-slot-column" @dragover.prevent @drop="onDrop($event, null, shift)">
-                <div class="shift-label">{{ shift }}</div>
-                <!-- 时间段卡片区域 - 只显示在这个列中 -->
-                <div class="time-slot-cards">
-                  <div v-for="timeSlot in getTimeSlotsForShift(shift)" :key="timeSlot.slot_id"
-                       class="time-slot-card" draggable="true" 
-                       @dragstart="onDragStart($event, { type: 'timeSlot', data: timeSlot })">
-                    <div class="time-slot-card-content">
-                      <div class="time-slot-name">{{ timeSlot.slot_name }}</div>
-                      <div class="time-slot-time">{{ timeSlot.start_time }} - {{ timeSlot.end_time }}</div>
-                    </div>
-                    <el-icon class="remove-icon" @click="removeTimeSlotFromColumn(timeSlot, shift)"><Close /></el-icon>
-                  </div>
-                </div>
-              </td>
-              <td v-for="day in weekDates" :key="day.fullDate + '-' + shift"
-                  @dragover.prevent @drop="onDrop($event, day.fullDate, shift)">
-                <div class="shift-cell">
-                  <div class="doctor-tags">
-                    <div v-for="doc in getDoctorsForShift(day.fullDate, shift)" :key="doc.id"
-                         class="doctor-card-in-table" :data-doctor-id="doc.id" draggable="true" @dragstart="onDragStart($event, { type: 'doctor', data: doc }, day.fullDate, shift)">
-                      <div class="doctor-card-header">
-                        <img :src="getDoctorAvatar(doc.id)" alt="医生头像" class="doctor-avatar-small">
-                        <span>{{ doc.name }}</span>
-                        <el-icon class="remove-icon" @click="removeDoctorFromShift(doc, day.fullDate, shift)"><Close /></el-icon>
-                      </div>
-                      <div class="doctor-card-location" :class="{ 'is-set': doc.location }">
-                        <el-icon><Location /></el-icon>
-                        <span>{{ doc.location || '待分配地点' }}</span>
-                        <!-- [新增] 清除地点按钮 -->
-                        <el-icon v-if="doc.location" class="clear-location-icon" @click.stop="clearLocation(doc)"><CircleCloseFilled /></el-icon>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </td>
-            </tr>
-            </tbody>
-          </table>
-        </div>
-        <div v-else class="placeholder">
-          <el-empty description="请在左侧选择一个子科室以查看排班表" />
-        </div>
+         <!-- 日历视图 -->
+         <div v-if="currentView !== 'week'" class="calendar-view">
+           <div class="calendar-container">
+             <FullCalendar 
+               ref="fullCalendar"
+               :options="calendarOptions"
+             />
+           </div>
+         </div>
+
+         <!-- 周视图表格 -->
+         <div v-if="currentView === 'week'">
+           <div v-if="activeSub">
+             <table class="schedule-table">
+               <thead>
+               <tr>
+                 <th>门诊时段</th>
+                 <th v-for="day in weekDates" :key="day.fullDate">{{ day.date }} ({{ day.dayOfWeek }})</th>
+               </tr>
+               </thead>
+               <tbody>
+               <tr v-for="shift in ['上午', '下午']" :key="shift">
+                 <td class="time-slot-column" @dragover.prevent @drop="onDrop($event, null, shift)">
+                   <div class="shift-label">{{ shift }}</div>
+                   <!-- 时间段卡片区域 - 只显示在这个列中 -->
+                   <div class="time-slot-cards">
+                     <div v-for="timeSlot in getTimeSlotsForShift(shift)" :key="timeSlot.slot_id"
+                          class="time-slot-card" draggable="true" 
+                          @dragstart="onDragStart($event, { type: 'timeSlot', data: timeSlot })">
+                       <div class="time-slot-card-content">
+                         <div class="time-slot-name">{{ timeSlot.slot_name }}</div>
+                         <div class="time-slot-time">{{ timeSlot.start_time }} - {{ timeSlot.end_time }}</div>
+                       </div>
+                       <el-icon class="remove-icon" @click="removeTimeSlotFromColumn(timeSlot, shift)"><Close /></el-icon>
+                     </div>
+                   </div>
+                 </td>
+                 <td v-for="day in weekDates" :key="day.fullDate + '-' + shift"
+                     @dragover.prevent @drop="onDrop($event, day.fullDate, shift)">
+                   <div class="shift-cell">
+                     <div class="doctor-tags">
+                       <div v-for="doc in getDoctorsForShift(day.fullDate, shift)" :key="doc.id"
+                            class="doctor-card-in-table" :data-doctor-id="doc.id" draggable="true" @dragstart="onDragStart($event, { type: 'doctor', data: doc }, day.fullDate, shift)">
+                         <div class="doctor-card-header">
+                           <img :src="getDoctorAvatar(doc.id)" alt="医生头像" class="doctor-avatar-small">
+                           <span>{{ doc.name }}</span>
+                           <el-icon class="remove-icon" @click="removeDoctorFromShift(doc, day.fullDate, shift)"><Close /></el-icon>
+                         </div>
+                         <div class="doctor-card-location" :class="{ 'is-set': doc.location }">
+                           <el-icon><Location /></el-icon>
+                           <span>{{ doc.location || '待分配地点' }}</span>
+                           <!-- [新增] 清除地点按钮 -->
+                           <el-icon v-if="doc.location" class="clear-location-icon" @click.stop="clearLocation(doc)"><CircleCloseFilled /></el-icon>
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 </td>
+               </tr>
+               </tbody>
+             </table>
+           </div>
+           <div v-else class="placeholder">
+             <el-empty description="请在左侧选择一个子科室以查看排班表" />
+           </div>
+         </div>
       </el-card>
 
       <!-- 底部拖拽区域 -->
@@ -157,9 +189,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 // [新增] 导入 CircleCloseFilled 图标
 import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFilled, Clock } from '@element-plus/icons-vue';
+// [新增] 导入 FullCalendar 组件和插件
+import FullCalendar from '@fullcalendar/vue3';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
 import { ElMessage } from 'element-plus';
 import doctorMaleImg from '@/assets/doctor.jpg';
 import doctorFemaleImg from '@/assets/doctor1.jpg';
@@ -228,11 +265,58 @@ const currentMonday = ref(new Date('2025-10-20'));
 const activeParent = ref(null);
 const activeSub = ref(null);
 
+// [新增] 视图切换状态
+const currentView = ref('week'); // 'day', 'week', 'month'
+const fullCalendar = ref(null);
+const calendarEvents = ref([]);
+
 const subDepartments = computed(() => {
   if (!activeParent.value) return [];
   const parent = departments.value.find(p => p.id === activeParent.value);
   return parent ? parent.children : [];
 });
+
+// [新增] FullCalendar 配置
+const calendarOptions = computed(() => ({
+  plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
+  initialView: currentView.value === 'day' ? 'timeGridDay' : 
+               currentView.value === 'week' ? 'timeGridWeek' : 'dayGridMonth',
+  headerToolbar: {
+    left: 'prev,next today',
+    center: 'title',
+    right: ''
+  },
+  locale: 'zh-cn',
+  buttonText: {
+    today: '今天',
+    month: '月',
+    week: '周',
+    day: '日'
+  },
+  slotMinTime: '08:00:00',
+  slotMaxTime: '18:00:00',
+  allDaySlot: false,
+  height: 'auto',
+  events: calendarEvents.value,
+  eventClick: handleEventClick,
+  dateClick: handleDateClick,
+  drop: handleCalendarDrop,
+  eventDrop: handleEventDrop,
+  eventResize: handleEventResize,
+  editable: true,
+  selectable: true,
+  selectMirror: true,
+  dayMaxEvents: true,
+  weekends: true,
+  slotDuration: '00:30:00',
+  eventTimeFormat: {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  },
+  droppable: true,
+  dropAccept: '.time-slot-card, .location-card'
+}));
 
 const selectedDepartmentName = computed(() => {
   if (!activeSub.value) return '请选择科室';
@@ -492,8 +576,230 @@ const handleSubSelect = (id) => {
   clearTimeSlotColumns();
 };
 
+// [新增] 视图切换函数
+const changeView = (viewType) => {
+  currentView.value = viewType;
+  if (fullCalendar.value) {
+    const calendarApi = fullCalendar.value.getApi();
+    if (viewType === 'day') {
+      calendarApi.changeView('timeGridDay');
+    } else if (viewType === 'week') {
+      calendarApi.changeView('timeGridWeek');
+    } else if (viewType === 'month') {
+      calendarApi.changeView('dayGridMonth');
+    }
+  }
+};
+
+// [新增] 日历事件处理函数
+const handleEventClick = (info) => {
+  const event = info.event;
+  const conflicts = event.extendedProps.conflicts;
+  
+  let message = `医生: ${event.title}\n时间: ${event.startStr} - ${event.endStr}\n地点: ${event.extendedProps.location || '未分配'}`;
+  
+  if (conflicts?.hasConflict) {
+    message += `\n\n⚠️ 冲突警告: ${conflicts.conflictDetails}`;
+    if (conflicts.severity === 'error') {
+      ElMessage.error(message);
+    } else {
+      ElMessage.warning(message);
+    }
+  } else {
+    ElMessage.info(message);
+  }
+};
+
+const handleDateClick = (info) => {
+  console.log('点击日期:', info.dateStr);
+};
+
+// [新增] 日历拖拽事件处理
+const handleCalendarDrop = (info) => {
+  const { date, allDay, resource } = info;
+  
+  // 尝试从不同位置获取拖拽数据
+  let dragData = info.draggedEl.dragData || 
+                 info.draggedEl.__vueParentComponent?.ctx?.dragData || 
+                 info.draggedEl.__vueParentComponent?.setupState?.dragData;
+  
+  // 如果没有找到，尝试从全局拖拽状态获取
+  if (!dragData && window.currentDragData) {
+    dragData = window.currentDragData;
+  }
+  
+  if (!dragData) {
+    console.log('未找到拖拽数据');
+    return;
+  }
+  
+  const { type, data } = dragData;
+  const dropDate = date.toISOString().split('T')[0];
+  
+  if (type === 'timeSlot') {
+    // 拖拽时间段到日历
+    handleTimeSlotDropToCalendar(data, dropDate, date);
+  } else if (type === 'location') {
+    // 拖拽地点到日历（这里可以显示提示）
+    ElMessage.info('请将地点拖拽到医生卡片上');
+  }
+};
+
+// [新增] 处理时间段拖拽到日历
+const handleTimeSlotDropToCalendar = (timeSlot, date, dropDateTime) => {
+  // 根据拖拽时间确定班次
+  const hour = dropDateTime.getHours();
+  const shift = hour < 12 ? '上午' : '下午';
+  
+  // 添加到时间段列
+  if (!timeSlotColumns.value[shift].find(slot => slot.slot_id === timeSlot.slot_id)) {
+    timeSlotColumns.value[shift].push(timeSlot);
+  }
+  
+  ElMessage.success(`已将 ${timeSlot.slot_name} 添加到 ${shift} 时间段`);
+};
+
+// [新增] 处理日历事件拖拽
+const handleEventDrop = (info) => {
+  const event = info.event;
+  const newStart = event.start;
+  const newDate = newStart.toISOString().split('T')[0];
+  
+  // 更新排班数据中的日期
+  updateScheduleDate(event.id, newDate);
+  
+  ElMessage.success('排班已更新');
+};
+
+// [新增] 处理日历事件调整大小
+const handleEventResize = (info) => {
+  const event = info.event;
+  ElMessage.success('排班时间已调整');
+};
+
+// [新增] 更新排班日期
+const updateScheduleDate = (eventId, newDate) => {
+  if (!activeSub.value) return;
+  
+  // 解析事件ID获取原始信息
+  const [originalDate, shift, doctorId] = eventId.split('-');
+  
+  // 找到原始排班记录
+  const originalSchedule = scheduleData.value[activeSub.value].find(
+    s => s.date === originalDate && s.shift === shift
+  );
+  
+  if (originalSchedule) {
+    // 移除原始记录中的医生
+    const doctorIndex = originalSchedule.doctors.findIndex(d => d.id === doctorId);
+    if (doctorIndex > -1) {
+      const doctor = originalSchedule.doctors[doctorIndex];
+      originalSchedule.doctors.splice(doctorIndex, 1);
+      
+      // 添加到新日期的排班
+      addDoctorToSchedule(newDate, shift, doctor);
+    }
+  }
+};
+
+// [新增] 添加医生到排班
+const addDoctorToSchedule = (date, shift, doctor) => {
+  if (!activeSub.value) return;
+  
+  // 确保排班数据结构存在
+  if (!scheduleData.value[activeSub.value]) {
+    scheduleData.value[activeSub.value] = [];
+  }
+  
+  // 查找或创建当天的排班记录
+  let daySchedule = scheduleData.value[activeSub.value].find(s => s.date === date && s.shift === shift);
+  if (!daySchedule) {
+    daySchedule = { date, shift, doctors: [] };
+    scheduleData.value[activeSub.value].push(daySchedule);
+  }
+  
+  // 添加医生（如果不存在）
+  if (!daySchedule.doctors.find(d => d.id === doctor.id)) {
+    daySchedule.doctors.push({ ...doctor });
+  }
+};
+
+// [新增] 将排班数据转换为日历事件
+const convertScheduleToEvents = () => {
+  const events = [];
+  
+  if (!activeSub.value || !scheduleData.value[activeSub.value]) {
+    calendarEvents.value = [];
+    return;
+  }
+
+  const schedules = scheduleData.value[activeSub.value];
+  
+  schedules.forEach(schedule => {
+    const { date, shift, doctors } = schedule;
+    
+    // 确定时间段
+    const startTime = shift === '上午' ? '08:00:00' : '14:00:00';
+    const endTime = shift === '上午' ? '12:00:00' : '18:00:00';
+    
+    // 为每个医生创建事件
+    doctors.forEach((doctor, index) => {
+      // 如果有多个医生，稍微错开时间显示
+      const offsetMinutes = index * 5;
+      const start = new Date(`${date}T${startTime}`);
+      start.setMinutes(start.getMinutes() + offsetMinutes);
+      
+      const end = new Date(`${date}T${endTime}`);
+      end.setMinutes(end.getMinutes() + offsetMinutes);
+      
+      // 根据冲突状态设置颜色
+      let backgroundColor = shift === '上午' ? '#67C23A' : '#409EFF';
+      let borderColor = shift === '上午' ? '#529b2e' : '#337ecc';
+      
+      if (doctor.conflicts?.hasConflict) {
+        if (doctor.conflicts.severity === 'error') {
+          backgroundColor = '#F56C6C';
+          borderColor = '#F56C6C';
+        } else if (doctor.conflicts.severity === 'warning') {
+          backgroundColor = '#E6A23C';
+          borderColor = '#E6A23C';
+        }
+      }
+      
+      events.push({
+        id: `${date}-${shift}-${doctor.id}`,
+        title: `${doctor.name} (${doctor.title || '医生'})`,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        backgroundColor,
+        borderColor,
+        extendedProps: {
+          doctorId: doctor.id,
+          location: doctor.location,
+          shift: shift,
+          departmentId: activeSub.value,
+          conflicts: doctor.conflicts
+        }
+      });
+    });
+  });
+  
+  calendarEvents.value = events;
+};
+
+// [新增] 监听 activeSub 变化，自动更新日历事件
+watch(activeSub, () => {
+  convertScheduleToEvents();
+});
+
+// [新增] 监听 scheduleData 变化，自动更新日历事件
+watch(() => scheduleData.value, () => {
+  convertScheduleToEvents();
+}, { deep: true });
+
 onMounted(() => {
   if (departments.value.length > 0) handleParentSelect(departments.value[0].id);
+  convertScheduleToEvents();
 });
 
 </script>
@@ -504,6 +810,85 @@ onMounted(() => {
   height: calc(100vh - 50px);
   background-color: #f7fafc;
 }
+
+/* [新增] 头部控制按钮样式 */
+.header-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.view-switcher {
+  margin-right: 16px;
+}
+
+/* [新增] 日历容器样式 */
+.calendar-container {
+  padding: 20px;
+  min-height: 600px;
+}
+
+/* [新增] FullCalendar 自定义样式 */
+.calendar-container :deep(.fc) {
+  font-family: 'Microsoft YaHei', sans-serif;
+}
+
+.calendar-container :deep(.fc-toolbar-title) {
+  font-size: 20px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.calendar-container :deep(.fc-button) {
+  background-color: #409EFF;
+  border-color: #409EFF;
+  text-transform: none;
+  padding: 6px 12px;
+}
+
+.calendar-container :deep(.fc-button:hover) {
+  background-color: #66b1ff;
+  border-color: #66b1ff;
+}
+
+.calendar-container :deep(.fc-button-active) {
+  background-color: #337ecc;
+  border-color: #337ecc;
+}
+
+.calendar-container :deep(.fc-event) {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.calendar-container :deep(.fc-event:hover) {
+  opacity: 0.8;
+}
+
+.calendar-container :deep(.fc-daygrid-event) {
+  white-space: normal;
+}
+
+.calendar-container :deep(.fc-timegrid-event) {
+  border-radius: 4px;
+}
+
+.calendar-container :deep(.fc-col-header-cell) {
+  background-color: #f5f7fa;
+  font-weight: bold;
+  padding: 10px 0;
+}
+
+.calendar-container :deep(.fc-day-today) {
+  background-color: #ecf5ff !important;
+}
+
+.calendar-container :deep(.fc-timegrid-slot) {
+  height: 2em;
+}
+
 .department-sidebar {
   width: 320px;
   display: flex;
