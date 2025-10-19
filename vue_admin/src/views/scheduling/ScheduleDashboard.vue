@@ -23,8 +23,36 @@
        <el-card shadow="always" class="schedule-card">
          <template #header>
            <div class="card-header">
-             <span>{{ selectedDepartmentName }} - 排班管理</span>
+             <span>{{ selectedDepartmentName }} ({{ selectedDepartmentCode }}) - 排班管理</span>
              <div class="header-controls">
+               <!-- 冲突信息显示 -->
+               <div class="conflict-controls">
+                 <div v-if="conflictData.hasConflicts" class="conflict-summary">
+                   <el-icon class="conflict-summary-icon" :class="conflictData.summary.critical > 0 ? 'critical-icon' : 'warning-icon'">
+                     <Warning />
+                   </el-icon>
+                   <span class="conflict-text">
+                     发现 {{ conflictData.summary.total }} 个冲突
+                     <span v-if="conflictData.summary.critical > 0" class="critical-count">
+                       (严重: {{ conflictData.summary.critical }})
+                     </span>
+                     <span v-if="conflictData.summary.warning > 0" class="warning-count">
+                       (警告: {{ conflictData.summary.warning }})
+                     </span>
+                   </span>
+                 </div>
+                 <!-- 手动检测冲突按钮 -->
+                 <el-button size="small" type="primary" @click="detectAllConflicts" class="detect-conflicts-btn">
+                   <el-icon><Refresh /></el-icon>
+                   检测冲突
+                 </el-button>
+                 <!-- 调试按钮 -->
+                 <el-button size="small" type="info" @click="debugConflicts" class="debug-btn">
+                   <el-icon><Warning /></el-icon>
+                   调试冲突
+                 </el-button>
+               </div>
+               
                <!-- 视图切换按钮 -->
                <el-button-group class="view-switcher">
                  <el-button 
@@ -80,11 +108,20 @@
                    <!-- 时间段卡片区域 - 只显示在这个列中 -->
                    <div class="time-slot-cards">
                      <div v-for="timeSlot in getTimeSlotsForShift(shift)" :key="timeSlot.slot_id"
-                          class="time-slot-card" draggable="true" 
+                          class="time-slot-card" 
+                          :class="{ 
+                            'time-slot-mismatch': !isTimeSlotMatchShift(timeSlot, shift)
+                          }"
+                          draggable="true" 
                           @dragstart="onDragStart($event, { type: 'timeSlot', data: timeSlot })">
                        <div class="time-slot-card-content">
                          <div class="time-slot-name">{{ timeSlot.slot_name }}</div>
                          <div class="time-slot-time">{{ timeSlot.start_time }} - {{ timeSlot.end_time }}</div>
+                         <!-- 班次不匹配警告 -->
+                         <div v-if="!isTimeSlotMatchShift(timeSlot, shift)" class="shift-mismatch-warning">
+                           <el-icon class="warning-icon"><Warning /></el-icon>
+                           <span>班次不匹配</span>
+                         </div>
                        </div>
                        <el-icon class="remove-icon" @click="removeTimeSlotFromColumn(timeSlot, shift)"><Close /></el-icon>
                      </div>
@@ -95,11 +132,21 @@
                    <div class="shift-cell">
                      <div class="doctor-tags">
                        <div v-for="doc in getDoctorsForShift(day.fullDate, shift)" :key="doc.id"
-                            class="doctor-card-in-table" :data-doctor-id="doc.id" draggable="true" @dragstart="onDragStart($event, { type: 'doctor', data: doc }, day.fullDate, shift)">
+                            class="doctor-card-in-table" 
+                            :class="getDoctorConflictClass(doc, day.fullDate, shift)"
+                            :data-doctor-id="doc.id" 
+                            draggable="true" 
+                            @dragstart="onDragStart($event, { type: 'doctor', data: doc }, day.fullDate, shift)"
+                            @click="showConflictDetails(doc, day.fullDate, shift)">
                          <div class="doctor-card-header">
                            <img :src="getDoctorAvatar(doc.id)" alt="医生头像" class="doctor-avatar-small">
                            <span>{{ doc.name }}</span>
                            <el-icon class="remove-icon" @click="removeDoctorFromShift(doc, day.fullDate, shift)"><Close /></el-icon>
+                           <!-- [新增] 冲突图标 -->
+                           <el-icon v-if="hasDoctorConflicts(doc, day.fullDate, shift)" class="conflict-icon" 
+                                    :class="getDoctorConflictIconClass(doc, day.fullDate, shift)">
+                             <Warning />
+                           </el-icon>
                          </div>
                          <div class="doctor-card-location" :class="{ 'is-set': doc.location }">
                            <el-icon><Location /></el-icon>
@@ -140,6 +187,113 @@
               </div>
             </div>
             <el-empty v-if="!availableDoctors.length" description="该科室暂无医生" :image-size="60"/>
+          </div>
+        </el-card>
+
+        <!-- 批量导入排班信息 -->
+        <el-card shadow="always" class="draggable-list-card batch-import-panel">
+          <template #header>
+            <div class="card-header">
+              <span>批量导入排班信息</span>
+            </div>
+          </template>
+          <div class="batch-import-content">
+            <!-- 模板下载 -->
+            <div class="template-section">
+              <div class="template-info">
+                <el-icon class="template-icon"><Document /></el-icon>
+                <span>请先下载模板文件，按格式填写后上传</span>
+              </div>
+              <el-button type="primary" size="small" @click="downloadTemplate">
+                <el-icon><Download /></el-icon>
+                下载模板
+              </el-button>
+            </div>
+
+            <!-- 文件上传 -->
+            <div class="upload-section">
+              <el-upload
+                ref="uploadRef"
+                class="upload-dragger"
+                drag
+                :auto-upload="false"
+                :show-file-list="false"
+                accept=".xlsx,.xls,.csv"
+                :on-change="handleFileChange"
+                :before-upload="beforeUpload">
+                <div class="upload-content">
+                  <el-icon class="upload-icon"><UploadFilled /></el-icon>
+                  <div class="upload-text">
+                    <p>点击或拖拽文件到此区域上传</p>
+                    <p class="upload-hint">支持 .xlsx、.xls、.csv 格式</p>
+                  </div>
+                </div>
+              </el-upload>
+            </div>
+
+            <!-- 文件信息显示 -->
+            <div v-if="selectedFile" class="file-info">
+              <div class="file-details">
+                <el-icon><Document /></el-icon>
+                <span class="file-name">{{ selectedFile.name }}</span>
+                <span class="file-size">({{ formatFileSize(selectedFile.size) }})</span>
+              </div>
+              <el-button type="danger" size="small" @click="removeFile">
+                <el-icon><Close /></el-icon>
+                移除
+              </el-button>
+            </div>
+
+            <!-- 导入按钮 -->
+            <div class="import-actions">
+              <el-button 
+                type="success" 
+                :loading="importing" 
+                :disabled="!selectedFile"
+                @click="handleImport">
+                <el-icon><Upload /></el-icon>
+                {{ importing ? '导入中...' : '开始导入' }}
+              </el-button>
+              <el-button @click="clearImportData">
+                <el-icon><Refresh /></el-icon>
+                清空数据
+              </el-button>
+            </div>
+
+            <!-- 导入进度 -->
+            <div v-if="importProgress.show" class="import-progress">
+              <div class="progress-header">
+                <span>导入进度</span>
+                <span>{{ importProgress.current }}/{{ importProgress.total }}</span>
+              </div>
+              <el-progress 
+                :percentage="importProgress.percentage" 
+                :status="importProgress.status"
+                :stroke-width="8">
+              </el-progress>
+              <div v-if="importProgress.message" class="progress-message">
+                {{ importProgress.message }}
+              </div>
+            </div>
+
+            <!-- 导入结果 -->
+            <div v-if="importResult.show" class="import-result">
+              <div class="result-header">
+                <el-icon :class="importResult.type === 'success' ? 'success-icon' : 'error-icon'">
+                  <component :is="importResult.type === 'success' ? 'CircleCheck' : 'CircleClose'" />
+                </el-icon>
+                <span>{{ importResult.title }}</span>
+              </div>
+              <div class="result-content">
+                <p>{{ importResult.message }}</p>
+                <div v-if="importResult.details && importResult.details.length > 0" class="result-details">
+                  <h5>详细信息：</h5>
+                  <ul>
+                    <li v-for="detail in importResult.details" :key="detail">{{ detail }}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         </el-card>
 
@@ -189,14 +343,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 // [新增] 导入 CircleCloseFilled 图标
-import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFilled, Clock } from '@element-plus/icons-vue';
+import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFilled, Clock, Document, Download, UploadFilled, Upload, Refresh, CircleCheck, CircleClose, Warning } from '@element-plus/icons-vue';
 // [新增] 导入 FullCalendar 组件和插件
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+// [新增] 导入 Excel 解析库
+import * as XLSX from 'xlsx';
 import { ElMessage } from 'element-plus';
 import doctorMaleImg from '@/assets/doctor.jpg';
 import doctorFemaleImg from '@/assets/doctor1.jpg';
@@ -269,6 +425,37 @@ const activeSub = ref(null);
 const currentView = ref('week'); // 'day', 'week', 'month'
 const fullCalendar = ref(null);
 const calendarEvents = ref([]);
+
+// [新增] 批量导入相关状态
+const uploadRef = ref(null);
+const selectedFile = ref(null);
+const importing = ref(false);
+const importProgress = ref({
+  show: false,
+  current: 0,
+  total: 0,
+  percentage: 0,
+  status: 'success',
+  message: ''
+});
+const importResult = ref({
+  show: false,
+  type: 'success', // 'success' | 'error'
+  title: '',
+  message: '',
+  details: []
+});
+
+// [新增] 冲突检测相关状态
+const conflictData = ref({
+  hasConflicts: false,
+  conflicts: [],
+  summary: {
+    total: 0,
+    critical: 0,
+    warning: 0
+  }
+});
 
 const subDepartments = computed(() => {
   if (!activeParent.value) return [];
@@ -1038,18 +1225,24 @@ onMounted(() => {
 
 
 .bottom-panels {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 20px;
+  display: flex;
+  gap: 16px;
+  margin-top: 20px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
 .draggable-list-card {
   flex-shrink: 0;
+  min-width: 280px;
+  max-width: 320px;
+  width: 300px;
 }
 .draggable-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  min-height: 100px;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .doctor-card {
@@ -1057,11 +1250,13 @@ onMounted(() => {
   align-items: center;
   background-color: #f9fafb;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: 6px;
+  padding: 8px 12px;
   cursor: grab;
   transition: box-shadow 0.2s;
-  width: calc(50% - 6px);
+  gap: 10px;
+  min-height: 50px;
+  width: 100%;
 }
 .doctor-card:hover {
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -1095,11 +1290,13 @@ onMounted(() => {
   align-items: center;
   background-color: #f4f4f5;
   border: 1px solid #e9e9eb;
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: 6px;
+  padding: 8px 12px;
   cursor: grab;
   transition: box-shadow 0.2s;
-  width: calc(50% - 5px);
+  width: 100%;
+  min-height: 50px;
+  gap: 10px;
 }
 .location-card:hover {
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -1216,11 +1413,13 @@ onMounted(() => {
   align-items: center;
   background-color: #f0f9ff;
   border: 1px solid #bae6fd;
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: 6px;
+  padding: 8px 12px;
   cursor: grab;
   transition: box-shadow 0.2s;
-  width: calc(50% - 5px);
+  width: 100%;
+  min-height: 50px;
+  gap: 10px;
 }
 
 .time-slot-card:hover {
@@ -1247,6 +1446,315 @@ onMounted(() => {
 .time-slot-time {
   font-size: 11px;
   color: #64748b;
+}
+
+/* [新增] 批量导入样式 */
+.batch-import-panel {
+  margin-bottom: 16px;
+  min-width: 350px;
+  max-width: 400px;
+  width: 380px;
+}
+
+.batch-import-content {
+  padding: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.template-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f0f9ff;
+  border-radius: 8px;
+  border: 1px solid #e1f5fe;
+}
+
+.template-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1976d2;
+  font-size: 14px;
+}
+
+.template-icon {
+  font-size: 16px;
+}
+
+.upload-section {
+  margin-bottom: 16px;
+}
+
+.upload-dragger {
+  width: 100%;
+}
+
+.upload-content {
+  padding: 20px;
+  text-align: center;
+}
+
+.upload-icon {
+  font-size: 48px;
+  color: #c0c4cc;
+  margin-bottom: 16px;
+}
+
+.upload-text p {
+  margin: 8px 0;
+  color: #606266;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: #909399;
+}
+
+.file-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f5f7fa;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
+.file-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-name {
+  font-weight: 500;
+  color: #303133;
+}
+
+.file-size {
+  color: #909399;
+  font-size: 12px;
+}
+
+.import-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.import-progress {
+  margin-bottom: 16px;
+  padding: 16px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #606266;
+}
+
+.progress-message {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+  text-align: center;
+}
+
+.import-result {
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid;
+}
+
+.import-result.success {
+  background-color: #f0f9ff;
+  border-color: #67c23a;
+}
+
+.import-result.error {
+  background-color: #fef0f0;
+  border-color: #f56c6c;
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.success-icon {
+  color: #67c23a;
+}
+
+.error-icon {
+  color: #f56c6c;
+}
+
+.result-content p {
+  margin: 8px 0;
+  color: #606266;
+}
+
+.result-details {
+  margin-top: 12px;
+}
+
+.result-details h5 {
+  margin: 8px 0;
+  color: #303133;
+  font-size: 14px;
+}
+
+.result-details ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.result-details li {
+  margin: 4px 0;
+  color: #606266;
+  font-size: 13px;
+}
+
+/* [新增] 冲突检测样式 */
+.conflict-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: 16px;
+}
+
+.conflict-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: #fff2e8;
+  border: 1px solid #f5dab1;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.detect-conflicts-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.conflict-summary-icon {
+  font-size: 16px;
+}
+
+.critical-icon {
+  color: #f56c6c;
+}
+
+.warning-icon {
+  color: #e6a23c;
+}
+
+.conflict-text {
+  color: #e6a23c;
+  font-weight: 500;
+}
+
+.critical-count {
+  color: #f56c6c;
+  font-weight: 600;
+}
+
+.warning-count {
+  color: #e6a23corn;
+  font-weight: 600;
+}
+
+/* 医生卡片冲突样式 */
+.conflict-error {
+  background-color: #fef0f0 !important;
+  border: 2px solid #f56c6c !important;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.2);
+}
+
+.conflict-warning {
+  background-color: #fdf6ec !important;
+  border: 2px solid #e6a23c !important;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(230, 162, 60, 0.2);
+}
+
+.conflict-icon {
+  margin-left: 8px;
+  font-size: 16px;
+}
+
+.conflict-error-icon {
+  color: #f56c6c;
+}
+
+.conflict-warning-icon {
+  color: #e6a23c;
+}
+
+/* 冲突卡片悬停效果 */
+.doctor-card-in-table.conflict-error:hover {
+  background-color: #fde2e2 !important;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
+.doctor-card-in-table.conflict-warning:hover {
+  background-color: #fce4d6 !important;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
+/* 日历事件冲突样式 */
+.calendar-container :deep(.fc-event.conflict-critical) {
+  background-color: #f56c6c !important;
+  border-color: #f56c6c !important;
+}
+
+.calendar-container :deep(.fc-event.conflict-warning) {
+  background-color: #e6a23c !important;
+  border-color: #e6a23c !important;
+}
+
+/* 时间段班次不匹配样式 */
+.time-slot-mismatch {
+  background-color: #fef0f0 !important;
+  border: 2px solid #f56c6c !important;
+  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.2);
+}
+
+.shift-mismatch-warning {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 2px 6px;
+  background-color: #f56c6c;
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.shift-mismatch-warning .warning-icon {
+  font-size: 12px;
 }
 </style>
 
