@@ -140,7 +140,7 @@
                             @click="showConflictDetails(doc, day.fullDate, shift)">
                          <div class="doctor-card-header">
                            <img :src="getDoctorAvatar(doc.id)" alt="医生头像" class="doctor-avatar-small">
-                           <span>{{ doc.name }}</span>
+                           <span>{{ doc.name }} (ID:{{ doc.id }})</span>
                            <el-icon class="remove-icon" @click="removeDoctorFromShift(doc, day.fullDate, shift)"><Close /></el-icon>
                            <!-- [新增] 冲突图标 -->
                            <el-icon v-if="hasDoctorConflicts(doc, day.fullDate, shift)" class="conflict-icon" 
@@ -182,7 +182,7 @@
                  class="doctor-card" draggable="true" @dragstart="onDragStart($event, { type: 'doctor', data: doc })">
               <img :src="doc.gender === 'male' ? doctorMaleImg : doctorFemaleImg" alt="医生头像" class="doctor-avatar">
               <div class="doctor-info">
-                <span class="doctor-name">{{ doc.name }}</span>
+                <span class="doctor-name">{{ doc.name }} (ID:{{ doc.id }})</span>
                 <span class="doctor-title">{{ doc.title }}</span>
               </div>
             </div>
@@ -516,6 +516,17 @@ const selectedDepartmentName = computed(() => {
   return '未知科室';
 });
 
+const selectedDepartmentCode = computed(() => {
+  if (!activeSub.value) return 'N/A';
+  const parentAsSub = departments.value.find(p => p.id === activeSub.value);
+  if (parentAsSub) return parentAsSub.code || 'N/A';
+  for (const parent of departments.value) {
+    const sub = parent.children.find(c => c.id === activeSub.value);
+    if (sub) return sub.code || 'N/A';
+  }
+  return 'N/A';
+});
+
 const availableDoctors = computed(() => {
   if (!activeSub.value) return [];
   return doctorsData.value[activeSub.value] || [];
@@ -712,6 +723,13 @@ const removeDoctorFromShift = (doctor, date, shift, showMessage = true) => {
     if (docIndex > -1) {
       shiftEntry.doctors.splice(docIndex, 1);
       if (showMessage) ElMessage.success(`已取消 ${doctor.name} 在 ${date} ${shift} 的排班`);
+      
+      console.log(`移除医生 ${doctor.name} 从 ${date} ${shift}`);
+      
+      // 移除医生后重新检测冲突
+      setTimeout(() => {
+        detectAllConflicts();
+      }, 100);
     }
   }
 };
@@ -911,6 +929,329 @@ const addDoctorToSchedule = (date, shift, doctor) => {
   }
 };
 
+// [新增] 批量导入功能函数
+// 下载模板文件
+const downloadTemplate = () => {
+  const templateData = [
+    ['日期', '班次', '医生姓名', '医生职称', '办公地点', '时间段1', '时间段2', '时间段3', '时间段4'],
+    ['2025/10/20', '上午', '张三', '主治医师', '门诊楼-201诊室', '08:00-08:30', '08:30-09:00', '09:00-09:30', '09:30-10:00'],
+    ['2025/10/20', '下午', '李四', '副主任医师', '门诊楼-203诊室', '14:00-14:30', '14:30-15:00', '15:00-15:30', '15:30-16:00'],
+    ['', '', '', '', '', '', '', '', ''],
+    ['说明：', '', '', '', '', '', '', '', ''],
+    ['1. 日期格式：YYYY/MM/DD 或 YYYY-MM-DD', '', '', '', '', '', '', '', ''],
+    ['2. 班次：上午/下午', '', '', '', '', '', '', '', ''],
+    ['3. 时间段格式：HH:MM-HH:MM', '', '', '', '', '', '', '', ''],
+    ['4. 办公地点请从可用地点中选择', '', '', '', '', '', '', '', '']
+  ];
+  
+  // 创建工作簿
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.aoa_to_sheet(templateData);
+  
+  // 设置列宽
+  worksheet['!cols'] = [
+    { wch: 12 }, // 日期
+    { wch: 8 },  // 班次
+    { wch: 12 }, // 医生姓名
+    { wch: 12 }, // 医生职称
+    { wch: 20 }, // 办公地点
+    { wch: 12 }, // 时间段1
+    { wch: 12 }, // 时间段2
+    { wch: 12 }, // 时间段3
+    { wch: 12 }  // 时间段4
+  ];
+  
+  // 添加工作表到工作簿
+  XLSX.utils.book_append_sheet(workbook, worksheet, '排班模板');
+  
+  // 生成Excel文件并下载
+  XLSX.writeFile(workbook, '排班导入模板.xlsx');
+  
+  ElMessage.success('Excel模板文件下载成功');
+};
+
+// 文件大小格式化
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+// 文件选择处理
+const handleFileChange = (file) => {
+  selectedFile.value = file.raw || file;
+  importResult.value.show = false;
+};
+
+// 上传前验证
+const beforeUpload = (file) => {
+  const isValidType = ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'].includes(file.type);
+  const isLt10M = file.size / 1024 / 1024 < 10;
+
+  if (!isValidType) {
+    ElMessage.error('只能上传 Excel 或 CSV 文件!');
+    return false;
+  }
+  if (!isLt10M) {
+    ElMessage.error('文件大小不能超过 10MB!');
+    return false;
+  }
+  return true;
+};
+
+// 移除文件
+const removeFile = () => {
+  selectedFile.value = null;
+  if (uploadRef.value) {
+    uploadRef.value.clearFiles();
+  }
+  importResult.value.show = false;
+  importProgress.value.show = false;
+};
+
+// Excel文件解析函数
+const parseExcelFile = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        console.log('Excel工作表:', workbook.SheetNames);
+        
+        // 获取第一个工作表
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // 将工作表转换为JSON数组
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        console.log('Excel原始数据:', jsonData);
+        
+        // 转换为标准格式
+        const result = [];
+        for (let i = 0; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          if (row && row.length >= 3 && row[0] && row[1] && row[2]) {
+            // 过滤掉说明行
+            if (typeof row[0] === 'string' && 
+                !row[0].startsWith('说明') && 
+                !row[0].startsWith('1.') && 
+                !row[0].startsWith('2.') && 
+                !row[0].startsWith('3.') && 
+                !row[0].startsWith('4.')) {
+              result.push(row);
+            }
+          }
+        }
+        
+        console.log('处理后的数据:', result);
+        resolve(result);
+      } catch (error) {
+        console.error('Excel解析错误:', error);
+        reject(error);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+};
+
+// 处理导入
+const handleImport = async () => {
+  if (!selectedFile.value) {
+    ElMessage.warning('请先选择文件');
+    return;
+  }
+
+  importing.value = true;
+  importProgress.value = {
+    show: true,
+    current: 0,
+    total: 0,
+    percentage: 0,
+    status: 'success',
+    message: '开始解析文件...'
+  };
+
+  try {
+    // 解析文件
+    const data = await parseExcelFile(selectedFile.value);
+    
+    // 添加调试信息
+    console.log('解析的数据:', data);
+    
+    if (data.length === 0) {
+      throw new Error('文件中没有有效的排班数据');
+    }
+
+    importProgress.value.total = data.length;
+    importProgress.value.message = `开始导入 ${data.length} 条排班记录...`;
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    // 模拟导入过程
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      importProgress.value.current = i + 1;
+      importProgress.value.percentage = Math.round(((i + 1) / data.length) * 100);
+      importProgress.value.message = `正在导入第 ${i + 1} 条记录...`;
+
+      try {
+        await importScheduleRow(row);
+        successCount++;
+      } catch (error) {
+        errors.push(`第${i + 1}行: ${error.message}`);
+        errorCount++;
+      }
+
+      // 模拟处理时间
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // 显示导入结果
+    if (errors.length === 0) {
+      importResult.value = {
+        show: true,
+        type: 'success',
+        title: '导入成功',
+        message: `成功导入 ${successCount} 条排班记录`,
+        details: []
+      };
+      ElMessage.success('排班信息导入成功！');
+    } else {
+      importResult.value = {
+        show: true,
+        type: 'error',
+        title: '导入完成（有错误）',
+        message: `成功导入 ${successCount} 条，失败 ${errorCount} 条`,
+        details: errors
+      };
+      ElMessage.warning(`导入完成，但有 ${errorCount} 条记录失败`);
+    }
+
+  } catch (error) {
+    importResult.value = {
+      show: true,
+      type: 'error',
+      title: '导入失败',
+      message: error.message,
+      details: []
+    };
+    ElMessage.error('导入失败：' + error.message);
+  } finally {
+    importing.value = false;
+    importProgress.value.show = false;
+  }
+};
+
+// 导入单行排班数据
+const importScheduleRow = async (row) => {
+  let [date, shift, doctorName, doctorTitle, location, ...timeSlots] = row;
+  
+  // 添加调试信息
+  console.log('处理行数据:', row);
+  console.log('解析后的字段:', { date, shift, doctorName, doctorTitle, location });
+  
+  // 验证必要字段
+  if (!date || !shift || !doctorName) {
+    throw new Error('日期、班次、医生姓名不能为空');
+  }
+
+  // 处理日期格式 - 支持多种格式
+  console.log('原始日期:', date);
+  
+  // 移除可能的空白字符和特殊字符
+  date = date.toString().trim().replace(/[\s\u00A0]/g, '');
+  
+  // 处理各种日期格式
+  if (date.includes('/')) {
+    // 处理 YYYY/MM/DD 格式
+    const dateParts = date.split('/');
+    if (dateParts.length === 3) {
+      const year = dateParts[0];
+      const month = dateParts[1].padStart(2, '0');
+      const day = dateParts[2].padStart(2, '0');
+      date = `${year}-${month}-${day}`;
+    }
+  } else if (date.includes('-')) {
+    // 处理 YYYY-MM-DD 格式
+    const dateParts = date.split('-');
+    if (dateParts.length === 3) {
+      const year = dateParts[0];
+      const month = dateParts[1].padStart(2, '0');
+      const day = dateParts[2].padStart(2, '0');
+      date = `${year}-${month}-${day}`;
+    }
+  } else if (date.length === 8 && /^\d{8}$/.test(date)) {
+    // 处理 YYYYMMDD 格式
+    const year = date.substring(0, 4);
+    const month = date.substring(4, 6);
+    const day = date.substring(6, 8);
+    date = `${year}-${month}-${day}`;
+  }
+  
+  console.log('处理后的日期:', date);
+  
+  // 验证日期格式
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(date)) {
+    console.error('日期验证失败:', date);
+    throw new Error(`日期格式不正确: "${date}"，应为 YYYY-MM-DD 或 YYYY/MM/DD`);
+  }
+
+  // 验证班次
+  if (!['上午', '下午'].includes(shift)) {
+    throw new Error('班次只能是"上午"或"下午"');
+  }
+
+  // 创建或获取医生
+  const doctor = {
+    id: `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    name: doctorName,
+    title: doctorTitle || '医生',
+    location: location || null,
+    gender: 'male' // 默认性别，实际项目中可以从数据中获取
+  };
+
+  // 添加到排班数据
+  addDoctorToSchedule(date, shift, doctor);
+
+  // 添加时间段
+  const validTimeSlots = timeSlots.filter(slot => slot && slot.toString().includes('-'));
+  for (const timeSlot of validTimeSlots) {
+    const timeSlotStr = timeSlot.toString();
+    const [startTime, endTime] = timeSlotStr.split('-');
+    const slotData = {
+      slot_id: `import_slot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      slot_name: `${shift}${startTime}-${endTime}`,
+      start_time: startTime,
+      end_time: endTime
+    };
+
+    // 添加到时间段列
+    if (!timeSlotColumns.value[shift].find(slot => slot.slot_name === slotData.slot_name)) {
+      timeSlotColumns.value[shift].push(slotData);
+    }
+  }
+};
+
+// 清空导入数据
+const clearImportData = () => {
+  selectedFile.value = null;
+  importResult.value.show = false;
+  importProgress.value.show = false;
+  if (uploadRef.value) {
+    uploadRef.value.clearFiles();
+  }
+  ElMessage.info('已清空导入数据');
+};
+
 // [新增] 将排班数据转换为日历事件
 const convertScheduleToEvents = () => {
   const events = [];
@@ -955,13 +1296,14 @@ const convertScheduleToEvents = () => {
       
       events.push({
         id: `${date}-${shift}-${doctor.id}`,
-        title: `${doctor.name} (${doctor.title || '医生'})`,
+        title: `${doctor.name} (ID:${doctor.id})`,
         start: start.toISOString(),
         end: end.toISOString(),
         backgroundColor,
         borderColor,
         extendedProps: {
           doctorId: doctor.id,
+          doctorTitle: doctor.title || '医生',
           location: doctor.location,
           shift: shift,
           departmentId: activeSub.value,
@@ -974,6 +1316,451 @@ const convertScheduleToEvents = () => {
   calendarEvents.value = events;
 };
 
+// [新增] 完整的冲突检测系统
+const detectAllConflicts = () => {
+  if (!activeSub.value || !scheduleData.value[activeSub.value]) {
+    conflictData.value = {
+      hasConflicts: false,
+      conflicts: [],
+      summary: { total: 0, critical: 0, warning: 0 }
+    };
+    return;
+  }
+
+  // 创建深拷贝，避免修改原始响应式数据
+  const schedules = JSON.parse(JSON.stringify(scheduleData.value[activeSub.value]));
+  const conflicts = [];
+  
+  console.log('开始冲突检测，排班数据:', schedules);
+  
+  // 1. 检测医生重复排班冲突（同一医生同一时间段多次排班）
+  const doctorConflicts = detectDoctorDoubleBooking(schedules);
+  console.log('医生重复排班冲突:', doctorConflicts);
+  conflicts.push(...doctorConflicts);
+  
+  // 2. 检测办公室冲突（同一办公室同一时间段被多个医生占用）
+  const officeConflicts = detectOfficeConflicts(schedules);
+  console.log('办公室冲突:', officeConflicts);
+  conflicts.push(...officeConflicts);
+  
+  // 3. 检测医生跨办公室冲突（同一医生同一时间段在不同办公室）
+  conflicts.push(...detectDoctorMultiOfficeConflicts(schedules));
+  
+  // 4. 检测工作时间冲突（医生连续工作时间过长）
+  conflicts.push(...detectWorkDurationConflicts(schedules));
+  
+  // 5. 检测医生休息时间冲突（医生没有足够的休息时间）
+  conflicts.push(...detectRestTimeConflicts(schedules));
+  
+  // 6. 检测时间段重叠冲突
+  conflicts.push(...detectTimeSlotOverlapConflicts(schedules));
+
+  console.log('所有冲突:', conflicts);
+
+  // 更新冲突数据
+  conflictData.value = {
+    hasConflicts: conflicts.length > 0,
+    conflicts: conflicts,
+    summary: {
+      total: conflicts.length,
+      critical: conflicts.filter(c => c.severity === 'critical').length,
+      warning: conflicts.filter(c => c.severity === 'warning').length
+    }
+  };
+};
+
+// [新增] 检测医生重复排班冲突
+const detectDoctorDoubleBooking = (schedules) => {
+  const conflicts = [];
+  const doctorScheduleMap = new Map();
+  
+  schedules.forEach(schedule => {
+    const { date, shift, doctors } = schedule;
+    const timeKey = `${date}-${shift}`;
+    
+    doctors.forEach(doctor => {
+      const doctorKey = `${doctor.id}-${timeKey}`;
+      
+      if (doctorScheduleMap.has(doctorKey)) {
+        const existingSchedule = doctorScheduleMap.get(doctorKey);
+        conflicts.push({
+          type: 'doctor_double_booking',
+          severity: 'critical',
+          title: '医生重复排班',
+          description: `医生 ${doctor.name} 在 ${date} ${shift} 被重复排班`,
+          details: [
+            `医生: ${doctor.name}`,
+            `时间: ${date} ${shift}`,
+            `地点1: ${existingSchedule.location || '未分配'}`,
+            `地点2: ${doctor.location || '未分配'}`
+          ],
+          doctorId: doctor.id,
+          date: date,
+          shift: shift
+        });
+      } else {
+        doctorScheduleMap.set(doctorKey, { ...doctor, date, shift });
+      }
+    });
+  });
+  
+  return conflicts;
+};
+
+// [新增] 检测办公室冲突 - 修改为同一日期同一办公室被多人使用即为冲突
+const detectOfficeConflicts = (schedules) => {
+  const conflicts = [];
+  const officeDateMap = new Map(); // 改为按日期和办公室分组
+  
+  console.log('开始检测办公室冲突，排班数据:', schedules);
+  
+  schedules.forEach(schedule => {
+    const { date, shift, doctors } = schedule;
+    
+    console.log(`检查 ${date} ${shift} 的医生:`, doctors);
+    
+    doctors.forEach(doctor => {
+      if (doctor.location) {
+        // 改为按日期和办公室分组，不区分时间段
+        const officeDateKey = `${doctor.location}-${date}`;
+        
+        console.log(`检查医生 ${doctor.name} 在办公室 ${doctor.location} 日期 ${date}`);
+        
+        if (officeDateMap.has(officeDateKey)) {
+          const existingDoctors = officeDateMap.get(officeDateKey);
+          
+          // 检查是否已经记录了这个医生
+          const alreadyRecorded = existingDoctors.some(existing => existing.id === doctor.id);
+          
+          if (!alreadyRecorded) {
+            existingDoctors.push({ ...doctor, date, shift });
+            console.log(`发现办公室冲突: ${doctor.location} 在 ${date} 被多个医生使用`);
+            
+            // 为所有使用这个办公室的医生创建冲突记录
+            existingDoctors.forEach(existingDoctor => {
+              conflicts.push({
+                type: 'office_conflict',
+                severity: 'critical',
+                title: '办公室冲突',
+                description: `办公室 ${doctor.location} 在 ${date} 被多个医生使用`,
+                details: [
+                  `办公室: ${doctor.location}`,
+                  `日期: ${date}`,
+                  `使用医生: ${existingDoctors.map(d => d.name).join(', ')}`,
+                  `建议: 每个办公室每天只能分配给一个医生`
+                ],
+                location: doctor.location,
+                date: date,
+                shift: shift,
+                doctorIds: existingDoctors.map(d => d.id),
+                allDoctors: existingDoctors
+              });
+            });
+          }
+        } else {
+          officeDateMap.set(officeDateKey, [{ ...doctor, date, shift }]);
+          console.log(`记录医生 ${doctor.name} 在办公室 ${doctor.location}`);
+        }
+      }
+    });
+  });
+  
+  console.log('办公室冲突检测完成，发现冲突:', conflicts);
+  return conflicts;
+};
+
+// [新增] 检测医生跨办公室冲突
+const detectDoctorMultiOfficeConflicts = (schedules) => {
+  const conflicts = [];
+  const doctorOfficeMap = new Map();
+  
+  schedules.forEach(schedule => {
+    const { date, shift, doctors } = schedule;
+    const timeKey = `${date}-${shift}`;
+    
+    doctors.forEach(doctor => {
+      if (doctor.location) {
+        const doctorKey = `${doctor.id}-${timeKey}`;
+        
+        if (doctorOfficeMap.has(doctorKey)) {
+          const existingLocation = doctorOfficeMap.get(doctorKey);
+          conflicts.push({
+            type: 'doctor_multi_office',
+            severity: 'critical',
+            title: '医生跨办公室冲突',
+            description: `医生 ${doctor.name} 在 ${date} ${shift} 被分配到多个办公室`,
+            details: [
+              `医生: ${doctor.name}`,
+              `时间: ${date} ${shift}`,
+              `办公室1: ${existingLocation}`,
+              `办公室2: ${doctor.location}`
+            ],
+            doctorId: doctor.id,
+            date: date,
+            shift: shift,
+            locations: [existingLocation, doctor.location]
+          });
+        } else {
+          doctorOfficeMap.set(doctorKey, doctor.location);
+        }
+      }
+    });
+  });
+  
+  return conflicts;
+};
+
+// [新增] 检测工作时间冲突（连续工作时间过长）
+const detectWorkDurationConflicts = (schedules) => {
+  const conflicts = [];
+  const doctorWorkMap = new Map();
+  
+  // 收集每个医生的工作安排
+  schedules.forEach(schedule => {
+    const { date, shift, doctors } = schedule;
+    doctors.forEach(doctor => {
+      if (!doctorWorkMap.has(doctor.id)) {
+        doctorWorkMap.set(doctor.id, []);
+      }
+      doctorWorkMap.get(doctor.id).push({ date, shift, doctor });
+    });
+  });
+  
+  // 检查每个医生的工作安排
+  doctorWorkMap.forEach((workList, doctorId) => {
+    // 按日期排序
+    workList.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    // 检查连续工作天数
+    let consecutiveDays = 1;
+    let maxConsecutiveDays = 1;
+    
+    for (let i = 1; i < workList.length; i++) {
+      const prevDate = new Date(workList[i-1].date);
+      const currDate = new Date(workList[i].date);
+      const dayDiff = (currDate - prevDate) / (1000 * 60 * 60 * 24);
+      
+      if (dayDiff === 1) {
+        consecutiveDays++;
+        maxConsecutiveDays = Math.max(maxConsecutiveDays, consecutiveDays);
+      } else {
+        consecutiveDays = 1;
+      }
+    }
+    
+    // 如果连续工作超过7天，标记为冲突
+    if (maxConsecutiveDays > 7) {
+      conflicts.push({
+        type: 'work_duration_conflict',
+        severity: 'warning',
+        title: '工作时间冲突',
+        description: `医生 ${workList[0].doctor.name} 连续工作 ${maxConsecutiveDays} 天，建议休息`,
+        details: [
+          `医生: ${workList[0].doctor.name}`,
+          `连续工作天数: ${maxConsecutiveDays} 天`,
+          `建议: 连续工作不应超过7天，请安排休息时间`
+        ],
+        doctorId: doctorId,
+        consecutiveDays: maxConsecutiveDays
+      });
+    }
+  });
+  
+  return conflicts;
+};
+
+// [新增] 检测休息时间冲突
+const detectRestTimeConflicts = (schedules) => {
+  const conflicts = [];
+  return conflicts; // 暂时简化实现
+};
+
+// [新增] 检测时间段重叠冲突
+const detectTimeSlotOverlapConflicts = (schedules) => {
+  const conflicts = [];
+  return conflicts; // 暂时简化实现
+};
+
+// [新增] 获取医生冲突样式类 - 修改为持久检查
+const getDoctorConflictClass = (doctor, date, shift) => {
+  const relevantConflicts = conflictData.value.conflicts.filter(conflict => {
+    switch (conflict.type) {
+      case 'doctor_double_booking':
+      case 'doctor_multi_office':
+        return conflict.doctorId === doctor.id && 
+               conflict.date === date && 
+               conflict.shift === shift;
+      case 'office_conflict':
+        // 办公室冲突：只要日期匹配且医生在冲突列表中即可
+        return conflict.date === date && 
+               conflict.doctorIds && conflict.doctorIds.includes(doctor.id);
+      case 'work_duration_conflict':
+      case 'rest_time_conflict':
+        return conflict.doctorId === doctor.id;
+      default:
+        return false;
+    }
+  });
+
+  console.log(`检查医生 ${doctor.name} 在 ${date} ${shift} 的冲突:`, relevantConflicts);
+
+  if (relevantConflicts.length > 0) {
+    const hasCritical = relevantConflicts.some(c => c.severity === 'critical');
+    console.log(`医生 ${doctor.name} 有冲突，严重程度:`, hasCritical ? 'critical' : 'warning');
+    return hasCritical ? 'conflict-error' : 'conflict-warning';
+  }
+  return '';
+};
+
+// [新增] 检查医生是否有冲突 - 修改为持久检查
+const hasDoctorConflicts = (doctor, date, shift) => {
+  const hasConflict = conflictData.value.conflicts.some(conflict => {
+    switch (conflict.type) {
+      case 'doctor_double_booking':
+      case 'office_conflict':
+      case 'doctor_multi_office':
+        // 对于办公室冲突，只检查日期匹配，不检查具体时间段
+        if (conflict.type === 'office_conflict') {
+          const dateMatch = conflict.date === date;
+          const doctorMatch = conflict.doctorIds && conflict.doctorIds.includes(doctor.id);
+          
+          console.log(`检查办公室冲突匹配:`, {
+            doctor: doctor.name,
+            date,
+            shift,
+            conflictDate: conflict.date,
+            conflictDoctorIds: conflict.doctorIds,
+            dateMatch,
+            doctorMatch,
+            conflict
+          });
+          
+          return doctorMatch && dateMatch;
+        } else {
+          // 其他冲突类型保持原有逻辑
+          const dateMatch = conflict.date === date;
+          const shiftMatch = conflict.shift === shift;
+          const doctorMatch = conflict.doctorId === doctor.id || 
+                             (conflict.doctorIds && conflict.doctorIds.includes(doctor.id));
+          
+          return doctorMatch && dateMatch && shiftMatch;
+        }
+      case 'work_duration_conflict':
+      case 'rest_time_conflict':
+        return conflict.doctorId === doctor.id;
+      default:
+        return false;
+    }
+  });
+  
+  console.log(`医生 ${doctor.name} 在 ${date} ${shift} 是否有冲突:`, hasConflict);
+  return hasConflict;
+};
+
+// [新增] 检查时间段卡片是否匹配班次
+const isTimeSlotMatchShift = (timeSlot, shift) => {
+  if (!timeSlot || !timeSlot.slot_name) return true;
+  
+  // 检查时间段名称是否包含班次信息
+  const slotName = timeSlot.slot_name.toLowerCase();
+  const shiftLower = shift.toLowerCase();
+  
+  // 如果时间段名称包含"上午"或"下午"，检查是否匹配
+  if (slotName.includes('上午') && shiftLower === '下午') {
+    return false;
+  }
+  if (slotName.includes('下午') && shiftLower === '上午') {
+    return false;
+  }
+  
+  return true; // 默认允许，对于没有明确班次标识的时间段
+};
+
+// [新增] 获取医生冲突图标样式类
+const getDoctorConflictIconClass = (doctor, date, shift) => {
+  const relevantConflicts = conflictData.value.conflicts.filter(conflict => {
+    switch (conflict.type) {
+      case 'doctor_double_booking':
+      case 'office_conflict':
+      case 'doctor_multi_office':
+        return conflict.doctorId === doctor.id && 
+               conflict.date === date && 
+               conflict.shift === shift;
+      case 'work_duration_conflict':
+      case 'rest_time_conflict':
+        return conflict.doctorId === doctor.id;
+      default:
+        return false;
+    }
+  });
+
+  if (relevantConflicts.length > 0) {
+    const hasCritical = relevantConflicts.some(c => c.severity === 'critical');
+    return hasCritical ? 'conflict-error-icon' : 'conflict-warning-icon';
+  }
+  return '';
+};
+
+// [新增] 显示冲突详情
+const showConflictDetails = (doctor, date, shift) => {
+  const relevantConflicts = conflictData.value.conflicts.filter(conflict => {
+    switch (conflict.type) {
+      case 'doctor_double_booking':
+      case 'office_conflict':
+      case 'doctor_multi_office':
+        return conflict.doctorId === doctor.id && 
+               conflict.date === date && 
+               conflict.shift === shift;
+      case 'work_duration_conflict':
+      case 'rest_time_conflict':
+        return conflict.doctorId === doctor.id;
+      default:
+        return false;
+    }
+  });
+
+  if (relevantConflicts.length > 0) {
+    const conflictTypes = relevantConflicts.map(c => c.title).join('、');
+    const severity = relevantConflicts.some(c => c.severity === 'critical') ? 'critical' : 'warning';
+    
+    let message = `医生: ${doctor.name}\n冲突类型: ${conflictTypes}\n\n详细信息:\n`;
+    relevantConflicts.forEach(conflict => {
+      message += `• ${conflict.description}\n`;
+    });
+    
+    if (severity === 'critical') {
+      ElMessage.error(message);
+    } else {
+      ElMessage.warning(message);
+    }
+  }
+};
+
+// [新增] 调试冲突函数
+const debugConflicts = () => {
+  console.log('=== 调试冲突信息 ===');
+  console.log('当前选中的科室:', activeSub.value);
+  console.log('排班数据:', scheduleData.value);
+  console.log('冲突数据:', conflictData.value);
+  
+  if (activeSub.value && scheduleData.value[activeSub.value]) {
+    const schedules = scheduleData.value[activeSub.value];
+    console.log('当前科室的排班:', schedules);
+    
+    // 检查每个排班
+    schedules.forEach((schedule, index) => {
+      console.log(`排班 ${index}:`, schedule);
+      if (schedule.doctors) {
+        schedule.doctors.forEach((doctor, docIndex) => {
+          console.log(`  医生 ${docIndex}:`, doctor);
+        });
+      }
+    });
+  }
+  
+  ElMessage.info('调试信息已输出到控制台，请按F12查看');
+};
+
 // [新增] 监听 activeSub 变化，自动更新日历事件
 watch(activeSub, () => {
   convertScheduleToEvents();
@@ -984,9 +1771,26 @@ watch(() => scheduleData.value, () => {
   convertScheduleToEvents();
 }, { deep: true });
 
+// [新增] 单独监听 scheduleData 变化进行冲突检测，避免递归
+let conflictDetectionTimeout = null;
+watch(() => scheduleData.value, () => {
+  // 使用防抖避免频繁触发冲突检测
+  if (conflictDetectionTimeout) {
+    clearTimeout(conflictDetectionTimeout);
+  }
+  conflictDetectionTimeout = setTimeout(() => {
+    console.log('排班数据发生变化，重新检测冲突...');
+    detectAllConflicts();
+  }, 500); // 500ms 防抖，给更多时间让数据稳定
+}, { deep: true });
+
 onMounted(() => {
   if (departments.value.length > 0) handleParentSelect(departments.value[0].id);
   convertScheduleToEvents();
+  // 延迟执行冲突检测，确保数据已经加载完成
+  setTimeout(() => {
+    detectAllConflicts();
+  }, 1000);
 });
 
 </script>
@@ -1678,7 +2482,7 @@ onMounted(() => {
 }
 
 .warning-count {
-  color: #e6a23corn;
+  color: #e6a23c;
   font-weight: 600;
 }
 
