@@ -18,11 +18,11 @@
       </div>
     </div>
 
-     <!-- 右侧内容区 -->
-     <div class="schedule-content">
-       <el-card shadow="always" class="schedule-card">
-         <template #header>
-           <div class="card-header">
+    <!-- 右侧内容区 -->
+    <div class="schedule-content">
+      <el-card shadow="always" class="schedule-card">
+        <template #header>
+          <div class="card-header">
              <span>{{ selectedDepartmentName }} ({{ selectedDepartmentCode }}) - 排班管理</span>
              <div class="header-controls">
                <!-- 冲突信息显示 -->
@@ -41,16 +41,6 @@
                      </span>
                    </span>
                  </div>
-                 <!-- 手动检测冲突按钮 -->
-                 <el-button size="small" type="primary" @click="detectAllConflicts" class="detect-conflicts-btn">
-                   <el-icon><Refresh /></el-icon>
-                   检测冲突
-                 </el-button>
-                 <!-- 调试按钮 -->
-                 <el-button size="small" type="info" @click="debugConflicts" class="debug-btn">
-                   <el-icon><Warning /></el-icon>
-                   调试冲突
-                 </el-button>
                </div>
                
                <!-- 视图切换按钮 -->
@@ -73,13 +63,13 @@
                </el-button-group>
                <!-- 周视图导航按钮 -->
                <el-button-group v-if="currentView === 'week'">
-                 <el-button :icon="ArrowLeft" @click="changeWeek(-1)">上一周</el-button>
-                 <el-button @click="changeWeek(0)">本周</el-button>
-                 <el-button :icon="ArrowRight" @click="changeWeek(1)">下一周</el-button>
-               </el-button-group>
-             </div>
-           </div>
-         </template>
+                <el-button :icon="ArrowLeft" @click="changeWeek(-1)">上一周</el-button>
+                <el-button @click="changeWeek(0)">本周</el-button>
+                <el-button :icon="ArrowRight" @click="changeWeek(1)">下一周</el-button>
+              </el-button-group>
+            </div>
+          </div>
+        </template>
 
          <!-- 日历视图 -->
          <div v-if="currentView !== 'week'" class="calendar-view">
@@ -93,79 +83,79 @@
 
          <!-- 周视图表格 -->
          <div v-if="currentView === 'week'">
-           <div v-if="activeSub">
-             <table class="schedule-table">
-               <thead>
-               <tr>
-                 <th>门诊时段</th>
-                 <th v-for="day in weekDates" :key="day.fullDate">{{ day.date }} ({{ day.dayOfWeek }})</th>
-               </tr>
-               </thead>
-               <tbody>
-               <tr v-for="shift in ['上午', '下午']" :key="shift">
-                 <td class="time-slot-column" @dragover.prevent @drop="onDrop($event, null, shift)">
-                   <div class="shift-label">{{ shift }}</div>
-                   <!-- 时间段卡片区域 - 只显示在这个列中 -->
-                   <div class="time-slot-cards">
-                     <div v-for="timeSlot in getTimeSlotsForShift(shift)" :key="timeSlot.slot_id"
+        <div v-if="activeSub">
+          <table class="schedule-table">
+            <thead>
+            <tr>
+              <th>门诊时段</th>
+              <th v-for="day in weekDates" :key="day.fullDate">{{ day.date }} ({{ day.dayOfWeek }})</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="shift in ['上午', '下午']" :key="shift">
+              <td class="time-slot-column" @dragover.prevent @drop="onDrop($event, null, shift)">
+                <div class="shift-label">{{ shift }}</div>
+                <!-- 时间段卡片区域 - 只显示在这个列中 -->
+                <div class="time-slot-cards">
+                  <div v-for="timeSlot in getTimeSlotsForShift(shift)" :key="timeSlot.slot_id"
                           class="time-slot-card" 
                           :class="{ 
                             'time-slot-mismatch': !isTimeSlotMatchShift(timeSlot, shift)
                           }"
                           draggable="true" 
-                          @dragstart="onDragStart($event, { type: 'timeSlot', data: timeSlot })">
-                       <div class="time-slot-card-content">
-                         <div class="time-slot-name">{{ timeSlot.slot_name }}</div>
-                         <div class="time-slot-time">{{ timeSlot.start_time }} - {{ timeSlot.end_time }}</div>
+                       @dragstart="onDragStart($event, { type: 'timeSlot', data: timeSlot })">
+                    <div class="time-slot-card-content">
+                      <div class="time-slot-name">{{ timeSlot.slot_name }}</div>
+                      <div class="time-slot-time">{{ timeSlot.start_time }} - {{ timeSlot.end_time }}</div>
                          <!-- 班次不匹配警告 -->
                          <div v-if="!isTimeSlotMatchShift(timeSlot, shift)" class="shift-mismatch-warning">
                            <el-icon class="warning-icon"><Warning /></el-icon>
                            <span>班次不匹配</span>
                          </div>
-                       </div>
-                       <el-icon class="remove-icon" @click="removeTimeSlotFromColumn(timeSlot, shift)"><Close /></el-icon>
-                     </div>
-                   </div>
-                 </td>
-                 <td v-for="day in weekDates" :key="day.fullDate + '-' + shift"
-                     @dragover.prevent @drop="onDrop($event, day.fullDate, shift)">
-                   <div class="shift-cell">
-                     <div class="doctor-tags">
-                       <div v-for="doc in getDoctorsForShift(day.fullDate, shift)" :key="doc.id"
+                    </div>
+                    <el-icon class="remove-icon" @click="removeTimeSlotFromColumn(timeSlot, shift)"><Close /></el-icon>
+                  </div>
+                </div>
+              </td>
+              <td v-for="day in weekDates" :key="day.fullDate + '-' + shift"
+                  @dragover.prevent @drop="onDrop($event, day.fullDate, shift)">
+                <div class="shift-cell">
+                  <div class="doctor-tags">
+                    <div v-for="doc in getDoctorsForShift(day.fullDate, shift)" :key="doc.id"
                             class="doctor-card-in-table" 
                             :class="getDoctorConflictClass(doc, day.fullDate, shift)"
                             :data-doctor-id="doc.id" 
                             draggable="true" 
                             @dragstart="onDragStart($event, { type: 'doctor', data: doc }, day.fullDate, shift)"
                             @click="showConflictDetails(doc, day.fullDate, shift)">
-                         <div class="doctor-card-header">
-                           <img :src="getDoctorAvatar(doc.id)" alt="医生头像" class="doctor-avatar-small">
-                           <span>{{ doc.name }} (ID:{{ doc.id }})</span>
-                           <el-icon class="remove-icon" @click="removeDoctorFromShift(doc, day.fullDate, shift)"><Close /></el-icon>
+                      <div class="doctor-card-header">
+                        <img :src="getDoctorAvatar(doc.id)" alt="医生头像" class="doctor-avatar-small">
+                          <span>{{ doc.name }} (ID:{{ doc.identifier || doc.id }})</span>
+                        <el-icon class="remove-icon" @click="removeDoctorFromShift(doc, day.fullDate, shift)"><Close /></el-icon>
                            <!-- [新增] 冲突图标 -->
                            <el-icon v-if="hasDoctorConflicts(doc, day.fullDate, shift)" class="conflict-icon" 
                                     :class="getDoctorConflictIconClass(doc, day.fullDate, shift)">
                              <Warning />
                            </el-icon>
-                         </div>
-                         <div class="doctor-card-location" :class="{ 'is-set': doc.location }">
-                           <el-icon><Location /></el-icon>
-                           <span>{{ doc.location || '待分配地点' }}</span>
-                           <!-- [新增] 清除地点按钮 -->
-                           <el-icon v-if="doc.location" class="clear-location-icon" @click.stop="clearLocation(doc)"><CircleCloseFilled /></el-icon>
-                         </div>
-                       </div>
-                     </div>
-                   </div>
-                 </td>
-               </tr>
-               </tbody>
-             </table>
+                      </div>
+                      <div class="doctor-card-location" :class="{ 'is-set': doc.location }">
+                        <el-icon><Location /></el-icon>
+                        <span>{{ doc.location || '待分配地点' }}</span>
+                        <!-- [新增] 清除地点按钮 -->
+                        <el-icon v-if="doc.location" class="clear-location-icon" @click.stop="clearLocation(doc)"><CircleCloseFilled /></el-icon>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else class="placeholder">
+          <el-empty description="请在左侧选择一个子科室以查看排班表" />
            </div>
-           <div v-else class="placeholder">
-             <el-empty description="请在左侧选择一个子科室以查看排班表" />
-           </div>
-         </div>
+        </div>
       </el-card>
 
       <!-- 底部拖拽区域 -->
@@ -177,123 +167,15 @@
               <span>待排班医生 (拖拽到上方进行排班)</span>
             </div>
           </template>
-          <div class="draggable-list">
+              <div class="draggable-list">
             <div v-for="doc in availableDoctors" :key="doc.id"
                  class="doctor-card" draggable="true" @dragstart="onDragStart($event, { type: 'doctor', data: doc })">
               <img :src="doc.gender === 'male' ? doctorMaleImg : doctorFemaleImg" alt="医生头像" class="doctor-avatar">
               <div class="doctor-info">
-                <span class="doctor-name">{{ doc.name }} (ID:{{ doc.id }})</span>
-                <span class="doctor-title">{{ doc.title }}</span>
+                <span class="doctor-name">{{ doc.name }} (ID:{{ doc.identifier }})</span>
               </div>
             </div>
             <el-empty v-if="!availableDoctors.length" description="该科室暂无医生" :image-size="60"/>
-          </div>
-        </el-card>
-
-        <!-- 批量导入排班信息 -->
-        <el-card shadow="always" class="draggable-list-card batch-import-panel">
-          <template #header>
-            <div class="card-header">
-              <span>批量导入排班信息</span>
-            </div>
-          </template>
-          <div class="batch-import-content">
-            <!-- 模板下载 -->
-            <div class="template-section">
-              <div class="template-info">
-                <el-icon class="template-icon"><Document /></el-icon>
-                <span>请先下载模板文件，按格式填写后上传</span>
-              </div>
-              <el-button type="primary" size="small" @click="downloadTemplate">
-                <el-icon><Download /></el-icon>
-                下载模板
-              </el-button>
-            </div>
-
-            <!-- 文件上传 -->
-            <div class="upload-section">
-              <el-upload
-                ref="uploadRef"
-                class="upload-dragger"
-                drag
-                :auto-upload="false"
-                :show-file-list="false"
-                accept=".xlsx,.xls,.csv"
-                :on-change="handleFileChange"
-                :before-upload="beforeUpload">
-                <div class="upload-content">
-                  <el-icon class="upload-icon"><UploadFilled /></el-icon>
-                  <div class="upload-text">
-                    <p>点击或拖拽文件到此区域上传</p>
-                    <p class="upload-hint">支持 .xlsx、.xls、.csv 格式</p>
-                  </div>
-                </div>
-              </el-upload>
-            </div>
-
-            <!-- 文件信息显示 -->
-            <div v-if="selectedFile" class="file-info">
-              <div class="file-details">
-                <el-icon><Document /></el-icon>
-                <span class="file-name">{{ selectedFile.name }}</span>
-                <span class="file-size">({{ formatFileSize(selectedFile.size) }})</span>
-              </div>
-              <el-button type="danger" size="small" @click="removeFile">
-                <el-icon><Close /></el-icon>
-                移除
-              </el-button>
-            </div>
-
-            <!-- 导入按钮 -->
-            <div class="import-actions">
-              <el-button 
-                type="success" 
-                :loading="importing" 
-                :disabled="!selectedFile"
-                @click="handleImport">
-                <el-icon><Upload /></el-icon>
-                {{ importing ? '导入中...' : '开始导入' }}
-              </el-button>
-              <el-button @click="clearImportData">
-                <el-icon><Refresh /></el-icon>
-                清空数据
-              </el-button>
-            </div>
-
-            <!-- 导入进度 -->
-            <div v-if="importProgress.show" class="import-progress">
-              <div class="progress-header">
-                <span>导入进度</span>
-                <span>{{ importProgress.current }}/{{ importProgress.total }}</span>
-              </div>
-              <el-progress 
-                :percentage="importProgress.percentage" 
-                :status="importProgress.status"
-                :stroke-width="8">
-              </el-progress>
-              <div v-if="importProgress.message" class="progress-message">
-                {{ importProgress.message }}
-              </div>
-            </div>
-
-            <!-- 导入结果 -->
-            <div v-if="importResult.show" class="import-result">
-              <div class="result-header">
-                <el-icon :class="importResult.type === 'success' ? 'success-icon' : 'error-icon'">
-                  <component :is="importResult.type === 'success' ? 'CircleCheck' : 'CircleClose'" />
-                </el-icon>
-                <span>{{ importResult.title }}</span>
-              </div>
-              <div class="result-content">
-                <p>{{ importResult.message }}</p>
-                <div v-if="importResult.details && importResult.details.length > 0" class="result-details">
-                  <h5>详细信息：</h5>
-                  <ul>
-                    <li v-for="detail in importResult.details" :key="detail">{{ detail }}</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
           </div>
         </el-card>
 
@@ -369,11 +251,11 @@ const departments = ref([
 
 const doctorsData = ref({
   's1-2': [
-    {id: 1, name: '杨青松', title: '主任医师', gender: 'male'},
-    {id: 2, name: '杨林', title: '副主任医师', gender: 'male'},
-    {id: 3, name: '席紫明', title: '主治医师', gender: 'female'}
+    {id: 1, name: '杨青松', identifier: 'D001', title: '主任医师', gender: 'male'},
+    {id: 2, name: '杨林', identifier: 'D002', title: '副主任医师', gender: 'male'},
+    {id: 3, name: '席紫明', identifier: 'D003', title: '主治医师', gender: 'female'}
   ],
-  'p3': [ {id: 6, name: '王莉', title: '主任医师', gender: 'female'} ],
+  'p3': [ {id: 6, name: '王莉', identifier: 'D006', title: '主任医师', gender: 'female'} ],
 });
 
 const availableLocations = ref([
@@ -1134,6 +1016,18 @@ const handleImport = async () => {
       };
       ElMessage.warning(`导入完成，但有 ${errorCount} 条记录失败`);
     }
+    
+    // [新增] 导入完成后立即进行冲突检测
+    setTimeout(() => {
+      detectAllConflicts();
+      if (conflictData.value.hasConflicts) {
+        ElMessage.warning(
+          `检测到 ${conflictData.value.summary.total} 个排班冲突，` +
+          `其中严重冲突 ${conflictData.value.summary.critical} 个，` +
+          `警告 ${conflictData.value.summary.warning} 个。请检查红色/黄色高亮的排班。`
+        );
+      }
+    }, 500);
 
   } catch (error) {
     importResult.value = {
@@ -1210,9 +1104,52 @@ const importScheduleRow = async (row) => {
     throw new Error('班次只能是"上午"或"下午"');
   }
 
+  // [新增] 检查是否存在冲突 - 防止同一医生同一时间在多个地点
+  if (activeSub.value && scheduleData.value[activeSub.value]) {
+    const existingSchedule = scheduleData.value[activeSub.value].find(
+      s => s.date === date && s.shift === shift
+    );
+    
+    if (existingSchedule) {
+      // 检查是否已经有同名医生在这个时间段
+      const duplicateDoctor = existingSchedule.doctors.find(d => d.name === doctorName);
+      if (duplicateDoctor) {
+        // 检查办公地点是否不同
+        if (duplicateDoctor.location && location && duplicateDoctor.location !== location) {
+          throw new Error(
+            `医生 ${doctorName} 在 ${date} ${shift} 已被分配到 ${duplicateDoctor.location}，` +
+            `不能再分配到 ${location}。同一医生不能同时在两个地方。`
+          );
+        } else if (duplicateDoctor.location && location && duplicateDoctor.location === location) {
+          // 如果是同一地点，跳过（避免重复导入）
+          console.log(`医生 ${doctorName} 在 ${date} ${shift} 已在 ${location}，跳过重复导入`);
+          return;
+        }
+      }
+      
+      // 检查办公室是否已被其他医生占用（同一天同一办公室）
+      if (location) {
+        // 检查当天所有班次的所有医生
+        const allSchedulesOnDate = scheduleData.value[activeSub.value].filter(s => s.date === date);
+        for (const schedule of allSchedulesOnDate) {
+          const doctorInSameOffice = schedule.doctors.find(
+            d => d.location === location && d.name !== doctorName
+          );
+          if (doctorInSameOffice) {
+            throw new Error(
+              `办公室 ${location} 在 ${date} 已被医生 ${doctorInSameOffice.name} 占用，` +
+              `不能再分配给医生 ${doctorName}。每个办公室每天只能分配给一个医生。`
+            );
+          }
+        }
+      }
+    }
+  }
+
   // 创建或获取医生
   const doctor = {
     id: `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    identifier: `IMP${Date.now().toString().slice(-6)}`, // 生成导入医生的工号
     name: doctorName,
     title: doctorTitle || '医生',
     location: location || null,
@@ -1283,31 +1220,38 @@ const convertScheduleToEvents = () => {
       // 根据冲突状态设置颜色
       let backgroundColor = shift === '上午' ? '#67C23A' : '#409EFF';
       let borderColor = shift === '上午' ? '#529b2e' : '#337ecc';
+      let className = '';
       
-      if (doctor.conflicts?.hasConflict) {
-        if (doctor.conflicts.severity === 'error') {
+      // 检查该医生在这个日期和班次是否有冲突
+      const hasConflict = hasDoctorConflicts(doctor, date, shift);
+      if (hasConflict) {
+        const conflictClass = getDoctorConflictClass(doctor, date, shift);
+        if (conflictClass === 'conflict-error') {
           backgroundColor = '#F56C6C';
           borderColor = '#F56C6C';
-        } else if (doctor.conflicts.severity === 'warning') {
+          className = 'conflict-critical';
+        } else if (conflictClass === 'conflict-warning') {
           backgroundColor = '#E6A23C';
           borderColor = '#E6A23C';
+          className = 'conflict-warning';
         }
       }
       
       events.push({
         id: `${date}-${shift}-${doctor.id}`,
-        title: `${doctor.name} (ID:${doctor.id})`,
+        title: `${doctor.name} (ID:${doctor.identifier || doctor.id})`,
         start: start.toISOString(),
         end: end.toISOString(),
         backgroundColor,
         borderColor,
+        className,
         extendedProps: {
           doctorId: doctor.id,
           doctorTitle: doctor.title || '医生',
           location: doctor.location,
           shift: shift,
           departmentId: activeSub.value,
-          conflicts: doctor.conflicts
+          hasConflict: hasConflict
         }
       });
     });
@@ -1581,12 +1525,13 @@ const detectTimeSlotOverlapConflicts = (schedules) => {
   return conflicts; // 暂时简化实现
 };
 
-// [新增] 获取医生冲突样式类 - 修改为持久检查
+// [新增] 获取医生冲突样式类 - 修改为持久检查，显示所有冲突
 const getDoctorConflictClass = (doctor, date, shift) => {
   const relevantConflicts = conflictData.value.conflicts.filter(conflict => {
     switch (conflict.type) {
       case 'doctor_double_booking':
       case 'doctor_multi_office':
+        // 特定日期和班次的冲突
         return conflict.doctorId === doctor.id && 
                conflict.date === date && 
                conflict.shift === shift;
@@ -1596,64 +1541,47 @@ const getDoctorConflictClass = (doctor, date, shift) => {
                conflict.doctorIds && conflict.doctorIds.includes(doctor.id);
       case 'work_duration_conflict':
       case 'rest_time_conflict':
-        return conflict.doctorId === doctor.id;
+      case 'time_slot_overlap':
+        // 全局性冲突：影响该医生的所有排班
+        return conflict.doctorId === doctor.id || 
+               (conflict.doctorIds && conflict.doctorIds.includes(doctor.id));
       default:
         return false;
     }
   });
 
-  console.log(`检查医生 ${doctor.name} 在 ${date} ${shift} 的冲突:`, relevantConflicts);
-
   if (relevantConflicts.length > 0) {
     const hasCritical = relevantConflicts.some(c => c.severity === 'critical');
-    console.log(`医生 ${doctor.name} 有冲突，严重程度:`, hasCritical ? 'critical' : 'warning');
     return hasCritical ? 'conflict-error' : 'conflict-warning';
   }
   return '';
 };
 
-// [新增] 检查医生是否有冲突 - 修改为持久检查
+// [新增] 检查医生是否有冲突 - 修改为持久检查，显示所有冲突
 const hasDoctorConflicts = (doctor, date, shift) => {
   const hasConflict = conflictData.value.conflicts.some(conflict => {
     switch (conflict.type) {
       case 'doctor_double_booking':
-      case 'office_conflict':
       case 'doctor_multi_office':
-        // 对于办公室冲突，只检查日期匹配，不检查具体时间段
-        if (conflict.type === 'office_conflict') {
-          const dateMatch = conflict.date === date;
-          const doctorMatch = conflict.doctorIds && conflict.doctorIds.includes(doctor.id);
-          
-          console.log(`检查办公室冲突匹配:`, {
-            doctor: doctor.name,
-            date,
-            shift,
-            conflictDate: conflict.date,
-            conflictDoctorIds: conflict.doctorIds,
-            dateMatch,
-            doctorMatch,
-            conflict
-          });
-          
-          return doctorMatch && dateMatch;
-        } else {
-          // 其他冲突类型保持原有逻辑
-          const dateMatch = conflict.date === date;
-          const shiftMatch = conflict.shift === shift;
-          const doctorMatch = conflict.doctorId === doctor.id || 
-                             (conflict.doctorIds && conflict.doctorIds.includes(doctor.id));
-          
-          return doctorMatch && dateMatch && shiftMatch;
-        }
+        // 特定日期和班次的冲突
+        return conflict.doctorId === doctor.id && 
+               conflict.date === date && 
+               conflict.shift === shift;
+      case 'office_conflict':
+        // 办公室冲突：只要日期匹配且医生在冲突列表中即可
+        return conflict.date === date && 
+               conflict.doctorIds && conflict.doctorIds.includes(doctor.id);
       case 'work_duration_conflict':
       case 'rest_time_conflict':
-        return conflict.doctorId === doctor.id;
+      case 'time_slot_overlap':
+        // 全局性冲突：影响该医生的所有排班，全部显示冲突图标
+        return conflict.doctorId === doctor.id || 
+               (conflict.doctorIds && conflict.doctorIds.includes(doctor.id));
       default:
         return false;
     }
   });
   
-  console.log(`医生 ${doctor.name} 在 ${date} ${shift} 是否有冲突:`, hasConflict);
   return hasConflict;
 };
 
@@ -1681,14 +1609,21 @@ const getDoctorConflictIconClass = (doctor, date, shift) => {
   const relevantConflicts = conflictData.value.conflicts.filter(conflict => {
     switch (conflict.type) {
       case 'doctor_double_booking':
-      case 'office_conflict':
       case 'doctor_multi_office':
+        // 特定日期和班次的冲突
         return conflict.doctorId === doctor.id && 
                conflict.date === date && 
                conflict.shift === shift;
+      case 'office_conflict':
+        // 办公室冲突：只要日期匹配且医生在冲突列表中即可
+        return conflict.date === date && 
+               conflict.doctorIds && conflict.doctorIds.includes(doctor.id);
       case 'work_duration_conflict':
       case 'rest_time_conflict':
-        return conflict.doctorId === doctor.id;
+      case 'time_slot_overlap':
+        // 全局性冲突：影响该医生的所有排班
+        return conflict.doctorId === doctor.id || 
+               (conflict.doctorIds && conflict.doctorIds.includes(doctor.id));
       default:
         return false;
     }
@@ -1706,14 +1641,21 @@ const showConflictDetails = (doctor, date, shift) => {
   const relevantConflicts = conflictData.value.conflicts.filter(conflict => {
     switch (conflict.type) {
       case 'doctor_double_booking':
-      case 'office_conflict':
       case 'doctor_multi_office':
+        // 特定日期和班次的冲突
         return conflict.doctorId === doctor.id && 
                conflict.date === date && 
                conflict.shift === shift;
+      case 'office_conflict':
+        // 办公室冲突：只要日期匹配且医生在冲突列表中即可
+        return conflict.date === date && 
+               conflict.doctorIds && conflict.doctorIds.includes(doctor.id);
       case 'work_duration_conflict':
       case 'rest_time_conflict':
-        return conflict.doctorId === doctor.id;
+      case 'time_slot_overlap':
+        // 全局性冲突：影响该医生的所有排班
+        return conflict.doctorId === doctor.id || 
+               (conflict.doctorIds && conflict.doctorIds.includes(doctor.id));
       default:
         return false;
     }
@@ -1723,9 +1665,14 @@ const showConflictDetails = (doctor, date, shift) => {
     const conflictTypes = relevantConflicts.map(c => c.title).join('、');
     const severity = relevantConflicts.some(c => c.severity === 'critical') ? 'critical' : 'warning';
     
-    let message = `医生: ${doctor.name}\n冲突类型: ${conflictTypes}\n\n详细信息:\n`;
+    let message = `医生: ${doctor.name} (工号:${doctor.identifier || doctor.id})\n冲突类型: ${conflictTypes}\n\n详细信息:\n`;
     relevantConflicts.forEach(conflict => {
       message += `• ${conflict.description}\n`;
+      if (conflict.details && conflict.details.length > 0) {
+        conflict.details.forEach(detail => {
+          message += `  - ${detail}\n`;
+        });
+      }
     });
     
     if (severity === 'critical') {
