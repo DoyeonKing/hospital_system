@@ -1,41 +1,60 @@
-import request from '@/utils/request'; // 假设这是您的 axios 封装
+import request from '@/utils/request';
 
 /**
- * 获取科室分页列表
+ * 获取子科室分页列表
  * GET /api/departments
  * 接收查询参数 queryDTO，返回 PageDepartmentResponseDTO
  */
 export function getDepartmentPage(query) {
-    // 1. 构造后端需要的参数
     const params = {
         name: query.name,
         description: query.description,
-        // 💡 重点：后端分页 page 通常从 0 开始，前端的 currentPage 从 1 开始，所以需要 -1
-        page: query.page - 1,
+        parentDepartmentId: query.parentDepartmentId,
+        page: query.page !== undefined ? query.page : 0, // 直接使用传入的页码，不进行减1操作
         size: query.size,
         sortBy: query.sortBy,
-        // 💡 后端通常需要大写的 ASC/DESC 或全小写 asc/desc，具体看您的后端要求
-        sortOrder: query.sortOrder === 'descending' ? 'DESC' : 'ASC',
+        sortOrder: query.sortOrder === 'descending' ? 'desc' : 'asc',
     };
 
-    // 2. 发起 GET 请求
     return request({
-        url: '/api/departments', // 您的接口路径
+        url: '/api/departments',
         method: 'get',
-        params: params, // 将参数放在 params 中，axios 会自动添加到 URL Query String
+        params: params,
     });
 }
 
 /**
- * 新增科室信息
+ * 获取所有父科室列表
+ * GET /api/departments/parents
+ */
+export function getAllParentDepartments() {
+    return request({
+        url: '/api/departments/parents',
+        method: 'get',
+    });
+}
+
+/**
+ * 根据父科室ID获取子科室列表
+ * GET /api/departments/parent/{parentId}
+ */
+export function getDepartmentsByParentId(parentId) {
+    return request({
+        url: `/api/departments/parent/${parentId}`,
+        method: 'get',
+    });
+}
+
+/**
+ * 新增子科室信息
  * POST /api/departments
- * 接收 DepartmentCreationDTO (包含 name, parentDepartmentName, description)
+ * 接收 DepartmentDTO (包含 name, parentDepartmentName, description)
  */
 export function createDepartment(departmentData) {
     return request({
         url: '/api/departments',
-        method: 'post', // 使用 POST 方法新增资源
-        data: departmentData, // 将数据放在请求体中
+        method: 'post',
+        data: departmentData,
     });
 }
 
@@ -116,5 +135,40 @@ export function deleteDepartmentByName(departmentName) {
     return request({
         url: `/api/departments/${departmentName}`,
         method: 'delete',
+    });
+}
+
+/**
+ * 根据ID获取科室详情
+ * GET /api/departments/{id}
+ * @param {number} id - 科室ID
+ */
+export function getDepartmentById(id) {
+    return request({
+        url: `/api/departments/${id}`,
+        method: 'get',
+    });
+}
+
+/**
+ * 获取科室树形结构数据（排除ID=999的未分配科室）
+ * GET /api/departments/tree
+ */
+export function getDepartmentTree() {
+    return request({
+        url: '/api/departments/tree',
+        method: 'get',
+    });
+}
+
+/**
+ * 根据科室ID获取该科室下的医生列表
+ * GET /api/departments/{departmentId}/doctors
+ * @param {number} departmentId - 科室ID
+ */
+export function getDoctorsByDepartmentId(departmentId) {
+    return request({
+        url: `/api/departments/${departmentId}/doctors`,
+        method: 'get',
     });
 }

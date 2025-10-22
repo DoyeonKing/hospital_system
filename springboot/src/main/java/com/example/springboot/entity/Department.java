@@ -2,33 +2,35 @@ package com.example.springboot.entity;
 
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
- * 科室表
+ * 子科室表
  */
 @Entity
-@Table(name = "departments") // 确保表名正确
+@Table(name = "departments")
 public class Department {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer departmentId; // 对应 department_id
+    @Column(name = "department_id")
+    private Integer departmentId;
 
-    // 对应 parent_id 字段, 指向本表
-    @JsonIgnore // <--- 新增：断开向上的序列化循环
+    // 关联到父科室表
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_id")
-    private Department parentDepartment;
+    @JoinColumn(name = "parent_id", nullable = false)
+    private ParentDepartment parentDepartment;
 
-    @Column(nullable = false, length = 100)
-    private String name; // 科室名称
+    @Column(name = "name", nullable = false, length = 100)
+    private String name; // 子科室名称
 
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description; // 科室职能描述
 
-    // 孩子部门: 使用 @JsonIgnore 打破 Jackson 序列化循环引用
+    // 与医生的关联关系（一对多）
+    @OneToMany(mappedBy = "department", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JsonIgnore
-    @OneToMany(mappedBy = "parentDepartment", fetch = FetchType.LAZY)
-    private Set<Department> childrenDepartments;
+    private List<Doctor> doctors = new ArrayList<>();
 
     // =======================================================
     // 手动生成的 Getter 和 Setter 方法 (保持不变)
@@ -42,11 +44,11 @@ public class Department {
         this.departmentId = departmentId;
     }
 
-    public Department getParentDepartment() {
+    public ParentDepartment getParentDepartment() {
         return parentDepartment;
     }
 
-    public void setParentDepartment(Department parentDepartment) {
+    public void setParentDepartment(ParentDepartment parentDepartment) {
         this.parentDepartment = parentDepartment;
     }
 
@@ -66,11 +68,20 @@ public class Department {
         this.description = description;
     }
 
-    public Set<Department> getChildrenDepartments() {
-        return childrenDepartments;
+    public List<Doctor> getDoctors() {
+        return doctors;
     }
 
-    public void setChildrenDepartments(Set<Department> childrenDepartments) {
-        this.childrenDepartments = childrenDepartments;
+    public void setDoctors(List<Doctor> doctors) {
+        this.doctors = doctors;
+    }
+
+    // 构造函数
+    public Department() {}
+
+    public Department(ParentDepartment parentDepartment, String name, String description) {
+        this.parentDepartment = parentDepartment;
+        this.name = name;
+        this.description = description;
     }
 }
