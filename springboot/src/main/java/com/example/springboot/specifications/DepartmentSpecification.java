@@ -28,6 +28,11 @@ public class DepartmentSpecification {
                 predicates.add(builder.like(root.get("description"), likePattern));
             }
 
+            // 3. 根据父科室ID搜索
+            if (queryDTO.getParentDepartmentId() != null) {
+                predicates.add(builder.equal(root.get("parentDepartment").get("parentDepartmentId"), queryDTO.getParentDepartmentId()));
+            }
+
             // 将所有条件用 AND 连接
             return builder.and(predicates.toArray(new Predicate[0]));
         };

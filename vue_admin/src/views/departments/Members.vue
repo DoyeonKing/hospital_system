@@ -16,18 +16,19 @@
 
       <div class="member-management-section">
         <el-table :data="currentDepartment.members" border stripe>
-          <el-table-column prop="id" label="医生ID" width="150" />
-          <el-table-column prop="name" label="医生姓名" width="180" />
+          <el-table-column prop="identifier" label="医生工号" width="150" />
+          <el-table-column prop="fullName" label="医生姓名" width="180" />
           <el-table-column prop="title" label="职称" />
+          <el-table-column prop="phoneNumber" label="联系电话" width="150" />
           <el-table-column label="操作" width="120" align="center">
             <template #default="{ row }">
               <el-button
                   type="danger"
                   size="small"
                   :icon="Delete"
-                  @click="handleDelete(row.id)"
+                  @click="handleDelete(row.identifier)"
               >
-                删除
+                移除
               </el-button>
             </template>
           </el-table-column>
@@ -39,20 +40,22 @@
     <el-empty v-else-if="!loading" description="未找到指定的科室信息或获取失败" />
 
     <el-dialog v-model="addDialogVisible" title="添加新成员" width="500px">
-      <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="80px">
-        <el-form-item label="医生ID" prop="id">
-          <el-input v-model="addForm.id" placeholder="请输入医生工号" />
+      <el-form :model="addMemberForm" :rules="addMemberRules" ref="addMemberFormRef" label-width="100px">
+        <el-form-item label="医生工号" prop="identifier">
+          <el-input v-model="addMemberForm.identifier" placeholder="请输入医生工号" />
         </el-form-item>
-        <el-form-item label="医生姓名" prop="name">
-          <el-input v-model="addForm.name" placeholder="请输入医生姓名" />
+        <el-form-item label="医生姓名" prop="fullName">
+          <el-input v-model="addMemberForm.fullName" placeholder="请输入医生姓名" />
         </el-form-item>
         <el-form-item label="职称" prop="title">
-          <el-input v-model="addForm.title" placeholder="请输入医生职称" />
+          <el-input v-model="addMemberForm.title" placeholder="请输入职称" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="addDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleAddMember">确认添加</el-button>
+        <div class="dialog-footer">
+          <el-button @click="addDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitAddMember" :loading="addingMember">确定</el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -60,135 +63,168 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { Plus, Delete } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { Plus, Delete } from '@element-plus/icons-vue';
 import BackButton from '@/components/BackButton.vue';
-import { useRoute } from 'vue-router';
-// 1. 导入新增的 deleteDepartmentMember API 函数
-import { getDepartmentDoctors, addDepartmentMember, deleteDepartmentMember } from '@/api/department';
+import { useRoute, useRouter } from 'vue-router';
+
+// 导入 API 服务
+import { getDepartmentById, addDepartmentMember, deleteDepartmentMember, getDoctorsByDepartmentId } from '@/api/department';
 
 const route = useRoute();
-const addFormRef = ref(null);
-const currentDepartment = ref(null);
-const loading = ref(true);
-const departmentId = route.params.id;
+const router = useRouter();
 
-// 获取成员列表函数 (保持不变)
-const fetchDepartmentDoctors = async (deptId) => {
-  if (!deptId) {
-    loading.value = false;
-    ElMessage.error('无效的科室ID');
+// 数据状态
+const currentDepartment = ref(null);
+const loading = ref(false);
+const addDialogVisible = ref(false);
+const addingMember = ref(false);
+
+// 添加成员表单
+const addMemberForm = reactive({
+  identifier: '',
+  fullName: '',
+  title: ''
+});
+
+const addMemberRules = {
+  identifier: [
+    { required: true, message: '请输入医生工号', trigger: 'blur' }
+  ],
+  fullName: [
+    { required: true, message: '请输入医生姓名', trigger: 'blur' }
+  ],
+  title: [
+    { required: true, message: '请输入职称', trigger: 'blur' }
+  ]
+};
+
+const addMemberFormRef = ref(null);
+
+// 获取科室信息
+const fetchDepartmentInfo = async () => {
+  const departmentId = route.params.id;
+  if (!departmentId) {
+    ElMessage.error('缺少科室ID参数');
+    router.back();
     return;
   }
+
   loading.value = true;
   try {
-    const response = await getDepartmentDoctors(deptId);
-    const departmentData = response.data || response;
-    if (!departmentData || !departmentData.departmentId) {
-      throw new Error("返回的数据格式不正确或为空");
+    // 并行获取科室信息和医生列表
+    const [departmentResponse, doctorsResponse] = await Promise.all([
+      getDepartmentById(departmentId),
+      getDoctorsByDepartmentId(departmentId)
+    ]);
+    
+    if (departmentResponse) {
+      currentDepartment.value = departmentResponse;
+      // 设置医生列表
+      currentDepartment.value.members = doctorsResponse || [];
+    } else {
+      ElMessage.error('科室不存在');
+      router.back();
     }
-    currentDepartment.value = {
-      id: departmentData.departmentId,
-      name: departmentData.departmentName,
-      members: departmentData.doctors.map(doctor => ({
-        id: doctor.identifier,
-        name: doctor.fullName,
-        title: doctor.title
-      }))
-    };
   } catch (error) {
-    console.error('获取科室医生列表失败:', error);
-    ElMessage.error('获取科室医生列表失败，详情请查看控制台');
-    currentDepartment.value = null;
+    console.error('获取科室信息失败:', error);
+    ElMessage.error('获取科室信息失败: ' + (error.message || '未知错误'));
   } finally {
     loading.value = false;
   }
 };
 
-onMounted(() => {
-  if (departmentId) {
-    fetchDepartmentDoctors(departmentId);
-  } else {
-    loading.value = false;
-    ElMessage.error('页面路由参数不正确，无法加载科室信息');
-  }
-});
-
-// 添加成员逻辑 (保持不变)
-const addDialogVisible = ref(false);
-const addForm = reactive({ id: '', name: '', title: '' });
-const addRules = reactive({
-  id: [{ required: true, message: '医生ID不能为空', trigger: 'blur' }],
-  name: [{ required: true, message: '医生姓名不能为空', trigger: 'blur' }],
-  title: [{ required: true, message: '医生职称不能为空', trigger: 'blur' }]
-});
+// 打开添加成员对话框
 const openAddDialog = () => {
-  if (addFormRef.value) addFormRef.value.resetFields();
-  Object.assign(addForm, { id: '', name: '', title: '' });
+  addMemberForm.identifier = '';
+  addMemberForm.fullName = '';
+  addMemberForm.title = '';
   addDialogVisible.value = true;
 };
-const handleAddMember = () => {
-  addFormRef.value.validate(async (valid) => {
-    if (valid) {
-      const payload = {
-        identifier: addForm.id,
-        fullName: addForm.name,
-        title: addForm.title
-      };
-      try {
-        await addDepartmentMember(departmentId, payload);
-        ElMessage.success('成员添加成功！');
-        addDialogVisible.value = false;
-        await fetchDepartmentDoctors(departmentId);
-      } catch (error) {
-        console.error("添加成员失败:", error);
+
+// 提交添加成员
+const submitAddMember = async () => {
+  if (!addMemberFormRef.value) return;
+
+  try {
+    await addMemberFormRef.value.validate();
+    
+    addingMember.value = true;
+    
+    await addDepartmentMember(currentDepartment.value.departmentId, addMemberForm);
+    
+    ElMessage.success('医生添加成功');
+    addDialogVisible.value = false;
+    
+    // 刷新科室信息
+    await fetchDepartmentInfo();
+    
+  } catch (error) {
+    console.error('添加医生失败:', error);
+    ElMessage.error('添加医生失败: ' + (error.message || '未知错误'));
+  } finally {
+    addingMember.value = false;
+  }
+};
+
+// 删除成员
+const handleDelete = async (doctorIdentifier) => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要从该科室移除该医生吗？医生将被移动到未分配科室。',
+      '确认移除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
       }
+    );
+
+    await deleteDepartmentMember(currentDepartment.value.departmentId, doctorIdentifier);
+    ElMessage.success('医生移除成功');
+    
+    // 刷新科室信息
+    await fetchDepartmentInfo();
+    
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('移除医生失败:', error);
+      ElMessage.error('移除医生失败: ' + (error.message || '未知错误'));
     }
-  });
+  }
 };
 
-// 2. ***** 核心修改：改造 handleDelete 函数以对接API *****
-const handleDelete = (memberId) => {
-  ElMessageBox.confirm('确定要从该科室移除这位成员吗？', '警告', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => { // 将回调函数改为 async
-    try {
-      // 3. 调用删除API，传入科室ID和成员ID
-      await deleteDepartmentMember(departmentId, memberId);
-
-      ElMessage.success('成员删除成功！');
-
-      // 4. 【关键】删除成功后，重新获取列表数据以刷新页面
-      await fetchDepartmentDoctors(departmentId);
-
-    } catch (error) {
-      // API请求失败时的错误处理
-      console.error("删除成员失败:", error);
-      // request 工具库通常会自动弹出消息，这里可以留空或添加额外日志
-    }
-  });
-};
+// 组件挂载时获取数据
+onMounted(() => {
+  fetchDepartmentInfo();
+});
 </script>
 
 <style scoped>
 .app-container {
   padding: 20px;
 }
+
+.back-area {
+  margin-bottom: 12px;
+}
+
 .card-header-title {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
 .department-name-title {
   margin: 0;
-  font-size: 18px;
-  font-weight: bold;
   color: #303133;
-  line-height: 1.6;
 }
+
 .member-management-section {
-  margin-top: 10px;
+  margin-top: 20px;
+}
+
+.dialog-footer {
+  text-align: right;
 }
 </style>

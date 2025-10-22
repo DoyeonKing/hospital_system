@@ -20,6 +20,11 @@ public class DepartmentQueryDTO {
     private String description;
 
     /**
+     * 父科室ID，用于精确搜索
+     */
+    private Integer parentDepartmentId;
+
+    /**
      * 当前页码 (从 0 开始)
      * 默认值将在 Controller 层或 Service 层处理 (通常为 0)
      */
