@@ -1,11 +1,14 @@
-package com.example.springboot.entity; // 包名调整
+package com.example.springboot.entity;
 
-import com.example.springboot.entity.enums.ScheduleStatus; // 导入路径调整
+import com.example.springboot.entity.enums.ScheduleStatus;
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * 医生排班表
@@ -29,7 +32,11 @@ public class Schedule {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "slot_id", nullable = false)
-    private TimeSlot timeSlot; // 时间段ID
+    private TimeSlot slot; // 时间段ID
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "location_id", nullable = false)
+    private Location location; // 就诊地点ID
 
     @Column(name = "total_slots", nullable = false)
     private Integer totalSlots; // 总号源数
@@ -45,4 +52,12 @@ public class Schedule {
     private ScheduleStatus status; // 排班状态
 
     private String remarks; // 特别的排班要求或备注信息
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 }

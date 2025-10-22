@@ -3,6 +3,7 @@ package com.example.springboot.service;
 import com.example.springboot.dto.waitlist.WaitlistCreateRequest;
 import com.example.springboot.dto.waitlist.WaitlistResponse;
 import com.example.springboot.dto.waitlist.WaitlistUpdateRequest;
+import com.example.springboot.dto.ScheduleResponse;
 import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.Schedule;
@@ -11,6 +12,7 @@ import com.example.springboot.entity.enums.AppointmentStatus;
 import com.example.springboot.entity.enums.BlacklistStatus;
 import com.example.springboot.entity.enums.WaitlistStatus;
 import com.example.springboot.entity.enums.PaymentStatus;
+import com.example.springboot.entity.enums.PatientStatus;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.AppointmentRepository;
@@ -190,7 +192,7 @@ public class WaitlistService {
         WaitlistResponse response = new WaitlistResponse();
         BeanUtils.copyProperties(waitlist, response, "patient", "schedule");
         response.setPatient(patientService.convertToResponseDto(waitlist.getPatient()));
-        response.setSchedule(scheduleService.convertToResponseDto(waitlist.getSchedule()));
+        response.setSchedule(ScheduleResponse.fromEntity(waitlist.getSchedule()));
         return response;
     }
 }

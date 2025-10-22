@@ -246,7 +246,7 @@ import { ref, computed, onMounted } from 'vue';
 import { ArrowLeft, ArrowRight, Money, Tickets, RefreshLeft, Check } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import BackButton from '@/components/BackButton.vue';
-// import { getSchedules, batchUpdateSchedules } from '@/api/schedule'; // 等后端接口完成后启用
+import { getSchedules, batchUpdateSchedules } from '@/api/schedule';
 
 // --- 科室数据 ---
 const departments = ref([
@@ -265,250 +265,8 @@ const departments = ref([
     ]},
 ]);
 
-// --- 排班数据（模拟，完全匹配数据库表结构）---
-const mockScheduleData = ref({
-  's1-2': [
-    // === 本周 (2025-10-20 ~ 2025-10-26) ===
-    { 
-      scheduleId: 1,
-      doctorId: 5,
-      scheduleDate: '2025-10-20',
-      slotId: 3,
-      location: '门诊楼201',
-      totalSlots: 20,
-      bookedSlots: 15,
-      fee: 20.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '张主任',
-      doctorTitle: '主任医师',
-      departmentId: 2,
-      slotName: '上午 08:00-12:00',
-      startTime: '08:00:00',
-      endTime: '12:00:00'
-    },
-    { 
-      scheduleId: 2,
-      doctorId: 6,
-      scheduleDate: '2025-10-20',
-      slotId: 9,
-      location: '门诊楼201',
-      totalSlots: 30,
-      bookedSlots: 8,
-      fee: 5.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '李医生',
-      doctorTitle: '主治医师',
-      departmentId: 2,
-      slotName: '下午 14:00-18:00',
-      startTime: '14:00:00',
-      endTime: '18:00:00'
-    },
-    { 
-      scheduleId: 3,
-      doctorId: 7,
-      scheduleDate: '2025-10-21',
-      slotId: 3,
-      location: '门诊楼203',
-      totalSlots: 25,
-      bookedSlots: 0,
-      fee: 15.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '王医生',
-      doctorTitle: '副主任医师',
-      departmentId: 2,
-      slotName: '上午 08:00-12:00',
-      startTime: '08:00:00',
-      endTime: '12:00:00'
-    },
-    { 
-      scheduleId: 4,
-      doctorId: 5,
-      scheduleDate: '2025-10-22',
-      slotId: 3,
-      location: '门诊楼201',
-      totalSlots: 20,
-      bookedSlots: 12,
-      fee: 20.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '张主任',
-      doctorTitle: '主任医师',
-      departmentId: 2,
-      slotName: '上午 08:00-12:00',
-      startTime: '08:00:00',
-      endTime: '12:00:00'
-    },
-    { 
-      scheduleId: 5,
-      doctorId: 6,
-      scheduleDate: '2025-10-23',
-      slotId: 9,
-      location: '门诊楼201',
-      totalSlots: 30,
-      bookedSlots: 5,
-      fee: 5.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '李医生',
-      doctorTitle: '主治医师',
-      departmentId: 2,
-      slotName: '下午 14:00-18:00',
-      startTime: '14:00:00',
-      endTime: '18:00:00'
-    },
-    // === 下一周 (2025-10-27 ~ 2025-11-02) ===
-    { 
-      scheduleId: 6,
-      doctorId: 5,
-      scheduleDate: '2025-10-27',
-      slotId: 3,
-      location: '门诊楼201',
-      totalSlots: 25,
-      bookedSlots: 5,
-      fee: 20.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '张主任',
-      doctorTitle: '主任医师',
-      departmentId: 2,
-      slotName: '上午 08:00-12:00',
-      startTime: '08:00:00',
-      endTime: '12:00:00'
-    },
-    { 
-      scheduleId: 7,
-      doctorId: 6,
-      scheduleDate: '2025-10-28',
-      slotId: 9,
-      location: '门诊楼201',
-      totalSlots: 35,
-      bookedSlots: 10,
-      fee: 5.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '李医生',
-      doctorTitle: '主治医师',
-      departmentId: 2,
-      slotName: '下午 14:00-18:00',
-      startTime: '14:00:00',
-      endTime: '18:00:00'
-    },
-    { 
-      scheduleId: 8,
-      doctorId: 7,
-      scheduleDate: '2025-10-29',
-      slotId: 3,
-      location: '门诊楼203',
-      totalSlots: 30,
-      bookedSlots: 8,
-      fee: 15.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '王医生',
-      doctorTitle: '副主任医师',
-      departmentId: 2,
-      slotName: '上午 08:00-12:00',
-      startTime: '08:00:00',
-      endTime: '12:00:00'
-    },
-    // === 上一周 (2025-10-13 ~ 2025-10-19) ===
-    { 
-      scheduleId: 9,
-      doctorId: 5,
-      scheduleDate: '2025-10-13',
-      slotId: 3,
-      location: '门诊楼201',
-      totalSlots: 20,
-      bookedSlots: 18,
-      fee: 20.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '张主任',
-      doctorTitle: '主任医师',
-      departmentId: 2,
-      slotName: '上午 08:00-12:00',
-      startTime: '08:00:00',
-      endTime: '12:00:00'
-    },
-    { 
-      scheduleId: 10,
-      doctorId: 6,
-      scheduleDate: '2025-10-14',
-      slotId: 9,
-      location: '门诊楼201',
-      totalSlots: 30,
-      bookedSlots: 20,
-      fee: 5.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '李医生',
-      doctorTitle: '主治医师',
-      departmentId: 2,
-      slotName: '下午 14:00-18:00',
-      startTime: '14:00:00',
-      endTime: '18:00:00'
-    },
-  ],
-  's3-1': [
-    { 
-      scheduleId: 11,
-      doctorId: 8,
-      scheduleDate: '2025-10-20',
-      slotId: 3,
-      location: '门诊楼305',
-      totalSlots: 15,
-      bookedSlots: 10,
-      fee: 10.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '陈医生',
-      doctorTitle: '主治医师',
-      departmentId: 5,
-      slotName: '上午 08:00-12:00',
-      startTime: '08:00:00',
-      endTime: '12:00:00'
-    },
-    { 
-      scheduleId: 12,
-      doctorId: 9,
-      scheduleDate: '2025-10-21',
-      slotId: 3,
-      location: '门诊楼305',
-      totalSlots: 20,
-      bookedSlots: 8,
-      fee: 15.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '刘医生',
-      doctorTitle: '副主任医师',
-      departmentId: 5,
-      slotName: '上午 08:00-12:00',
-      startTime: '08:00:00',
-      endTime: '12:00:00'
-    },
-    { 
-      scheduleId: 13,
-      doctorId: 8,
-      scheduleDate: '2025-10-22',
-      slotId: 9,
-      location: '门诊楼305',
-      totalSlots: 15,
-      bookedSlots: 0,
-      fee: 10.00,
-      status: 'available',
-      remarks: '',
-      doctorName: '陈医生',
-      doctorTitle: '主治医师',
-      departmentId: 5,
-      slotName: '下午 14:00-18:00',
-      startTime: '14:00:00',
-      endTime: '18:00:00'
-    },
-  ]
-});
+// --- 排班数据（从后端获取）---
+const scheduleData = ref({});
 
 // --- 状态管理 ---
 const currentMonday = ref(new Date('2025-10-20'));
@@ -517,6 +275,7 @@ const activeSub = ref(null);
 const selectedSchedules = ref([]);
 const selectAll = ref(false);
 const tableRef = ref(null);
+const loading = ref(false);
 
 // 修改跟踪
 const originalData = ref({}); // 保存原始数据
@@ -548,59 +307,162 @@ const selectedDepartmentName = computed(() => {
 
 const scheduleList = computed(() => {
   if (!activeSub.value) return [];
-  const allSchedules = mockScheduleData.value[activeSub.value] || [];
+  const allSchedules = scheduleData.value[activeSub.value] || [];
+  
+  console.log('所有排班数据:', allSchedules);
   
   // 计算当前周的日期范围
   const weekStart = new Date(currentMonday.value);
   const weekEnd = new Date(currentMonday.value);
   weekEnd.setDate(weekEnd.getDate() + 6); // 周一到周日（7天）
   
+  console.log('周范围:', weekStart, '到', weekEnd);
+  
   // 过滤出本周的排班数据
-  return allSchedules.filter(schedule => {
-    const scheduleDate = new Date(schedule.scheduleDate);
-    return scheduleDate >= weekStart && scheduleDate <= weekEnd;
+  const filteredSchedules = allSchedules.filter(schedule => {
+    console.log('=== 开始检查排班 ===');
+    console.log('排班原始数据:', schedule);
+    console.log('排班日期:', schedule.scheduleDate, '类型:', typeof schedule.scheduleDate);
+    
+    // 将日期转换为数字进行比较 (YYYYMMDD格式)
+    const scheduleDateStr = schedule.scheduleDate; // 'YYYY-MM-DD' 格式
+    console.log('步骤1 - 排班日期字符串:', scheduleDateStr);
+    
+    const scheduleDateWithoutDashes = scheduleDateStr.replace(/-/g, '');
+    console.log('步骤2 - 去除横线后:', scheduleDateWithoutDashes);
+    
+    const scheduleDateNum = parseInt(scheduleDateWithoutDashes);
+    console.log('步骤3 - 转换为数字:', scheduleDateNum);
+    
+    // 计算周范围
+    const weekStartStr = formatDateForAPI(weekStart); // 'YYYY-MM-DD' 格式
+    console.log('步骤4 - 周开始日期字符串:', weekStartStr);
+    
+    const weekStartWithoutDashes = weekStartStr.replace(/-/g, '');
+    console.log('步骤5 - 周开始去除横线后:', weekStartWithoutDashes);
+    
+    const weekStartNum = parseInt(weekStartWithoutDashes);
+    console.log('步骤6 - 周开始转换为数字:', weekStartNum);
+    
+    const weekEndStr = formatDateForAPI(weekEnd); // 'YYYY-MM-DD' 格式
+    console.log('步骤7 - 周结束日期字符串:', weekEndStr);
+    
+    const weekEndWithoutDashes = weekEndStr.replace(/-/g, '');
+    console.log('步骤8 - 周结束去除横线后:', weekEndWithoutDashes);
+    
+    const weekEndNum = parseInt(weekEndWithoutDashes);
+    console.log('步骤9 - 周结束转换为数字:', weekEndNum);
+    
+    // 进行比较
+    console.log('=== 开始数字比较 ===');
+    console.log('比较条件: 排班日期 >= 周开始日期 && 排班日期 <= 周结束日期');
+    console.log('即:', scheduleDateNum, '>=', weekStartNum, '&&', scheduleDateNum, '<=', weekEndNum);
+    
+    const firstCondition = scheduleDateNum >= weekStartNum;
+    const secondCondition = scheduleDateNum <= weekEndNum;
+    const isInRange = firstCondition && secondCondition;
+    
+    console.log('第一个条件 (>=):', scheduleDateNum, '>=', weekStartNum, '=', firstCondition);
+    console.log('第二个条件 (<=):', scheduleDateNum, '<=', weekEndNum, '=', secondCondition);
+    console.log('最终结果 (&&):', firstCondition, '&&', secondCondition, '=', isInRange);
+    console.log('=== 检查完成 ===');
+    
+    return isInRange;
   });
+  
+  console.log('过滤后的排班数据:', filteredSchedules);
+  return filteredSchedules;
 });
 
-// 【后端接口完成后启用】
-// /**
-//  * 加载排班数据（从后端获取）
-//  */
-// const loadSchedules = async () => {
-//   if (!activeSub.value) return;
-//   
-//   loading.value = true;
-//   try {
-//     const weekStart = new Date(currentMonday.value);
-//     const weekEnd = new Date(currentMonday.value);
-//     weekEnd.setDate(weekEnd.getDate() + 6);
-//     
-//     const response = await getSchedules({
-//       departmentId: activeSub.value,
-//       startDate: formatDateForAPI(weekStart),
-//       endDate: formatDateForAPI(weekEnd)
-//     });
-//     
-//     // 将后端数据存储到 mockScheduleData 中对应的科室
-//     if (!mockScheduleData.value[activeSub.value]) {
-//       mockScheduleData.value[activeSub.value] = [];
-//     }
-//     mockScheduleData.value[activeSub.value] = response.data;
-//     
-//   } catch (error) {
-//     ElMessage.error('加载排班数据失败：' + (error.message || '未知错误'));
-//   } finally {
-//     loading.value = false;
-//   }
-// };
-// 
-// // 格式化日期为 API 需要的格式 (YYYY-MM-DD)
-// const formatDateForAPI = (date) => {
-//   const year = date.getFullYear();
-//   const month = (date.getMonth() + 1).toString().padStart(2, '0');
-//   const day = date.getDate().toString().padStart(2, '0');
-//   return `${year}-${month}-${day}`;
-// };
+/**
+ * 加载排班数据（从后端获取）
+ */
+const loadSchedules = async () => {
+  if (!activeSub.value) return;
+  
+  loading.value = true;
+  try {
+    const weekStart = new Date(currentMonday.value);
+    const weekEnd = new Date(currentMonday.value);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    
+    // 将前端科室ID转换为后端期望的数字ID
+    let departmentId = null;
+    if (activeSub.value.startsWith('s')) {
+      const idMapping = {
+        's1-1': 1, // 呼吸内科
+        's1-2': 2, // 心血管内科  
+        's1-3': 3, // 消化内科
+        's2-1': 4, // 普外科
+        's2-2': 5, // 骨科
+        's3-1': 6, // 口腔科
+        's3-2': 7  // 眼科
+      };
+      departmentId = idMapping[activeSub.value];
+    }
+    
+    const requestParams = {
+      departmentId: departmentId,
+      startDate: formatDateForAPI(weekStart),
+      endDate: formatDateForAPI(weekEnd)
+    };
+    
+    const formattedStartDate = formatDateForAPI(weekStart);
+    const formattedEndDate = formatDateForAPI(weekEnd);
+    
+    console.log('=== 前端请求参数详情 ===');
+    console.log('科室ID:', departmentId, '(类型:', typeof departmentId, ')');
+    console.log('开始日期原始:', weekStart);
+    console.log('开始日期格式化:', formattedStartDate, '(类型:', typeof formattedStartDate, ')');
+    console.log('结束日期原始:', weekEnd);
+    console.log('结束日期格式化:', formattedEndDate, '(类型:', typeof formattedEndDate, ')');
+    console.log('完整请求参数:', requestParams);
+    console.log('请求URL: GET /api/schedules');
+    console.log('========================');
+    
+    const response = await getSchedules(requestParams);
+    
+    console.log('API响应:', response);
+    console.log('响应数据类型:', typeof response);
+    console.log('响应数据结构:', response);
+    
+    // 将后端数据存储到 scheduleData 中对应的科室
+    if (!scheduleData.value[activeSub.value]) {
+      scheduleData.value[activeSub.value] = [];
+    }
+    
+    // 处理分页响应数据
+    let schedules = [];
+    if (response && response.content) {
+      schedules = response.content;
+      console.log('从分页数据中提取:', schedules);
+    } else if (Array.isArray(response)) {
+      schedules = response;
+      console.log('直接使用数组数据:', schedules);
+    } else {
+      console.log('未识别的数据格式:', response);
+    }
+    
+    scheduleData.value[activeSub.value] = schedules;
+    console.log('最终存储的排班数据:', schedules);
+    console.log('排班数据长度:', schedules.length);
+    console.log('存储到科室:', activeSub.value);
+    console.log('scheduleData状态:', scheduleData.value);
+    
+  } catch (error) {
+    ElMessage.error('加载排班数据失败：' + (error.message || '未知错误'));
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 格式化日期为 API 需要的格式 (YYYY-MM-DD)
+const formatDateForAPI = (date) => {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const weekRangeText = computed(() => {
   const start = new Date(currentMonday.value);
@@ -711,8 +573,8 @@ const changeWeek = (offset) => {
       if (tableRef.value) {
         tableRef.value.clearSelection();
       }
-      // 【后端接口完成后启用】加载新周次的数据
-      // loadSchedules();
+      // 加载新周次的数据
+      loadSchedules();
       // 保存新周次的原始数据
       setTimeout(() => {
         saveOriginalData();
@@ -734,8 +596,8 @@ const changeWeek = (offset) => {
     if (tableRef.value) {
       tableRef.value.clearSelection();
     }
-    // 【后端接口完成后启用】加载新周次的数据
-    // loadSchedules();
+    // 加载新周次的数据
+    loadSchedules();
     // 保存新周次的原始数据
     setTimeout(() => {
       saveOriginalData();
@@ -782,8 +644,8 @@ const handleSubSelect = (id) => {
       if (tableRef.value) {
         tableRef.value.clearSelection();
       }
-      // 【后端接口完成后启用】加载新科室的数据
-      // loadSchedules();
+      // 加载新科室的数据
+      loadSchedules();
       // 保存新科室的原始数据
       setTimeout(() => {
         saveOriginalData();
@@ -799,8 +661,8 @@ const handleSubSelect = (id) => {
     if (tableRef.value) {
       tableRef.value.clearSelection();
     }
-    // 【后端接口完成后启用】加载新科室的数据
-    // loadSchedules();
+    // 加载新科室的数据
+    loadSchedules();
     // 保存新科室的原始数据
     setTimeout(() => {
       saveOriginalData();
@@ -934,21 +796,13 @@ const handleSaveAll = () => {
       }
     });
     
-    // 【模拟保存】等后端接口完成后删除
-    console.log('准备保存的数据：', updates);
-    ElMessage.success(`成功保存 ${modifiedSchedules.value.size} 条排班的修改`);
-    saveOriginalData();
-    
-    // 【后端接口完成后启用】
-    // try {
-    //   await batchUpdateSchedules({ updates });
-    //   ElMessage.success(`成功保存 ${modifiedSchedules.value.size} 条排班的修改`);
-    //   saveOriginalData();
-    //   // 可选：重新加载数据
-    //   // await loadSchedules();
-    // } catch (error) {
-    //   ElMessage.error('保存失败：' + (error.message || '未知错误'));
-    // }
+    try {
+      await batchUpdateSchedules({ updates });
+      ElMessage.success(`成功保存 ${modifiedSchedules.value.size} 条排班的修改`);
+      saveOriginalData();
+    } catch (error) {
+      ElMessage.error('保存失败：' + (error.message || '未知错误'));
+    }
   }).catch(() => {
     // 取消保存
   });
@@ -988,8 +842,8 @@ const handleResetChanges = () => {
 onMounted(() => {
   if (departments.value.length > 0) {
     handleParentSelect(departments.value[0].id);
-    // 【后端接口完成后启用】初始加载时从后端获取数据
-    // loadSchedules();
+    // 初始加载时从后端获取数据
+    loadSchedules();
     // 初始加载时保存原始数据
     setTimeout(() => {
       saveOriginalData();

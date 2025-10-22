@@ -15,6 +15,8 @@ import com.example.springboot.dto.user.UserImportResponse;
 import com.example.springboot.dto.user.UserResponse;
 import com.example.springboot.entity.*;
 import com.example.springboot.entity.enums.BlacklistStatus;
+import com.example.springboot.entity.enums.DoctorStatus;
+import com.example.springboot.entity.enums.PatientStatus;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.*;
@@ -586,7 +588,7 @@ public class UserServiceImpl implements UserService {
             doctorRepository.save(doctor);
             
         } else if ("PATIENT".equalsIgnoreCase(role)) {
-            Patient patient = patientRepository.findById(userId.intValue())
+            Patient patient = patientRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("患者不存在"));
             
             // 检查是否已经删除

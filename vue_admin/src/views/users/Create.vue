@@ -44,6 +44,13 @@
                 :value="dept.id"
               />
             </el-select>
+            <!-- 调试信息 -->
+            <div v-if="departmentList.length === 0" style="color: red; font-size: 12px;">
+              暂无科室数据，请先创建科室
+            </div>
+            <div v-else style="color: green; font-size: 12px;">
+              共 {{ departmentList.length }} 个科室可选
+            </div>
           </el-form-item>
           <el-form-item label="职称" prop="title">
             <el-input v-model="userForm.title" placeholder="如：主任医师、副主任医师、主治医师"></el-input>
@@ -112,13 +119,16 @@ const rules = reactive({
 // 获取科室列表
 const fetchDepartments = async () => {
   try {
-    const response = await getDepartmentPage({ page: 1, size: 9999 });
+    const response = await getDepartmentPage({ page: 0, size: 9999 });
+    console.log("科室API响应:", response);
     departmentList.value = response.content.map(dept => ({
       id: dept.departmentId,
       name: dept.name
     })) || [];
+    console.log("处理后的科室列表:", departmentList.value);
   } catch (error) {
     console.error("获取科室列表失败:", error);
+    ElMessage.error("获取科室列表失败: " + error.message);
   }
 };
 

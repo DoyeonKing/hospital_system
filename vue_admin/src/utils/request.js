@@ -9,6 +9,13 @@ const request = axios.create({
 // request 拦截器
 // 可以自请求发送前对请求做一些处理
 request.interceptors.request.use(config => {
+  console.log('=== 请求拦截器 ===');
+  console.log('请求URL:', config.baseURL + config.url);
+  console.log('请求方法:', config.method);
+  console.log('请求参数:', config.params);
+  console.log('请求头:', config.headers);
+  console.log('================');
+  
   // 如果是FormData类型，不设置Content-Type，让浏览器自动设置（包含boundary）
   if (!(config.data instanceof FormData)) {
     config.headers['Content-Type'] = 'application/json;charset=utf-8';

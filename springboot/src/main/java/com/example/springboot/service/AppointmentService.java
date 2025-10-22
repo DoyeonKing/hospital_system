@@ -4,12 +4,14 @@ import com.example.springboot.common.Constants;
 import com.example.springboot.dto.appointment.AppointmentCreateRequest;
 import com.example.springboot.dto.appointment.AppointmentResponse;
 import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
+import com.example.springboot.dto.ScheduleResponse;
 import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.Schedule;
 import com.example.springboot.entity.enums.AppointmentStatus;
 import com.example.springboot.entity.enums.BlacklistStatus;
 import com.example.springboot.entity.enums.PaymentStatus;
+import com.example.springboot.entity.enums.PatientStatus;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.AppointmentRepository;
@@ -95,7 +97,7 @@ public class AppointmentService {
             throw new BadRequestException("No available slots for this schedule.");
         }
         if (schedule.getScheduleDate().isBefore(java.time.LocalDate.now()) ||
-                (schedule.getScheduleDate().isEqual(java.time.LocalDate.now()) && schedule.getTimeSlot().getEndTime().isBefore(java.time.LocalTime.now()))) {
+                (schedule.getScheduleDate().isEqual(java.time.LocalDate.now()) && schedule.getSlot().getEndTime().isBefore(java.time.LocalTime.now()))) {
             throw new BadRequestException("Cannot book past or ongoing schedules.");
         }
 
@@ -183,7 +185,7 @@ public class AppointmentService {
         response.setPatient(patientService.convertToResponseDto(appointment.getPatient()));
 
         // ScheduleResponse 包含 Doctor, TimeSlot, Clinic, Department 信息
-        response.setSchedule(scheduleService.convertToResponseDto(appointment.getSchedule()));
+        response.setSchedule(ScheduleResponse.fromEntity(appointment.getSchedule()));
 
         return response;
     }
