@@ -21,6 +21,9 @@ public interface DoctorRepository extends JpaRepository<Doctor, Integer>, JpaSpe
     // 检查工号是否存在
     boolean existsByIdentifier(String identifier);
 
+    // 检查身份证号是否存在
+    boolean existsByIdCardNumber(String idCardNumber);
+
     @Query("SELECT d FROM Doctor d JOIN FETCH d.department WHERE d.identifier LIKE %:id% OR d.fullName LIKE %:name%")
     Page<Doctor> findByKeywordWithDepartment(
             @Param("id") String id,

@@ -34,11 +34,14 @@ public class Doctor {
     @Column(name = "full_name", nullable = false, length = 100)
     private String fullName; // 真实姓名
 
+    @Column(name = "id_card_number", unique = true, length = 18)
+    private String idCardNumber; // 身份证号
+
     @Column(name = "phone_number", unique = true, length = 20)
     private String phoneNumber; // 存储E.164标准格式
 
     @Column(name = "title", length = 100)
-    private String title; // 职称 (如：“主治医师”)
+    private String title; // 职称 (如："主治医师")
 
     @Lob // 适用于 TEXT 类型
     @Column(name = "specialty")

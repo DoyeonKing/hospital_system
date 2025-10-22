@@ -132,12 +132,19 @@ public class UserServiceImpl implements UserService {
         Department department = departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found with id: " + request.getDepartmentId()));
 
+        // 身份证号唯一性校验（如果提供了身份证号）
+        if (request.getId_card() != null &&
+                doctorRepository.existsByIdCardNumber(request.getId_card())) {
+            throw new BadRequestException("身份证号已存在: " + request.getId_card());
+        }
+
         // 创建医生
         Doctor doctor = new Doctor();
         doctor.setDepartment(department);  // 设置科室关联
         doctor.setIdentifier(request.getId());
         doctor.setPasswordHash(request.getPassword());
         doctor.setFullName(request.getName());
+        doctor.setIdCardNumber(request.getId_card());  // 设置身份证号
         doctor.setPhoneNumber(request.getPhone());
         doctor.setTitle(request.getTitle());
         doctor.setSpecialty(request.getSpecialty());
