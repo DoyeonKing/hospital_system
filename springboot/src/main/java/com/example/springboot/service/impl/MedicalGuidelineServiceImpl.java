@@ -5,6 +5,7 @@ import com.example.springboot.dto.guideline.MedicalGuidelineRequest;
 import com.example.springboot.dto.guideline.MedicalGuidelineResponse;
 import com.example.springboot.entity.MedicalGuideline;
 import com.example.springboot.repository.MedicalGuidelineRepository;
+import com.example.springboot.repository.AdminRepository;
 import com.example.springboot.service.MedicalGuidelineService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,19 +19,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class MedicalGuidelineServiceImpl implements MedicalGuidelineService {
 
     private final MedicalGuidelineRepository guidelineRepository;
+    private final AdminRepository adminRepository;
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<MedicalGuidelineResponse> getGuidelines(
             Integer page, Integer pageSize, String keyword, String category, String status) {
 
-        Pageable pageable = PageRequest.of(page - 1, pageSize);
-        Page<MedicalGuideline> guidelinePage;
+        try {
+            Pageable pageable = PageRequest.of(page - 1, pageSize);
+            Page<MedicalGuideline> guidelinePage;
 
         // 处理状态参数
         MedicalGuideline.GuidelineStatus guidelineStatus = null;
         if (status != null && !status.isEmpty()) {
-            guidelineStatus = MedicalGuideline.GuidelineStatus.valueOf(status);
+            try {
+                guidelineStatus = MedicalGuideline.GuidelineStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // 如果状态值无效，忽略状态筛选
+                guidelineStatus = null;
+            }
         }
 
         // 条件组合查询
@@ -52,17 +60,21 @@ public class MedicalGuidelineServiceImpl implements MedicalGuidelineService {
             guidelinePage = guidelineRepository.findAll(pageable);
         }
 
-        // 转换为响应DTO
-        PageResponse<MedicalGuidelineResponse> response = new PageResponse<>();
-        response.setContent(guidelinePage.getContent().stream()
-                .map(this::convertToResponse)
-                .toList());
-        response.setCurrentPage(page);
-        response.setPageSize(pageSize);
-        response.setTotalElements(guidelinePage.getTotalElements());
-        response.setTotalPages(guidelinePage.getTotalPages());
+            // 转换为响应DTO
+            PageResponse<MedicalGuidelineResponse> response = new PageResponse<>();
+            response.setContent(guidelinePage.getContent().stream()
+                    .map(this::convertToResponse)
+                    .toList());
+            response.setCurrentPage(page);
+            response.setPageSize(pageSize);
+            response.setTotalElements(guidelinePage.getTotalElements());
+            response.setTotalPages(guidelinePage.getTotalPages());
 
-        return response;
+            return response;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("获取就医规范列表失败: " + e.getMessage(), e);
+        }
     }
 
     @Override
@@ -120,6 +132,18 @@ public class MedicalGuidelineServiceImpl implements MedicalGuidelineService {
         response.setCategory(guideline.getCategory());
         response.setStatus(guideline.getStatus());
         response.setCreatedBy(guideline.getCreatedBy());
+        
+        // 设置创建人姓名（通过查询管理员表获取）
+        try {
+            if (guideline.getCreatedBy() != null) {
+                adminRepository.findById(guideline.getCreatedBy())
+                    .ifPresent(admin -> response.setCreatedByName(admin.getFullName()));
+            }
+        } catch (Exception e) {
+            // 如果查询失败，使用默认值
+            response.setCreatedByName("系统管理员");
+        }
+        
         response.setCreatedAt(guideline.getCreatedAt());
         response.setUpdatedAt(guideline.getUpdatedAt());
         return response;

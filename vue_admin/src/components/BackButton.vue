@@ -12,10 +12,48 @@ import icon from '@/assets/dog1.jpg'
 const router = useRouter()
 
 function goBack() {
-  if (window.history.length > 1) {
-    router.back()
+  // 获取当前路由信息
+  const currentRoute = router.currentRoute.value;
+  
+  // 根据当前页面确定返回路径，避免循环跳转
+  if (currentRoute.path.includes('/create')) {
+    // 创建页面返回到对应的列表页面
+    if (currentRoute.path.includes('/regulations/create')) {
+      router.push('/regulations');
+    } else if (currentRoute.path.includes('/departments/create')) {
+      router.push('/departments');
+    } else if (currentRoute.path.includes('/users/create')) {
+      router.push('/users');
+    } else {
+      router.push('/');
+    }
+  } else if (currentRoute.path.includes('/edit')) {
+    // 编辑页面返回到对应的列表页面
+    if (currentRoute.path.includes('/regulations/edit')) {
+      router.push('/regulations');
+    } else if (currentRoute.path.includes('/users/edit')) {
+      router.push('/users');
+    } else {
+      router.push('/');
+    }
+  } else if (currentRoute.path.includes('/members')) {
+    // 成员页面返回到科室列表
+    router.push('/departments');
+  } else if (currentRoute.path.includes('/import')) {
+    // 导入页面返回到用户列表
+    router.push('/users');
+  } else if (currentRoute.path.includes('/search')) {
+    // 搜索页面返回到用户列表
+    router.push('/users');
+  } else if (currentRoute.path.includes('/history')) {
+    // 历史页面返回到用户列表
+    router.push('/users');
+  } else if (currentRoute.path.includes('/scheduling')) {
+    // 排班相关页面返回到首页
+    router.push('/');
   } else {
-    router.push('/')
+    // 其他情况返回到首页
+    router.push('/');
   }
 }
 </script>

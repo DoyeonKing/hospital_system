@@ -24,7 +24,7 @@ public class PatientUpdateRequest {
     @Size(max = 20, message = "电话号码长度不能超过20个字符")
     private String phoneNumber;
 
-    private PatientStatus status;
+    private String status;
 
     @Size(max = 18, message = "身份证号长度不能超过18个字符")
     private String idCardNumber;

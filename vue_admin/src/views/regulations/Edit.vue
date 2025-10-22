@@ -122,7 +122,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useAdminStore } from '@/stores/adminStore';
 import BackButton from '@/components/BackButton.vue';
-// import { getGuidelineById, updateGuideline } from '@/api/guideline'; // 等后端接口完成后启用
+import { getGuidelineById, updateGuideline } from '@/api/guideline';
 
 const router = useRouter();
 const route = useRoute();
@@ -185,66 +185,62 @@ const getCategoryTagType = (category) => {
   return types[category] || '';
 };
 
-const loadRegulationData = () => {
+const loadRegulationData = async () => {
   loading.value = true;
   const id = route.params.id;
   
-  // 【模拟加载数据】等后端接口完成后替换为真实API调用
-  setTimeout(() => {
-    const mockData = {
-      guidelineId: id,
-      title: '挂号就诊流程',
-      category: '就医流程',
-      content: '<h3>挂号流程</h3>\n<p>1. 选择科室和医生</p>\n<p>2. 选择就诊时间</p>\n<p>3. 填写就诊人信息</p>\n<p>4. 支付挂号费</p>\n<p>5. 等待就诊</p>',
-      status: 'active',
-      createdBy: 1,
-      createdByName: '系统管理员',
-      createdAt: '2025-10-15 10:30:00',
-      updatedAt: '2025-10-15 10:30:00'
-    };
+  try {
+    const response = await getGuidelineById(id);
     
-    Object.assign(form, mockData);
+    // 处理响应格式（前端拦截器已经处理了response.data）
+    let regulationData = response;
+    if (!regulationData) {
+      throw new Error('响应数据为空');
+    }
+    
+    // 将数据赋值给表单
+    form.guidelineId = regulationData.guidelineId;
+    form.title = regulationData.title || '';
+    form.content = regulationData.content || '';
+    form.category = regulationData.category || '';
+    form.status = regulationData.status || 'active';
+    form.createdBy = regulationData.createdBy;
+    form.createdByName = regulationData.createdByName || '未知';
+    form.createdAt = regulationData.createdAt || '';
+    form.updatedAt = regulationData.updatedAt || '';
+  } catch (error) {
+    ElMessage.error('加载规范数据失败：' + (error.message || '未知错误'));
+    router.push('/regulations');
+  } finally {
     loading.value = false;
-  }, 500);
-  
-  // 【后端接口完成后启用】
-  // try {
-  //   const response = await getGuidelineById(id);
-  //   Object.assign(form, response.data);
-  // } catch (error) {
-  //   ElMessage.error('加载规范数据失败：' + (error.message || '未知错误'));
-  //   router.push('/regulations');
-  // } finally {
-  //   loading.value = false;
-  // }
+  }
 };
 
-const handleSubmit = () => {
-  formRef.value.validate((valid) => {
+const handleSubmit = async () => {
+  try {
+    const valid = await formRef.value.validate();
     if (valid) {
       submitting.value = true;
       
-      // 【模拟提交】等后端接口完成后替换为真实API调用
-      setTimeout(() => {
-        ElMessage.success('规范更新成功！');
-        submitting.value = false;
-        router.push('/regulations');
-      }, 1000);
-      
-      // 【后端接口完成后启用】
-      // const submitData = {
-      //   title: form.title,
-      //   content: form.content,
-      //   category: form.category,
-      //   status: typeof form.status === 'string' ? form.status.toUpperCase() : form.status
-      // };
-      // await updateGuideline(form.guidelineId, submitData);
-      // ElMessage.success('规范更新成功！');
-      // router.push('/regulations');
+      const submitData = {
+        title: form.title,
+        content: form.content,
+        category: form.category,
+        status: form.status
+      };
+      await updateGuideline(form.guidelineId, submitData);
+      ElMessage.success('规范更新成功！');
+      router.push('/regulations');
+    }
+  } catch (error) {
+    if (error !== false) { // false表示验证失败
+      ElMessage.error('更新失败：' + (error.message || '未知错误'));
     } else {
       ElMessage.error('请填写完整信息');
     }
-  });
+  } finally {
+    submitting.value = false;
+  }
 };
 
 const handleReset = () => {

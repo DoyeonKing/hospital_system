@@ -13,6 +13,7 @@ public class MedicalGuidelineResponse {
     private String category;
     private MedicalGuideline.GuidelineStatus status;
     private Integer createdBy;
+    private String createdByName;  // 创建人姓名
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

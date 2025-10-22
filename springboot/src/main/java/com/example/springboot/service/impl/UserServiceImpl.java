@@ -486,8 +486,21 @@ public class UserServiceImpl implements UserService {
         if (request.getPhoneNumber() != null) {
             patient.setPhoneNumber(request.getPhoneNumber());
         }
-        if (request.getStatus() != null) {
-            patient.setStatus(request.getStatus());
+        if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
+            // 确保状态值有效
+            try {
+                String statusStr = request.getStatus().trim();
+                String lowerStatus = statusStr.toLowerCase();
+                System.out.println("原始状态值: " + request.getStatus());
+                System.out.println("处理后状态值: " + lowerStatus);
+                // 直接使用小写，因为枚举定义就是小写
+                PatientStatus status = PatientStatus.valueOf(lowerStatus);
+                patient.setStatus(status);
+                System.out.println("成功设置状态: " + status);
+            } catch (Exception e) {
+                System.out.println("状态转换失败: " + e.getMessage());
+                throw new BadRequestException("无效的状态值: " + request.getStatus() + ", 有效值: active, inactive, locked, deleted");
+            }
         }
 
         Patient updatedPatient = patientRepository.save(patient);
