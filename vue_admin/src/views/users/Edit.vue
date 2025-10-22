@@ -83,9 +83,19 @@
         </template>
 
         <!-- 操作列 -->
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="openEditDialog(row)">编辑</el-button>
+            <el-popconfirm
+              title="确定要删除该账户吗？"
+              confirm-button-text="确定"
+              cancel-button-text="取消"
+              @confirm="handleDelete(row)"
+            >
+              <template #reference>
+                <el-button type="danger" size="small">删除</el-button>
+              </template>
+            </el-popconfirm>
           </template>
         </el-table-column>
       </el-table>
@@ -213,7 +223,7 @@
 import BackButton from '@/components/BackButton.vue';
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { searchPatients, searchDoctors, updateUser } from '@/api/user';
+import { searchPatients, searchDoctors, updateUser, deleteUser } from '@/api/user';
 import { getAllDepartments } from '@/api/department';
 
 // 搜索类型
@@ -475,6 +485,20 @@ const handleSave = async () => {
     ElMessage.error('保存失败: ' + (error.message || '未知错误'));
   } finally {
     saveLoading.value = false;
+  }
+};
+
+// 删除用户处理函数
+const handleDelete = async (row) => {
+  try {
+    loading.value = true;
+    await deleteUser(row.userId, row.role);
+    ElMessage.success('删除成功');
+    await handleSearch(); // 刷新列表
+  } catch (error) {
+    ElMessage.error('删除失败: ' + (error.response?.data?.message || error.message));
+  } finally {
+    loading.value = false;
   }
 };
 

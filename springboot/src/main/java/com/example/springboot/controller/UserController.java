@@ -149,4 +149,12 @@ public class UserController {
         PageResponse<MedicalHistoryResponse> response = userService.getMedicalHistories(page, pageSize);
         return ResponseEntity.ok(response);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable Long id,
+            @RequestParam String role) {
+        userService.softDeleteUser(id, role);
+        return ResponseEntity.noContent().build();
+    }
 }

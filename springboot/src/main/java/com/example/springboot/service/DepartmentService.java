@@ -252,8 +252,10 @@ public class DepartmentService {
         Department department = departmentRepository.findById(departmentId)
                 .orElseThrow(() -> new RuntimeException("科室不存在: " + departmentId));
 
-        // 获取该科室下的医生
-        List<Doctor> doctors = department.getDoctors();
+        // 获取该科室下的医生，排除已删除的医生
+        List<Doctor> doctors = department.getDoctors().stream()
+                .filter(doctor -> doctor.getStatus() != DoctorStatus.deleted)
+                .toList();
         
         return doctors.stream()
                 .map(this::convertToDoctorResponse)

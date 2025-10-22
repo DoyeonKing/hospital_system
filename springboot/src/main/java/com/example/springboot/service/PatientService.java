@@ -261,6 +261,10 @@ public class PatientService {
         if (patient.getStatus() == PatientStatus.locked) {
             throw new IllegalArgumentException("账户已被锁定，请联系管理员");
         }
+        
+        if (patient.getStatus() == PatientStatus.deleted) {
+            throw new IllegalArgumentException("账户已删除，无法登录");
+        }
 
         // 4. 构建用户信息
         Map<String, Object> patientInfo = new HashMap<>();

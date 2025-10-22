@@ -61,6 +61,12 @@ public class ScheduleService {
     public List<ScheduleResponse> findSchedulesByDoctorAndDateRange(Integer doctorId, LocalDate startDate, LocalDate endDate) {
         Doctor doctor = doctorRepository.findById(doctorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id " + doctorId));
+        
+        // 检查医生是否已删除
+        if (doctor.getStatus() == DoctorStatus.deleted) {
+            throw new BadRequestException("医生已删除，无法查询排班");
+        }
+        
         return scheduleRepository.findByDoctorAndScheduleDateBetween(doctor, startDate, endDate).stream()
                 .map(this::convertToResponseDto)
                 .collect(Collectors.toList());

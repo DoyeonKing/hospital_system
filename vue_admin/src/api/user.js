@@ -132,3 +132,15 @@ export function getMedicalHistories(page = 1, pageSize = 10) {
     });
 }
 
+/**
+ * 删除用户（软删除）
+ * DELETE /api/users/{id}?role=DOCTOR
+ */
+export function deleteUser(id, role) {
+    return request({
+        url: `/api/users/${id}`,
+        method: 'delete',
+        params: { role }
+    });
+}
+

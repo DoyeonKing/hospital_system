@@ -81,6 +81,11 @@ public class WaitlistService {
         Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + request.getScheduleId()));
 
+        // 检查患者状态
+        if (patient.getStatus() == PatientStatus.deleted) {
+            throw new BadRequestException("患者已删除，无法加入候补队列");
+        }
+
         // 检查患者是否已在黑名单
         if (patient.getPatientProfile() != null && patient.getPatientProfile().getBlacklistStatus() == BlacklistStatus.blacklisted) {
             throw new BadRequestException("Patient is blacklisted and cannot join waitlist.");

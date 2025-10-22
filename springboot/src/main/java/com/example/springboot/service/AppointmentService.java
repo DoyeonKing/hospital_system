@@ -75,6 +75,11 @@ public class AppointmentService {
         Patient patient = patientRepository.findById(request.getPatientId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id " + request.getPatientId()));
 
+        // Check patient status
+        if (patient.getStatus() == PatientStatus.deleted) {
+            throw new BadRequestException("患者已删除，无法创建预约");
+        }
+
         // Check patient blacklist status
         if (patient.getPatientProfile() != null && patient.getPatientProfile().getBlacklistStatus() == BlacklistStatus.blacklisted) {
             throw new BadRequestException("Patient is blacklisted and cannot make appointments.");

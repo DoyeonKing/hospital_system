@@ -28,4 +28,6 @@ public interface UserService {
     PageResponse<MedicalHistoryResponse> getMedicalHistories(Integer page, Integer pageSize);
 
     MedicalHistoryResponse updateMedicalHistory(Long id, MedicalHistoryUpdateRequest request);
+
+    void softDeleteUser(Long userId, String role);
 }

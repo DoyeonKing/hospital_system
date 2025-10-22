@@ -67,6 +67,12 @@ public class LeaveRequestService {
     public List<LeaveRequestResponse> findLeaveRequestsByDoctor(Integer doctorId) {
         Doctor doctor = doctorRepository.findById(doctorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id " + doctorId));
+        
+        // 检查医生是否已删除
+        if (doctor.getStatus() == DoctorStatus.deleted) {
+            throw new BadRequestException("医生已删除，无法查询请假记录");
+        }
+        
         return leaveRequestRepository.findByDoctor(doctor).stream()
                 .map(this::convertToResponseDto)
                 .collect(Collectors.toList());

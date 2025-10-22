@@ -289,6 +289,9 @@ public class UserServiceImpl implements UserService {
         Page<Doctor> doctorPage = doctorRepository.findAll((Specification<Doctor>) (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
+            // 排除已删除的记录
+            predicates.add(cb.notEqual(root.get("status"), DoctorStatus.deleted));
+
             // 工号模糊查询
             if (id != null && !id.isEmpty()) {
                 predicates.add(cb.like(root.get("identifier"), "%" + id + "%"));
@@ -351,6 +354,10 @@ public class UserServiceImpl implements UserService {
         // 查询患者: 使用 JPA Specification 进行动态查询。
         Page<Patient> patientPage = patientRepository.findAll((Specification<Patient>) (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            
+            // 排除已删除的记录
+            predicates.add(cb.notEqual(root.get("status"), PatientStatus.deleted));
+            
             // 按学号/工号/ID (identifier) 模糊查询
             if (id != null && !id.isEmpty()) {
                 predicates.add(cb.like(root.get("identifier"), "%" + id + "%"));
@@ -557,5 +564,45 @@ public class UserServiceImpl implements UserService {
         response.setRole("DOCTOR");
         response.setUserDetails(doctorService.convertToResponseDto(updatedDoctor));
         return response;
+    }
+
+    @Override
+    @Transactional
+    public void softDeleteUser(Long userId, String role) {
+        if ("DOCTOR".equalsIgnoreCase(role)) {
+            Doctor doctor = doctorRepository.findById(userId.intValue())
+                .orElseThrow(() -> new ResourceNotFoundException("医生不存在"));
+            
+            // 检查是否已经删除
+            if (doctor.getStatus() == DoctorStatus.deleted) {
+                throw new BadRequestException("该医生已被删除");
+            }
+            
+            // 检查是否有未完成的排班（可选的前置检查）
+            // 这里可以添加更复杂的业务逻辑检查
+            
+            // 软删除
+            doctor.setStatus(DoctorStatus.deleted);
+            doctorRepository.save(doctor);
+            
+        } else if ("PATIENT".equalsIgnoreCase(role)) {
+            Patient patient = patientRepository.findById(userId.intValue())
+                .orElseThrow(() -> new ResourceNotFoundException("患者不存在"));
+            
+            // 检查是否已经删除
+            if (patient.getStatus() == PatientStatus.deleted) {
+                throw new BadRequestException("该患者已被删除");
+            }
+            
+            // 检查是否有未完成的预约（可选的前置检查）
+            // 这里可以添加更复杂的业务逻辑检查
+            
+            // 软删除
+            patient.setStatus(PatientStatus.deleted);
+            patientRepository.save(patient);
+            
+        } else {
+            throw new BadRequestException("不支持的用户角色: " + role);
+        }
     }
 }
