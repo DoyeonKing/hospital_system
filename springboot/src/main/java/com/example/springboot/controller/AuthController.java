@@ -36,7 +36,7 @@ public class AuthController {
             LoginResponse response = patientService.login(request.getIdentifier(), request.getPassword());
             return ResponseEntity.ok(Result.success(response));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.ok(Result.error("500", e.getMessage()));
+            return ResponseEntity.ok(Result.error("400", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.ok(Result.error("500", "登录失败：" + e.getMessage()));
         }
@@ -52,7 +52,7 @@ public class AuthController {
             LoginResponse response = adminService.login(request.getIdentifier(), request.getPassword());
             return ResponseEntity.ok(Result.success(response));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.ok(Result.error("500", e.getMessage()));
+            return ResponseEntity.ok(Result.error("400", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.ok(Result.error("500", "登录失败：" + e.getMessage()));
         }

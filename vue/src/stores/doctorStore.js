@@ -102,7 +102,7 @@ export const useDoctorStore = defineStore('doctor', {
                     }
                 });
 
-                if (response.code === '200') {
+                if (response.code === '200' || response.code === 200) {
                     this.detailedDoctorInfo = {
                         ...this.detailedDoctorInfo,
                         ...response.data
@@ -138,7 +138,7 @@ export const useDoctorStore = defineStore('doctor', {
                     }
                 });
 
-                if (response.code === '200') {
+                if (response.code === '200' || response.code === 200) {
                     // 更新本地状态
                     this.detailedDoctorInfo = {
                         ...this.detailedDoctorInfo,
@@ -181,7 +181,7 @@ export const useDoctorStore = defineStore('doctor', {
                     }
                 });
 
-                if (response.code === '200') {
+                if (response.code === '200' || response.code === 200) {
                     return true;
                 } else {
                     this.error = response.msg || '修改密码失败';

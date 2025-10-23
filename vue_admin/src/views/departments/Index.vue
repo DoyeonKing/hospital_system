@@ -38,8 +38,8 @@
 
       <!-- 树形结构控制栏 -->
       <div class="tree-controls" v-if="treeData.length > 0">
-        <el-button size="small" @click="expandAll">展开全部</el-button>
-        <el-button size="small" @click="collapseAll">折叠全部</el-button>
+        <el-button size="small" @click="expandAllSimple">展开全部</el-button>
+        <el-button size="small" @click="collapseAllSimple">折叠全部</el-button>
         <span class="tree-stats">共 {{ totalElements }} 个科室</span>
       </div>
 
@@ -53,6 +53,7 @@
             node-key="id"
             :expand-on-click-node="false"
             :default-expand-all="false"
+            :default-expanded-keys="[]"
             class="department-tree"
         >
           <template #default="{ node, data }">
@@ -176,6 +177,19 @@ const fetchDepartments = async () => {
         allDepartments.value = response || [];
 
         console.log('2. 处理后的树形数据:', allDepartments.value);
+        
+        // 调试：检查节点ID
+        if (allDepartments.value && allDepartments.value.length > 0) {
+            console.log('3. 第一个节点的详细信息:', allDepartments.value[0]);
+            console.log('4. 第一个节点的ID:', allDepartments.value[0]?.id);
+            console.log('5. 第一个节点的类型:', typeof allDepartments.value[0]?.id);
+            
+            // 检查所有节点的ID
+            const allKeys = getAllNodeKeys(allDepartments.value);
+            console.log('6. 所有节点键值:', allKeys);
+            console.log('7. 键值类型:', allKeys.map(key => typeof key));
+        }
+        
         console.log('--- 调试日志 end ---');
 
     } catch (error) {
@@ -256,34 +270,104 @@ const resetSearch = async () => {
 
 // 展开全部节点
 const expandAll = () => {
-    if (treeRef.value) {
+    console.log('开始展开全部节点...');
+    console.log('树组件引用:', treeRef.value);
+    console.log('树形数据:', treeData.value);
+    
+    if (!treeRef.value) {
+        console.warn('树组件引用不存在');
+        return;
+    }
+    
+    // 方法1：使用 setExpandedKeys
+    try {
         const allKeys = getAllNodeKeys(treeData.value);
-        allKeys.forEach(key => {
-            treeRef.value.setExpanded(key, true);
-        });
+        console.log('找到的节点键值:', allKeys);
+        treeRef.value.setExpandedKeys(allKeys);
+        console.log('使用setExpandedKeys展开成功');
+    } catch (error) {
+        console.error('setExpandedKeys失败:', error);
+        
+        // 方法2：使用 setExpanded 逐个展开
+        try {
+            const allKeys = getAllNodeKeys(treeData.value);
+            allKeys.forEach(key => {
+                treeRef.value.setExpanded(key, true);
+            });
+            console.log('使用setExpanded展开成功');
+        } catch (error2) {
+            console.error('setExpanded也失败:', error2);
+        }
     }
 };
 
 // 折叠全部节点
 const collapseAll = () => {
-    if (treeRef.value) {
-        const allKeys = getAllNodeKeys(treeData.value);
-        allKeys.forEach(key => {
-            treeRef.value.setExpanded(key, false);
-        });
+    console.log('开始折叠全部节点...');
+    console.log('树组件引用:', treeRef.value);
+    console.log('树形数据:', treeData.value);
+    
+    if (!treeRef.value) {
+        console.warn('树组件引用不存在');
+        return;
+    }
+    
+    // 方法1：使用 setExpandedKeys 设置为空数组
+    try {
+        treeRef.value.setExpandedKeys([]);
+        console.log('使用setExpandedKeys折叠成功');
+    } catch (error) {
+        console.error('setExpandedKeys失败:', error);
+        
+        // 方法2：使用 setExpanded 逐个折叠
+        try {
+            const allKeys = getAllNodeKeys(treeData.value);
+            allKeys.forEach(key => {
+                treeRef.value.setExpanded(key, false);
+            });
+            console.log('使用setExpanded折叠成功');
+        } catch (error2) {
+            console.error('setExpanded也失败:', error2);
+        }
     }
 };
 
 // 获取所有节点键值
 const getAllNodeKeys = (nodes) => {
     let keys = [];
+    if (!nodes || !Array.isArray(nodes)) {
+        return keys;
+    }
+    
     nodes.forEach(node => {
-        keys.push(node.id);
+        // 确保节点有有效的id
+        if (node.id !== null && node.id !== undefined) {
+            keys.push(node.id);
+        }
         if (node.children && node.children.length > 0) {
             keys = keys.concat(getAllNodeKeys(node.children));
         }
     });
     return keys;
+};
+
+// 简化的展开全部方法
+const expandAllSimple = () => {
+    if (treeRef.value) {
+        // 直接设置所有节点为展开状态
+        const allKeys = getAllNodeKeys(treeData.value);
+        console.log('简化展开方法，键值:', allKeys);
+        treeRef.value.setExpandedKeys(allKeys);
+    }
+};
+
+// 简化的折叠全部方法
+const collapseAllSimple = () => {
+    if (treeRef.value) {
+        // 直接设置所有节点为折叠状态
+        console.log('简化折叠方法');
+        treeRef.value.setExpandedKeys([]);
+    }
 };
 
 // 搜索高亮
