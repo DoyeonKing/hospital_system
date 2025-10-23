@@ -47,7 +47,7 @@ export const useVolunteerActivityStore = defineStore('volunteerActivity', {
         // *** 关键修改：将路径从 '/volunteer-activity/apply' 改为 '/volunteerActivity/apply' ***
         const response = await request.post('/volunteerActivity/apply', activityData);
 
-        if (response.code === '200') {
+        if (response.code === '200' || response.code === 200) {
           console.log('Store (VolunteerActivity): Application submitted successfully.', response.data);
           ElMessage.success(response.msg || '活动申请成功提交！'); // 添加前端提示
           // 申请成功后可以进行的操作，例如：
