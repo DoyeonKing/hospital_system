@@ -4,6 +4,7 @@ import com.example.springboot.entity.Department;
 import com.example.springboot.entity.ParentDepartment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -52,4 +53,24 @@ public interface DepartmentRepository extends JpaRepository<Department, Integer>
      * 检查科室名称是否存在
      */
     boolean existsByName(String name);
+    
+    /**
+     * 更新症状科室映射表中的科室ID
+     * @param oldDepartmentId 原科室ID
+     * @param newDepartmentId 新科室ID
+     * @return 更新的记录数
+     */
+    @Modifying
+    @Query("UPDATE SymptomDepartmentMapping sdm SET sdm.departmentId = :newDepartmentId WHERE sdm.departmentId = :oldDepartmentId")
+    int updateSymptomDepartmentMappings(@Param("oldDepartmentId") Integer oldDepartmentId, @Param("newDepartmentId") Integer newDepartmentId);
+    
+    /**
+     * 更新诊室表中的科室ID
+     * @param oldDepartmentId 原科室ID
+     * @param newDepartmentId 新科室ID
+     * @return 更新的记录数
+     */
+    @Modifying
+    @Query("UPDATE Location l SET l.departmentId = :newDepartmentId WHERE l.departmentId = :oldDepartmentId")
+    int updateLocationDepartments(@Param("oldDepartmentId") Integer oldDepartmentId, @Param("newDepartmentId") Integer newDepartmentId);
 }

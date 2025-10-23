@@ -172,3 +172,40 @@ export function getDoctorsByDepartmentId(departmentId) {
         method: 'get',
     });
 }
+
+/**
+ * 获取所有未分配科室的医生（department_id = 999）
+ * GET /api/departments/unassigned-doctors
+ */
+export function getUnassignedDoctors() {
+    return request({
+        url: '/api/departments/unassigned-doctors',
+        method: 'get',
+    });
+}
+
+/**
+ * 批量将医生添加到指定科室
+ * POST /api/departments/{departmentId}/batch-add-doctors
+ * @param {number} departmentId - 科室ID
+ * @param {Array<string>} doctorIdentifiers - 医生工号列表
+ */
+export function batchAddDoctorsToDepartment(departmentId, doctorIdentifiers) {
+    return request({
+        url: `/api/departments/${departmentId}/batch-add-doctors`,
+        method: 'post',
+        data: doctorIdentifiers,
+    });
+}
+
+/**
+ * 删除科室（支持非空科室删除）
+ * DELETE /api/departments/{departmentId}
+ * @param {number} departmentId - 科室ID
+ */
+export function deleteDepartment(departmentId) {
+    return request({
+        url: `/api/departments/${departmentId}`,
+        method: 'delete',
+    });
+}

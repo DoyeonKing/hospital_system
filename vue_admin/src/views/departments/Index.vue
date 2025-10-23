@@ -129,7 +129,7 @@ import BackButton from '@/components/BackButton.vue';
 import { useRouter } from 'vue-router';
 
 // 导入 API 服务
-import { getDepartmentPage, updateDepartmentDescription, deleteDepartmentByName, getAllParentDepartments, getDepartmentTree } from '@/api/department';
+import { getDepartmentPage, updateDepartmentDescription, deleteDepartmentByName, getAllParentDepartments, getDepartmentTree, deleteDepartment } from '@/api/department';
 
 const router = useRouter();
 
@@ -412,26 +412,44 @@ const submitEdit = async () => {
 
 // 删除科室
 const handleDelete = async (row) => {
-    try {
-        await ElMessageBox.confirm(
-            `确定要删除科室 "${row.name}" 吗？此操作不可恢复。`,
-            '确认删除',
-            {
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                type: 'warning',
-            }
-        );
-
-        await deleteDepartmentByName(row.name);
-        ElMessage.success('科室删除成功');
-        await fetchDepartments(); // 刷新列表
-    } catch (error) {
-        if (error !== 'cancel') {
-            console.error('删除科室失败:', error);
-            ElMessage.error('删除科室失败: ' + (error.message || '未知错误'));
-        }
+  try {
+    // 构建确认消息
+    let confirmMessage = `确定要删除科室 "${row.name}" 吗？`;
+    
+    // 如果是子科室，添加额外提示
+    if (row.type === 'department') {
+      confirmMessage += '\n\n注意：如果该科室下有医生，删除操作将把该科室下的所有医生自动移入"未分配科室"。';
     }
+    
+    confirmMessage += '\n\n此操作不可恢复。';
+
+    await ElMessageBox.confirm(
+      confirmMessage,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+
+    // 调用新的删除接口
+    const result = await deleteDepartment(row.id);
+    
+    // 显示删除结果
+    if (result.doctorCount > 0) {
+      ElMessage.success(`科室删除成功！已将 ${result.doctorCount} 位医生移动到未分配科室`);
+    } else {
+      ElMessage.success('科室删除成功');
+    }
+    
+    await fetchDepartments(); // 刷新列表
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除科室失败:', error);
+      ElMessage.error('删除科室失败: ' + (error.message || '未知错误'));
+    }
+  }
 };
 
 // 组件挂载时获取数据
