@@ -89,14 +89,28 @@ CREATE TABLE `time_slots` (
   PRIMARY KEY (`slot_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='固定时间段表';
 
--- 7. schedules (医生排班表)
+-- 7. locations (诊室表)
+DROP TABLE IF EXISTS `locations`;
+CREATE TABLE `locations` (
+  `location_id` INT NOT NULL AUTO_INCREMENT,
+  `location_name` VARCHAR(100) NOT NULL COMMENT '诊室名称，如：门诊楼201室',
+  `department_id` INT COMMENT '所属科室',
+  `floor_level` INT COMMENT '楼层',
+  `building` VARCHAR(50) COMMENT '楼栋',
+  `room_number` VARCHAR(20) COMMENT '房间号',
+  `capacity` INT COMMENT '容纳人数',
+  `map_node_id` INT COMMENT '对应的地图节点',
+  PRIMARY KEY (`location_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='诊室表';
+
+-- 8. schedules (医生排班表)
 DROP TABLE IF EXISTS `schedules`;
 CREATE TABLE `schedules` (
   `schedule_id` INT NOT NULL AUTO_INCREMENT,
   `doctor_id` INT NOT NULL COMMENT '医生ID',
   `schedule_date` DATE NOT NULL COMMENT '出诊日期',
   `slot_id` INT NOT NULL COMMENT '时间段ID',
-  `location` VARCHAR(200) NOT NULL COMMENT '就诊地点',
+  `location_id` INT NOT NULL COMMENT '就诊地点ID',
   `total_slots` INT NOT NULL COMMENT '总号源数',
   `booked_slots` INT NOT NULL DEFAULT 0 COMMENT '已预约数',
   `fee` DECIMAL(10,2) NOT NULL DEFAULT 5.00 COMMENT '挂号费用',
@@ -110,7 +124,7 @@ CREATE TABLE `schedules` (
 
 -- 三、核心业务与流程模型
 
--- 8. patient_profiles (患者信息扩展表)
+-- 9. patient_profiles (患者信息扩展表)
 DROP TABLE IF EXISTS `patient_profiles`;
 CREATE TABLE `patient_profiles` (
   `patient_id` INT NOT NULL COMMENT '患者ID',
@@ -124,7 +138,7 @@ CREATE TABLE `patient_profiles` (
   PRIMARY KEY (`patient_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='患者信息扩展表';
 
--- 9. appointments (预约挂号表)
+-- 10. appointments (预约挂号表)
 DROP TABLE IF EXISTS `appointments`;
 CREATE TABLE `appointments` (
   `appointment_id` INT NOT NULL AUTO_INCREMENT,
@@ -140,7 +154,7 @@ CREATE TABLE `appointments` (
   PRIMARY KEY (`appointment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='预约挂号表';
 
--- 10. waitlist (候补表)
+-- 11. waitlist (候补表)
 DROP TABLE IF EXISTS `waitlist`;
 CREATE TABLE `waitlist` (
   `waitlist_id` INT NOT NULL AUTO_INCREMENT,
@@ -152,7 +166,7 @@ CREATE TABLE `waitlist` (
   PRIMARY KEY (`waitlist_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='候补表';
 
--- 11. symptom_department_mapping (症状-科室映射表)
+-- 12. symptom_department_mapping (症状-科室映射表)
 DROP TABLE IF EXISTS `symptom_department_mapping`;
 CREATE TABLE `symptom_department_mapping` (
   `mapping_id` INT NOT NULL AUTO_INCREMENT,
@@ -164,7 +178,7 @@ CREATE TABLE `symptom_department_mapping` (
   PRIMARY KEY (`mapping_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='症状-科室映射表';
 
--- 12. medical_guidelines (就医规范表)
+-- 13. medical_guidelines (就医规范表)
 DROP TABLE IF EXISTS `medical_guidelines`;
 CREATE TABLE `medical_guidelines` (
   `guideline_id` INT NOT NULL AUTO_INCREMENT,
@@ -178,9 +192,30 @@ CREATE TABLE `medical_guidelines` (
   PRIMARY KEY (`guideline_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='就医规范表';
 
+-- 14. notifications (通知消息表)
+DROP TABLE IF EXISTS `notifications`;
+CREATE TABLE `notifications` (
+  `notification_id` BIGINT NOT NULL AUTO_INCREMENT,
+  `user_id` INT NOT NULL COMMENT '接收用户ID',
+  `user_type` ENUM('patient','doctor','admin') NOT NULL COMMENT '用户类型',
+  `type` VARCHAR(50) NOT NULL COMMENT '通知类型: appointment_reminder, cancellation, waitlist_available, schedule_change, system_notice等',
+  `title` VARCHAR(200) NOT NULL COMMENT '通知标题',
+  `content` TEXT NOT NULL COMMENT '通知内容',
+  `related_entity` VARCHAR(50) COMMENT '相关实体类型 (如: appointment, schedule)',
+  `related_id` INT COMMENT '相关实体ID',
+  `status` ENUM('unread','read','deleted') NOT NULL DEFAULT 'unread' COMMENT '通知状态',
+  `priority` ENUM('low','normal','high','urgent') NOT NULL DEFAULT 'normal' COMMENT '优先级',
+  `sent_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
+  `read_at` DATETIME COMMENT '阅读时间',
+  PRIMARY KEY (`notification_id`),
+  INDEX `idx_user` (`user_id`, `user_type`),
+  INDEX `idx_status` (`status`),
+  INDEX `idx_sent_at` (`sent_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知消息表';
+
 -- 四、权限与管理模型 (RBAC)
 
--- 13. roles (角色表)
+-- 15. roles (角色表)
 DROP TABLE IF EXISTS `roles`;
 CREATE TABLE `roles` (
   `role_id` INT NOT NULL AUTO_INCREMENT,
@@ -190,7 +225,7 @@ CREATE TABLE `roles` (
   UNIQUE KEY `uk_roles_name` (`role_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
 
--- 14. permissions (权限表)
+-- 16. permissions (权限表)
 DROP TABLE IF EXISTS `permissions`;
 CREATE TABLE `permissions` (
   `permission_id` INT NOT NULL AUTO_INCREMENT,
@@ -200,7 +235,7 @@ CREATE TABLE `permissions` (
   UNIQUE KEY `uk_permissions_name` (`permission_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='权限表';
 
--- 15. role_permissions (角色-权限映射表)
+-- 17. role_permissions (角色-权限映射表)
 DROP TABLE IF EXISTS `role_permissions`;
 CREATE TABLE `role_permissions` (
   `role_id` INT NOT NULL COMMENT '角色ID',
@@ -208,7 +243,7 @@ CREATE TABLE `role_permissions` (
   PRIMARY KEY (`role_id`, `permission_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色-权限映射表';
 
--- 16. admin_roles (管理员-角色映射表)
+-- 18. admin_roles (管理员-角色映射表)
 DROP TABLE IF EXISTS `admin_roles`;
 CREATE TABLE `admin_roles` (
   `admin_id` INT NOT NULL COMMENT '管理员ID',
@@ -218,7 +253,7 @@ CREATE TABLE `admin_roles` (
 
 -- 五、辅助与日志模型
 
--- 17. leave_requests (调班/休假申请表)
+-- 19. leave_requests (调班/休假申请表)
 DROP TABLE IF EXISTS `leave_requests`;
 CREATE TABLE `leave_requests` (
   `request_id` INT NOT NULL AUTO_INCREMENT,
@@ -235,7 +270,7 @@ CREATE TABLE `leave_requests` (
   PRIMARY KEY (`request_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='调班/休假申请表';
 
--- 18. audit_logs (审计日志表)
+-- 20. audit_logs (审计日志表)
 DROP TABLE IF EXISTS `audit_logs`;
 CREATE TABLE `audit_logs` (
   `log_id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -251,7 +286,7 @@ CREATE TABLE `audit_logs` (
 
 -- 六、地图导航模型
 
--- 19. map_nodes (地图节点表)
+-- 21. map_nodes (地图节点表)
 DROP TABLE IF EXISTS `map_nodes`;
 CREATE TABLE `map_nodes` (
   `node_id` INT NOT NULL AUTO_INCREMENT,
@@ -265,7 +300,7 @@ CREATE TABLE `map_nodes` (
   PRIMARY KEY (`node_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='地图节点表';
 
--- 20. map_edges (地图路径表)
+-- 22. map_edges (地图路径表)
 DROP TABLE IF EXISTS `map_edges`;
 CREATE TABLE `map_edges` (
   `edge_id` INT NOT NULL AUTO_INCREMENT,
@@ -285,11 +320,20 @@ ALTER TABLE `doctors` ADD CONSTRAINT `fk_doctors_department`
 ALTER TABLE `departments` ADD CONSTRAINT `fk_departments_parent` 
   FOREIGN KEY (`parent_id`) REFERENCES `parent_departments` (`parent_department_id`);
 
+ALTER TABLE `locations` ADD CONSTRAINT `fk_locations_department` 
+  FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`);
+
+ALTER TABLE `locations` ADD CONSTRAINT `fk_locations_map_node` 
+  FOREIGN KEY (`map_node_id`) REFERENCES `map_nodes` (`node_id`);
+
 ALTER TABLE `schedules` ADD CONSTRAINT `fk_schedules_doctor` 
   FOREIGN KEY (`doctor_id`) REFERENCES `doctors` (`doctor_id`);
 
 ALTER TABLE `schedules` ADD CONSTRAINT `fk_schedules_slot` 
   FOREIGN KEY (`slot_id`) REFERENCES `time_slots` (`slot_id`);
+
+ALTER TABLE `schedules` ADD CONSTRAINT `fk_schedules_location` 
+  FOREIGN KEY (`location_id`) REFERENCES `locations` (`location_id`);
 
 ALTER TABLE `patient_profiles` ADD CONSTRAINT `fk_patient_profiles_patient` 
   FOREIGN KEY (`patient_id`) REFERENCES `patients` (`patient_id`);
@@ -387,6 +431,23 @@ INSERT IGNORE INTO `time_slots` (`slot_id`, `slot_name`, `start_time`, `end_time
 (15, '晚间 18:00-18:30', '18:00:00', '18:30:00'),
 (16, '晚间 18:30-19:00', '18:30:00', '19:00:00');
 
+-- 插入诊室数据
+INSERT IGNORE INTO `locations` (`location_id`, `location_name`, `department_id`, `floor_level`, `building`, `room_number`, `capacity`, `map_node_id`) VALUES
+(1, '门诊楼201室', 1, 2, '门诊楼', '201', 15, 5),
+(2, '门诊楼202室', 1, 2, '门诊楼', '202', 15, 5),
+(3, '门诊楼301室', 2, 3, '门诊楼', '301', 12, 5),
+(4, '门诊楼302室', 2, 3, '门诊楼', '302', 12, 5),
+(5, '门诊楼203室', 3, 2, '门诊楼', '203', 15, 5),
+(6, '门诊楼303室', 4, 3, '门诊楼', '303', 15, 5),
+(7, '外科楼101室', 5, 1, '外科楼', '101', 12, 6),
+(8, '外科楼102室', 6, 1, '外科楼', '102', 12, 6),
+(9, '外科楼103室', 7, 1, '外科楼', '103', 10, 6),
+(10, '专科楼201室', 8, 2, '专科楼', '201', 20, 7),
+(11, '专科楼202室', 9, 2, '专科楼', '202', 15, 7),
+(12, '专科楼203室', 10, 2, '专科楼', '203', 15, 7),
+(13, '专科楼204室', 11, 2, '专科楼', '204', 15, 7),
+(14, '专科楼205室', 12, 2, '专科楼', '205', 12, 7);
+
 -- 插入管理员数据
 INSERT IGNORE INTO `admins` (`admin_id`, `username`, `password_hash`, `full_name`, `status`) VALUES
 (1, 'admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '系统管理员', 'active'),
@@ -471,41 +532,41 @@ INSERT IGNORE INTO `admin_roles` (`admin_id`, `role_id`) VALUES
 (4, 5);  -- 王刚拥有系统操作员权限
 
 -- 插入排班数据 (未来一周的排班)
-INSERT IGNORE INTO `schedules` (`schedule_id`, `doctor_id`, `schedule_date`, `slot_id`, `location`, `total_slots`, `booked_slots`, `fee`, `status`, `remarks`) VALUES
+INSERT IGNORE INTO `schedules` (`schedule_id`, `doctor_id`, `schedule_date`, `slot_id`, `location_id`, `total_slots`, `booked_slots`, `fee`, `status`, `remarks`) VALUES
 -- 李明医生 (呼吸内科)
-(1, 1, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 1, '门诊楼201室', 10, 3, 10.00, 'available', '专家门诊'),
-(2, 1, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 2, '门诊楼201室', 10, 2, 10.00, 'available', '专家门诊'),
-(3, 1, DATE_ADD(CURDATE(), INTERVAL 3 DAY), 1, '门诊楼201室', 10, 0, 10.00, 'available', '专家门诊'),
+(1, 1, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 1, 1, 10, 3, 10.00, 'available', '专家门诊'),
+(2, 1, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 2, 1, 10, 2, 10.00, 'available', '专家门诊'),
+(3, 1, DATE_ADD(CURDATE(), INTERVAL 3 DAY), 1, 1, 10, 0, 10.00, 'available', '专家门诊'),
 
 -- 王小红医生 (呼吸内科)
-(4, 2, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 3, '门诊楼202室', 15, 5, 8.00, 'available', '普通门诊'),
-(5, 2, DATE_ADD(CURDATE(), INTERVAL 2 DAY), 2, '门诊楼202室', 15, 1, 8.00, 'available', '普通门诊'),
+(4, 2, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 3, 2, 15, 5, 8.00, 'available', '普通门诊'),
+(5, 2, DATE_ADD(CURDATE(), INTERVAL 2 DAY), 2, 2, 15, 1, 8.00, 'available', '普通门诊'),
 
 -- 张建国医生 (心血管内科)
-(6, 3, DATE_ADD(CURDATE(), INTERVAL 2 DAY), 1, '门诊楼301室', 8, 6, 15.00, 'available', '专家门诊，限号'),
-(7, 3, DATE_ADD(CURDATE(), INTERVAL 4 DAY), 1, '门诊楼301室', 8, 2, 15.00, 'available', '专家门诊，限号'),
+(6, 3, DATE_ADD(CURDATE(), INTERVAL 2 DAY), 1, 3, 8, 6, 15.00, 'available', '专家门诊，限号'),
+(7, 3, DATE_ADD(CURDATE(), INTERVAL 4 DAY), 1, 3, 8, 2, 15.00, 'available', '专家门诊，限号'),
 
 -- 陈静医生 (心血管内科)
-(8, 4, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 4, '门诊楼302室', 12, 4, 8.00, 'available', '普通门诊'),
-(9, 4, DATE_ADD(CURDATE(), INTERVAL 3 DAY), 3, '门诊楼302室', 12, 3, 8.00, 'available', '普通门诊'),
+(8, 4, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 4, 4, 12, 4, 8.00, 'available', '普通门诊'),
+(9, 4, DATE_ADD(CURDATE(), INTERVAL 3 DAY), 3, 4, 12, 3, 8.00, 'available', '普通门诊'),
 
 -- 刘强医生 (消化内科)
-(10, 5, DATE_ADD(CURDATE(), INTERVAL 2 DAY), 2, '门诊楼203室', 10, 2, 10.00, 'available', '专家门诊'),
+(10, 5, DATE_ADD(CURDATE(), INTERVAL 2 DAY), 2, 5, 10, 2, 10.00, 'available', '专家门诊'),
 
 -- 赵敏医生 (神经内科)
-(11, 6, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 5, '门诊楼303室', 10, 1, 8.00, 'available', '普通门诊'),
+(11, 6, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 5, 6, 10, 1, 8.00, 'available', '普通门诊'),
 
 -- 周伟医生 (普外科)
-(12, 7, DATE_ADD(CURDATE(), INTERVAL 3 DAY), 1, '外科楼101室', 10, 7, 12.00, 'available', '专家门诊'),
+(12, 7, DATE_ADD(CURDATE(), INTERVAL 3 DAY), 1, 7, 10, 7, 12.00, 'available', '专家门诊'),
 
 -- 孙志强医生 (骨科)
-(13, 8, DATE_ADD(CURDATE(), INTERVAL 2 DAY), 3, '外科楼102室', 10, 4, 12.00, 'available', '专家门诊'),
+(13, 8, DATE_ADD(CURDATE(), INTERVAL 2 DAY), 3, 8, 10, 4, 12.00, 'available', '专家门诊'),
 
 -- 杨光医生 (眼科)
-(14, 9, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 6, '专科楼201室', 15, 8, 8.00, 'available', '普通门诊'),
+(14, 9, DATE_ADD(CURDATE(), INTERVAL 1 DAY), 6, 10, 15, 8, 8.00, 'available', '普通门诊'),
 
 -- 吴晓丽医生 (耳鼻喉科)
-(15, 10, DATE_ADD(CURDATE(), INTERVAL 4 DAY), 2, '专科楼202室', 12, 3, 8.00, 'available', '普通门诊');
+(15, 10, DATE_ADD(CURDATE(), INTERVAL 4 DAY), 2, 11, 12, 3, 8.00, 'available', '普通门诊');
 
 -- 插入预约数据
 INSERT IGNORE INTO `appointments` (`appointment_id`, `patient_id`, `schedule_id`, `appointment_number`, `status`, `payment_status`, `payment_method`, `transaction_id`, `check_in_time`) VALUES
@@ -546,6 +607,19 @@ INSERT IGNORE INTO `medical_guidelines` (`guideline_id`, `title`, `content`, `ca
 (5, '医保报销流程', '持医保卡和身份证就诊，费用实时结算。特殊项目需提前审批。', '医保政策', 'active', 1),
 (6, '住院办理流程', '医生开具住院证 → 住院处办理手续 → 缴纳押金 → 入住病房', '住院流程', 'active', 1),
 (7, '转诊转院规范', '需经主治医生评估，填写转诊单，医务科审批，接收医院同意。', '转诊规范', 'active', 1);
+
+-- 插入通知消息示例数据
+INSERT IGNORE INTO `notifications` (`notification_id`, `user_id`, `user_type`, `type`, `title`, `content`, `related_entity`, `related_id`, `status`, `priority`, `sent_at`, `read_at`) VALUES
+(1, 1, 'patient', 'appointment_reminder', '就诊提醒', '您预约的李明医生门诊将于明天上午08:00-08:30开始，请提前15分钟到达门诊楼201室候诊。', 'appointment', 1, 'read', 'high', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 23 HOUR)),
+(2, 1, 'patient', 'appointment_success', '预约成功通知', '您已成功预约呼吸内科李明医生，就诊时间：明天上午08:00-08:30，请按时就诊。', 'appointment', 1, 'read', 'normal', DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY)),
+(3, 2, 'patient', 'appointment_reminder', '就诊提醒', '您预约的李明医生门诊将于明天上午08:30-09:00开始，地点：门诊楼201室。', 'appointment', 2, 'unread', 'high', DATE_SUB(NOW(), INTERVAL 1 DAY), NULL),
+(4, 4, 'patient', 'waitlist_available', '候补号源通知', '您候补的张建国医生号源已释放，请在2小时内登录系统完成预约，逾期将自动取消。', 'schedule', 6, 'read', 'urgent', DATE_SUB(NOW(), INTERVAL 3 HOUR), DATE_SUB(NOW(), INTERVAL 2 HOUR)),
+(5, 1, 'doctor', 'schedule_change', '排班变更通知', '您明天上午的排班已由管理员调整，请登录系统查看最新排班信息。', 'schedule', 1, 'read', 'high', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 20 HOUR)),
+(6, 7, 'patient', 'cancellation', '预约取消通知', '您预约的王小红医生门诊已取消，挂号费已原路退回。如需就诊请重新预约。', 'appointment', 9, 'read', 'high', DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY)),
+(7, 1, 'patient', 'system_notice', '系统维护通知', '系统将于本周六凌晨2:00-6:00进行维护升级，期间无法使用预约功能，请提前安排。', NULL, NULL, 'unread', 'normal', DATE_SUB(NOW(), INTERVAL 1 HOUR), NULL),
+(8, 3, 'patient', 'appointment_reminder', '明日就诊提醒', '温馨提示：您明天有一个预约，请携带身份证和就诊卡按时就诊。', 'appointment', 3, 'unread', 'normal', NOW(), NULL),
+(9, 2, 'admin', 'system_notice', '待审批提醒', '有2条医生休假申请待您审批，请及时处理。', 'leave_requests', NULL, 'unread', 'normal', DATE_SUB(NOW(), INTERVAL 2 HOUR), NULL),
+(10, 5, 'patient', 'appointment_success', '预约成功', '您已成功预约心血管内科张建国医生的专家号，挂号费15元已支付。', 'appointment', 5, 'read', 'normal', DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY));
 
 -- 插入地图节点数据
 INSERT IGNORE INTO `map_nodes` (`node_id`, `node_name`, `node_type`, `coordinates_x`, `coordinates_y`, `floor_level`, `description`, `is_accessible`) VALUES
