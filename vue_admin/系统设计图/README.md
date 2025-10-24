@@ -328,7 +328,3 @@ CREATE INDEX idx_appointments_schedule ON appointments(schedule_id, status);
 **文档格式**: PlantUML (Markdown)
 
 
-
-
-
-
