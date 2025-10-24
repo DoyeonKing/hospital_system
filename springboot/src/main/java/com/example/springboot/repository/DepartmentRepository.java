@@ -54,15 +54,16 @@ public interface DepartmentRepository extends JpaRepository<Department, Integer>
      */
     boolean existsByName(String name);
     
-    /**
-     * 更新症状科室映射表中的科室ID
-     * @param oldDepartmentId 原科室ID
-     * @param newDepartmentId 新科室ID
-     * @return 更新的记录数
-     */
-    @Modifying
-    @Query("UPDATE SymptomDepartmentMapping sdm SET sdm.departmentId = :newDepartmentId WHERE sdm.departmentId = :oldDepartmentId")
-    int updateSymptomDepartmentMappings(@Param("oldDepartmentId") Integer oldDepartmentId, @Param("newDepartmentId") Integer newDepartmentId);
+    // 注释掉不存在的实体查询
+    // /**
+    //  * 更新症状科室映射表中的科室ID
+    //  * @param oldDepartmentId 原科室ID
+    //  * @param newDepartmentId 新科室ID
+    //  * @return 更新的记录数
+    //  */
+    // @Modifying
+    // @Query("UPDATE SymptomDepartmentMapping sdm SET sdm.departmentId = :newDepartmentId WHERE sdm.departmentId = :oldDepartmentId")
+    // int updateSymptomDepartmentMappings(@Param("oldDepartmentId") Integer oldDepartmentId, @Param("newDepartmentId") Integer newDepartmentId);
     
     /**
      * 更新诊室表中的科室ID
@@ -71,6 +72,6 @@ public interface DepartmentRepository extends JpaRepository<Department, Integer>
      * @return 更新的记录数
      */
     @Modifying
-    @Query("UPDATE Location l SET l.departmentId = :newDepartmentId WHERE l.departmentId = :oldDepartmentId")
+    @Query("UPDATE Location l SET l.department.departmentId = :newDepartmentId WHERE l.department.departmentId = :oldDepartmentId")
     int updateLocationDepartments(@Param("oldDepartmentId") Integer oldDepartmentId, @Param("newDepartmentId") Integer newDepartmentId);
 }

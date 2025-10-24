@@ -149,14 +149,15 @@ public class DepartmentService {
             // 5. 处理其他外键约束
             System.out.println("处理其他外键约束...");
             
+            // 注释掉不存在的症状映射表处理
             // 处理 symptom_department_mapping 表
-            try {
-                int updatedMappings = departmentRepository.updateSymptomDepartmentMappings(departmentId, 999);
-                System.out.println("更新了 " + updatedMappings + " 条症状映射记录");
-            } catch (Exception e) {
-                System.out.println("处理症状映射时发生错误: " + e.getMessage());
-                // 继续执行，不中断删除流程
-            }
+            // try {
+            //     int updatedMappings = departmentRepository.updateSymptomDepartmentMappings(departmentId, 999);
+            //     System.out.println("更新了 " + updatedMappings + " 条症状映射记录");
+            // } catch (Exception e) {
+            //     System.out.println("处理症状映射时发生错误: " + e.getMessage());
+            //     // 继续执行，不中断删除流程
+            // }
 
             // 处理 locations 表（如果有外键约束）
             try {
