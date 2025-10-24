@@ -63,6 +63,10 @@ public class DoctorService {
         if (doctor.getStatus() == DoctorStatus.locked) {
             throw new IllegalArgumentException("账户已被锁定，请联系管理员");
         }
+        
+        if (doctor.getStatus() == DoctorStatus.deleted) {
+            throw new IllegalArgumentException("账户已删除，无法登录");
+        }
 
         // 4. 构建用户信息
         Map<String, Object> doctorInfo = new HashMap<>();

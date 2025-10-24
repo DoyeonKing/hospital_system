@@ -351,7 +351,7 @@ const handleLogin = async () => {
       }
     })
 
-    if (response.code === '200') {
+    if (response.code === '200' || response.code === 200) {
       // 保存登录信息到store
       const loginData = response.data
       doctorStore.loginSuccess(response.data, {

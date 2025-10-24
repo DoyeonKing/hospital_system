@@ -5,6 +5,7 @@ import com.example.springboot.dto.department.DepartmentQueryDTO;
 import com.example.springboot.dto.department.DepartmentResponseDTO;
 import com.example.springboot.dto.department.DepartmentTreeDTO;
 import com.example.springboot.dto.department.DoctorDataDTO;
+import com.example.springboot.dto.department.DepartmentDeleteResult;
 import com.example.springboot.dto.doctor.DoctorResponse;
 import com.example.springboot.entity.ParentDepartment;
 import com.example.springboot.service.DepartmentService;
@@ -79,30 +80,19 @@ public class DepartmentController {
     }
 
     /**
-     * 删除科室接口
-     * 使用 DELETE /api/departments/{name}
+     * 删除科室（支持非空科室删除）
+     * 使用 DELETE /api/departments/{departmentId}
      * 
-     * @param name 要删除的科室名称，作为路径变量传入
-     * @return 成功删除返回 204 No Content，失败时返回详细错误信息
+     * @param departmentId 科室ID
+     * @return 删除结果
      */
-    @DeleteMapping("/{name}")
-    public ResponseEntity<?> deleteDepartment(@PathVariable String name) {
+    @DeleteMapping("/{departmentId}")
+    public ResponseEntity<?> deleteDepartment(@PathVariable Integer departmentId) {
         try {
-            if (name == null || name.trim().isEmpty()) {
-                return new ResponseEntity<>("科室名称不能为空", HttpStatus.BAD_REQUEST);
-            }
-
-            departmentService.deleteDepartmentByName(name);
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } catch (RuntimeException e) {
-            if (e.getMessage() != null && e.getMessage().contains("不存在")) {
-                return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
-            }
-            String errorMessage = e.getMessage() != null ? e.getMessage() : "未知运行时错误";
-            return new ResponseEntity<>(errorMessage, HttpStatus.BAD_REQUEST);
+            DepartmentDeleteResult result = departmentService.deleteDepartment(departmentId);
+            return new ResponseEntity<>(result, HttpStatus.OK);
         } catch (Exception e) {
-            String errorMessage = e.getMessage() != null ? e.getMessage() : "未知内部错误";
-            return new ResponseEntity<>("服务器内部错误: " + errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>("删除科室时发生错误: " + e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -159,6 +149,53 @@ public class DepartmentController {
     }
 
     /**
+     * 测试接口 - 验证路由是否正常工作
+     * 使用 GET /api/departments/test-unassigned
+     * 
+     * @return 测试响应
+     */
+    @GetMapping("/test-unassigned")
+    public ResponseEntity<?> testUnassignedRoute() {
+        return new ResponseEntity<>("路由测试成功 - 未分配医生接口可访问", HttpStatus.OK);
+    }
+
+    /**
+     * 获取所有未分配科室的医生（department_id = 999）
+     * 使用 GET /api/departments/unassigned-doctors
+     * 
+     * @return 未分配医生的列表
+     */
+    @GetMapping("/unassigned-doctors")
+    public ResponseEntity<?> getUnassignedDoctors() {
+        try {
+            System.out.println("=== Controller: 收到获取未分配医生请求 ===");
+            List<DoctorResponse> doctors = departmentService.getUnassignedDoctors();
+            System.out.println("=== Controller: 返回医生数量: " + doctors.size() + " ===");
+            return new ResponseEntity<>(doctors, HttpStatus.OK);
+        } catch (Exception e) {
+            System.err.println("=== Controller: 获取未分配医生时发生错误: " + e.getMessage() + " ===");
+            e.printStackTrace();
+            return new ResponseEntity<>("获取未分配医生列表时发生错误: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * 获取科室树形结构数据（排除ID=999的未分配科室）
+     * 使用 GET /api/departments/tree
+     * 
+     * @return 树形结构的科室数据
+     */
+    @GetMapping("/tree")
+    public ResponseEntity<?> getDepartmentTree() {
+        try {
+            List<DepartmentTreeDTO> treeData = departmentService.getDepartmentTree();
+            return new ResponseEntity<>(treeData, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("获取科室树形数据时发生错误: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * 根据ID获取科室详情
      * 使用 GET /api/departments/{id}
      * 
@@ -176,22 +213,6 @@ public class DepartmentController {
             }
         } catch (Exception e) {
             return new ResponseEntity<>("查询科室时发生错误: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    /**
-     * 获取科室树形结构数据（排除ID=999的未分配科室）
-     * 使用 GET /api/departments/tree
-     * 
-     * @return 树形结构的科室数据
-     */
-    @GetMapping("/tree")
-    public ResponseEntity<?> getDepartmentTree() {
-        try {
-            List<DepartmentTreeDTO> treeData = departmentService.getDepartmentTree();
-            return new ResponseEntity<>(treeData, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("获取科室树形数据时发生错误: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -247,4 +268,23 @@ public class DepartmentController {
             return new ResponseEntity<>("从科室移除医生时发生错误: " + e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+
+    /**
+     * 批量将医生添加到指定科室
+     * 使用 POST /api/departments/{departmentId}/batch-add-doctors
+     * 
+     * @param departmentId 科室ID
+     * @param doctorIdentifiers 医生工号列表
+     * @return 添加成功的医生列表
+     */
+    @PostMapping("/{departmentId}/batch-add-doctors")
+    public ResponseEntity<?> batchAddDoctorsToDepartment(@PathVariable Integer departmentId, @RequestBody List<String> doctorIdentifiers) {
+        try {
+            List<DoctorResponse> doctors = departmentService.batchAddDoctorsToDepartment(departmentId, doctorIdentifiers);
+            return new ResponseEntity<>(doctors, HttpStatus.CREATED);
+        } catch (Exception e) {
+            return new ResponseEntity<>("批量添加医生到科室时发生错误: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
 }

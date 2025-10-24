@@ -1,6 +1,6 @@
-package com.example.springboot.exception; // 包名调整
+package com.example.springboot.exception;
 
-import com.example.springboot.common.BaseResponse; // 导入路径调整
+import com.example.springboot.common.Result;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -15,25 +15,25 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<BaseResponse<Void>> handleResourceNotFoundException(ResourceNotFoundException ex, WebRequest request) {
-        BaseResponse<Void> errorResponse = BaseResponse.error(HttpStatus.NOT_FOUND.value(), ex.getMessage());
-        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
+    public ResponseEntity<Result> handleResourceNotFoundException(ResourceNotFoundException ex, WebRequest request) {
+        Result errorResponse = Result.error("404", ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.OK);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<BaseResponse<Map<String, String>>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+    public ResponseEntity<Result> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getFieldErrors().forEach(error ->
                 errors.put(error.getField(), error.getDefaultMessage()));
 
-        BaseResponse<Map<String, String>> errorResponse = BaseResponse.error(HttpStatus.BAD_REQUEST.value(), "参数验证失败");
+        Result errorResponse = Result.error("400", "参数验证失败");
         errorResponse.setData(errors);
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(errorResponse, HttpStatus.OK);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<BaseResponse<Void>> handleGlobalException(Exception ex, WebRequest request) {
-        BaseResponse<Void> errorResponse = BaseResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "服务器内部错误: " + ex.getMessage());
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    public ResponseEntity<Result> handleGlobalException(Exception ex, WebRequest request) {
+        Result errorResponse = Result.error("500", "服务器内部错误: " + ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.OK);
     }
 }

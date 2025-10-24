@@ -123,7 +123,7 @@ public class UserController {
             updatedUser = userService.updateUser(id, null, request);
         } else if ("DOCTOR".equals(request.getRole().toUpperCase())) {
             // 医生ID通常为Integer类型，这里做类型转换
-            updatedUser = userService.updateUser(null, id.intValue(), request);
+            updatedUser = userService.updateUser(null, Integer.valueOf(id.intValue()), request);
         } else {
             throw new BadRequestException("不支持的用户角色: " + request.getRole());
         }
@@ -148,5 +148,13 @@ public class UserController {
         // 关键修复：传入正确的pageSize，而非null
         PageResponse<MedicalHistoryResponse> response = userService.getMedicalHistories(page, pageSize);
         return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable Long id,
+            @RequestParam String role) {
+        userService.softDeleteUser(id, role);
+        return ResponseEntity.noContent().build();
     }
 }

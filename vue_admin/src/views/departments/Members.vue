@@ -39,22 +39,43 @@
 
     <el-empty v-else-if="!loading" description="未找到指定的科室信息或获取失败" />
 
-    <el-dialog v-model="addDialogVisible" title="添加新成员" width="500px">
-      <el-form :model="addMemberForm" :rules="addMemberRules" ref="addMemberFormRef" label-width="100px">
-        <el-form-item label="医生工号" prop="identifier">
-          <el-input v-model="addMemberForm.identifier" placeholder="请输入医生工号" />
-        </el-form-item>
-        <el-form-item label="医生姓名" prop="fullName">
-          <el-input v-model="addMemberForm.fullName" placeholder="请输入医生姓名" />
-        </el-form-item>
-        <el-form-item label="职称" prop="title">
-          <el-input v-model="addMemberForm.title" placeholder="请输入职称" />
-        </el-form-item>
-      </el-form>
+    <el-dialog v-model="addDialogVisible" title="添加医生到科室" width="800px">
+      <div v-loading="loadingUnassignedDoctors">
+        <div style="margin-bottom: 16px;">
+          <el-text type="info">从以下未分配科室的医生中选择要添加到当前科室的医生：</el-text>
+        </div>
+        
+        <el-table 
+          :data="unassignedDoctors" 
+          @selection-change="handleSelectionChange"
+          style="margin-bottom: 16px;"
+        >
+          <el-table-column type="selection" width="55" />
+          <el-table-column prop="identifier" label="医生工号" width="120" />
+          <el-table-column prop="fullName" label="医生姓名" width="150" />
+          <el-table-column prop="title" label="职称" width="120" />
+          <el-table-column prop="phoneNumber" label="联系电话" width="150" />
+          <el-table-column prop="specialty" label="擅长领域" />
+        </el-table>
+        
+        <el-empty v-if="!loadingUnassignedDoctors && unassignedDoctors.length === 0" description="暂无未分配的医生" />
+        
+        <div v-if="selectedDoctors.length > 0" style="margin-top: 16px;">
+          <el-text type="primary">已选择 {{ selectedDoctors.length }} 位医生</el-text>
+        </div>
+      </div>
+      
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="addDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitAddMember" :loading="addingMember">确定</el-button>
+          <el-button 
+            type="primary" 
+            @click="submitBatchAddDoctors" 
+            :loading="addingMember"
+            :disabled="selectedDoctors.length === 0"
+          >
+            确认添加 ({{ selectedDoctors.length }})
+          </el-button>
         </div>
       </template>
     </el-dialog>
@@ -69,7 +90,7 @@ import BackButton from '@/components/BackButton.vue';
 import { useRoute, useRouter } from 'vue-router';
 
 // 导入 API 服务
-import { getDepartmentById, addDepartmentMember, deleteDepartmentMember, getDoctorsByDepartmentId } from '@/api/department';
+import { getDepartmentById, addDepartmentMember, deleteDepartmentMember, getDoctorsByDepartmentId, getUnassignedDoctors, batchAddDoctorsToDepartment } from '@/api/department';
 
 const route = useRoute();
 const router = useRouter();
@@ -79,25 +100,9 @@ const currentDepartment = ref(null);
 const loading = ref(false);
 const addDialogVisible = ref(false);
 const addingMember = ref(false);
-
-// 添加成员表单
-const addMemberForm = reactive({
-  identifier: '',
-  fullName: '',
-  title: ''
-});
-
-const addMemberRules = {
-  identifier: [
-    { required: true, message: '请输入医生工号', trigger: 'blur' }
-  ],
-  fullName: [
-    { required: true, message: '请输入医生姓名', trigger: 'blur' }
-  ],
-  title: [
-    { required: true, message: '请输入职称', trigger: 'blur' }
-  ]
-};
+const unassignedDoctors = ref([]);
+const selectedDoctors = ref([]);
+const loadingUnassignedDoctors = ref(false);
 
 const addMemberFormRef = ref(null);
 
@@ -136,32 +141,65 @@ const fetchDepartmentInfo = async () => {
 
 // 打开添加成员对话框
 const openAddDialog = () => {
-  addMemberForm.identifier = '';
-  addMemberForm.fullName = '';
-  addMemberForm.title = '';
+  selectedDoctors.value = [];
   addDialogVisible.value = true;
+  fetchUnassignedDoctors();
 };
 
-// 提交添加成员
-const submitAddMember = async () => {
-  if (!addMemberFormRef.value) return;
+// 获取未分配医生列表
+const fetchUnassignedDoctors = async () => {
+  loadingUnassignedDoctors.value = true;
+  try {
+    const response = await getUnassignedDoctors();
+    console.log('未分配医生API响应:', response);
+    
+    // 确保响应是数组
+    if (Array.isArray(response)) {
+      unassignedDoctors.value = response;
+    } else if (response && Array.isArray(response.data)) {
+      unassignedDoctors.value = response.data;
+    } else {
+      console.warn('未分配医生响应格式异常:', response);
+      unassignedDoctors.value = [];
+    }
+    
+    console.log('处理后的未分配医生列表:', unassignedDoctors.value);
+  } catch (error) {
+    console.error('获取未分配医生列表失败:', error);
+    ElMessage.error('获取未分配医生列表失败: ' + (error.message || '未知错误'));
+    unassignedDoctors.value = [];
+  } finally {
+    loadingUnassignedDoctors.value = false;
+  }
+};
+
+// 处理表格选择变化
+const handleSelectionChange = (selection) => {
+  selectedDoctors.value = selection;
+};
+
+// 批量添加医生
+const submitBatchAddDoctors = async () => {
+  if (selectedDoctors.value.length === 0) {
+    ElMessage.warning('请选择要添加的医生');
+    return;
+  }
 
   try {
-    await addMemberFormRef.value.validate();
-    
     addingMember.value = true;
     
-    await addDepartmentMember(currentDepartment.value.departmentId, addMemberForm);
+    const doctorIdentifiers = selectedDoctors.value.map(doctor => doctor.identifier);
+    await batchAddDoctorsToDepartment(currentDepartment.value.departmentId, doctorIdentifiers);
     
-    ElMessage.success('医生添加成功');
+    ElMessage.success(`成功添加 ${selectedDoctors.value.length} 位医生到科室`);
     addDialogVisible.value = false;
     
     // 刷新科室信息
     await fetchDepartmentInfo();
     
   } catch (error) {
-    console.error('添加医生失败:', error);
-    ElMessage.error('添加医生失败: ' + (error.message || '未知错误'));
+    console.error('批量添加医生失败:', error);
+    ElMessage.error('批量添加医生失败: ' + (error.message || '未知错误'));
   } finally {
     addingMember.value = false;
   }

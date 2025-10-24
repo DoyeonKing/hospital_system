@@ -4,16 +4,26 @@ import request from '@/utils/request'
  * 获取就医规范列表（分页）
  */
 export function getGuidelines(params) {
+  const requestParams = {
+    page: params.page || 1,
+    pageSize: params.pageSize || 10
+  };
+  
+  // 只有当参数有值且不为空字符串时才添加到请求中
+  if (params.keyword && params.keyword.trim() !== '') {
+    requestParams.keyword = params.keyword;
+  }
+  if (params.category && params.category.trim() !== '') {
+    requestParams.category = params.category;
+  }
+  if (params.status && params.status.trim() !== '') {
+    requestParams.status = params.status;
+  }
+  
   return request({
     url: '/api/medical-guidelines',
     method: 'get',
-    params: {
-      page: params.page || 1,
-      pageSize: params.pageSize || 10,
-      keyword: params.keyword || undefined,
-      category: params.category || undefined,
-      status: params.status || undefined
-    }
+    params: requestParams
   })
 }
 

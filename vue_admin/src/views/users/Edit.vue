@@ -46,7 +46,11 @@
           <el-table-column prop="patientId" label="患者ID" width="100" />
           <el-table-column prop="identifier" label="学号" width="120" />
           <el-table-column prop="fullName" label="姓名" width="120" />
-          <el-table-column prop="phoneNumber" label="手机号" width="130" />
+          <el-table-column prop="phoneNumber" label="手机号" width="130">
+            <template #default="{ row }">
+              {{ formatPhoneNumber(row.phoneNumber) }}
+            </template>
+          </el-table-column>
           <el-table-column prop="patientType" label="患者类型" width="100">
             <template #default="{ row }">
               {{ row.patientType === 'STUDENT' || row.patientType === 'student' ? '学生' : 
@@ -70,7 +74,11 @@
           <el-table-column prop="identifier" label="工号" width="120" />
           <el-table-column prop="fullName" label="姓名" width="120" />
           <el-table-column prop="title" label="职称" width="100" />
-          <el-table-column prop="phoneNumber" label="手机号" width="130" />
+          <el-table-column prop="phoneNumber" label="手机号" width="130">
+            <template #default="{ row }">
+              {{ formatPhoneNumber(row.phoneNumber) }}
+            </template>
+          </el-table-column>
           <el-table-column prop="departmentName" label="科室" width="120" />
           <el-table-column prop="specialty" label="专长" min-width="150" />
           <el-table-column prop="status" label="状态" width="100">
@@ -83,9 +91,19 @@
         </template>
 
         <!-- 操作列 -->
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="openEditDialog(row)">编辑</el-button>
+            <el-popconfirm
+              title="确定要删除该账户吗？"
+              confirm-button-text="确定"
+              cancel-button-text="取消"
+              @confirm="handleDelete(row)"
+            >
+              <template #reference>
+                <el-button type="danger" size="small">删除</el-button>
+              </template>
+            </el-popconfirm>
           </template>
         </el-table-column>
       </el-table>
@@ -139,6 +157,7 @@
             <el-select v-model="editForm.status" placeholder="请选择状态">
               <el-option label="正常" value="active" />
               <el-option label="禁用" value="inactive" />
+              <el-option label="已删除" value="deleted" />
             </el-select>
           </el-form-item>
           <el-form-item label="重置密码">
@@ -188,6 +207,8 @@
             <el-select v-model="editForm.status" placeholder="请选择状态">
               <el-option label="正常" value="active" />
               <el-option label="禁用" value="inactive" />
+              <el-option label="锁定" value="locked" />
+              <el-option label="已删除" value="deleted" />
             </el-select>
           </el-form-item>
           <el-form-item label="重置密码">
@@ -213,7 +234,7 @@
 import BackButton from '@/components/BackButton.vue';
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { searchPatients, searchDoctors, updateUser } from '@/api/user';
+import { searchPatients, searchDoctors, updateUser, deleteUser } from '@/api/user';
 import { getAllDepartments } from '@/api/department';
 
 // 搜索类型
@@ -386,14 +407,14 @@ const openEditDialog = (row) => {
   if (row.role === 'PATIENT') {
     editForm.identifier = row.identifier || '';
     editForm.fullName = row.fullName || '';
-    editForm.phoneNumber = row.phoneNumber || '';
+    editForm.phoneNumber = formatPhoneNumber(row.phoneNumber) || '';
     editForm.patientType = row.patientType || '';
     editForm.status = row.status || '';
     editForm.password = '';
   } else {
     editForm.identifier = row.identifier || '';
     editForm.fullName = row.fullName || '';
-    editForm.phoneNumber = row.phoneNumber || '';
+    editForm.phoneNumber = formatPhoneNumber(row.phoneNumber) || '';
     editForm.title = row.title || '';
     // 修复：正确获取科室ID
     editForm.departmentId = row.department?.departmentId || row.departmentId || null;
@@ -440,8 +461,11 @@ const handleSave = async () => {
         specialty: editForm.specialty,
         bio: editForm.bio,
         photoUrl: editForm.photoUrl,
-        // 后端枚举是小写：active, inactive, locked
-        status: editForm.status ? editForm.status.toLowerCase() : 'active'
+        // 后端枚举是小写：active, inactive, locked, deleted
+        status: (() => {
+          const status = editForm.status ? editForm.status.toLowerCase().trim() : 'active';
+          return isValidStatus(status) ? status : 'active';
+        })()
       };
       // 如果密码不为空，才添加密码字段
       if (editForm.password) {
@@ -454,8 +478,11 @@ const handleSave = async () => {
         phoneNumber: editForm.phoneNumber,
         // 后端枚举是小写：student, teacher, staff
         patientType: editForm.patientType ? editForm.patientType.toLowerCase() : 'student',
-        // 后端枚举是小写：active, inactive, locked
-        status: editForm.status ? editForm.status.toLowerCase() : 'active'
+        // 后端枚举是小写：active, inactive, locked, deleted
+        status: (() => {
+          const status = editForm.status ? editForm.status.toLowerCase().trim() : 'active';
+          return isValidStatus(status) ? status : 'active';
+        })()
       };
       // 如果密码不为空，才添加密码字段
       if (editForm.password) {
@@ -463,6 +490,11 @@ const handleSave = async () => {
       }
     }
 
+    // 调试：打印实际传递的数据
+    console.log('更新用户数据:', updateData);
+    console.log('患者状态值:', updateData.patientUpdateRequest?.status);
+    console.log('医生状态值:', updateData.doctorUpdateRequest?.status);
+    
     await updateUser(userId, updateData);
     
     ElMessage.success('保存成功');
@@ -476,6 +508,33 @@ const handleSave = async () => {
   } finally {
     saveLoading.value = false;
   }
+};
+
+// 删除用户处理函数
+const handleDelete = async (row) => {
+  try {
+    loading.value = true;
+    await deleteUser(row.userId, row.role);
+    ElMessage.success('删除成功');
+    await handleSearch(); // 刷新列表
+  } catch (error) {
+    ElMessage.error('删除失败: ' + (error.response?.data?.message || error.message));
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 验证状态值是否有效
+const isValidStatus = (status) => {
+  const validStatuses = ['active', 'inactive', 'locked', 'deleted'];
+  return validStatuses.includes(status);
+};
+
+// 格式化手机号，去掉+86前缀
+const formatPhoneNumber = (phone) => {
+  if (!phone) return '-';
+  // 去掉+86前缀
+  return phone.replace(/^\+86/, '');
 };
 
 // 初始化

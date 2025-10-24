@@ -14,7 +14,7 @@ CREATE TABLE `patients` (
   `password_hash` VARCHAR(255) NOT NULL COMMENT '哈希加盐后的密码',
   `full_name` VARCHAR(100) NOT NULL COMMENT '真实姓名',
   `phone_number` VARCHAR(20) NOT NULL COMMENT '存储E.164标准格式',
-  `status` ENUM('active','inactive','locked') NOT NULL DEFAULT 'active' COMMENT '账户状态',
+  `status` ENUM('active','inactive','locked','deleted') NOT NULL DEFAULT 'active' COMMENT '账户状态',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '账户创建时间',
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '信息最后更新时间',
   PRIMARY KEY (`patient_id`),
@@ -36,7 +36,7 @@ CREATE TABLE `doctors` (
   `specialty` TEXT COMMENT '擅长领域描述',
   `bio` TEXT COMMENT '个人简介',
   `photo_url` VARCHAR(255) COMMENT '头像照片URL',
-  `status` ENUM('active','inactive','locked') NOT NULL DEFAULT 'active' COMMENT '账户状态',
+  `status` ENUM('active','inactive','locked','deleted') NOT NULL DEFAULT 'active' COMMENT '账户状态',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '账户创建时间',
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '信息最后更新时间',
   PRIMARY KEY (`doctor_id`),
@@ -390,7 +390,8 @@ INSERT IGNORE INTO `parent_departments` (`parent_department_id`, `name`, `descri
 (2, '外科', '负责外科手术和创伤处理'),
 (3, '专科', '各类专科门诊'),
 (4, '医技科室', '辅助检查和治疗科室'),
-(5, '行政科室', '医院行政管理科室');
+(5, '行政科室', '医院行政管理科室'),
+(999, '未分配父科室', '用于存放未分配到具体父科室的医生');
 
 -- 插入子科室数据
 INSERT IGNORE INTO `departments` (`department_id`, `parent_id`, `name`, `description`) VALUES
@@ -410,7 +411,8 @@ INSERT IGNORE INTO `departments` (`department_id`, `parent_id`, `name`, `descrip
 (14, 4, '放射科', '医学影像检查'),
 (15, 4, '药房', '药品管理和发放'),
 (16, 5, '医务科', '医疗事务管理'),
-(17, 5, '财务科', '医院财务管理');
+(17, 5, '财务科', '医院财务管理'),
+(999, 999, '未分配科室', '用于存放未分配到具体科室的医生');
 
 -- 插入时间段数据
 INSERT IGNORE INTO `time_slots` (`slot_id`, `slot_name`, `start_time`, `end_time`) VALUES
@@ -663,6 +665,11 @@ INSERT IGNORE INTO `audit_logs` (`log_id`, `actor_id`, `actor_type`, `action`, `
 (3, 2, 'admin', '修改排班', 'schedules', 4, '调整号源数量从12到15', DATE_SUB(NOW(), INTERVAL 3 HOUR)),
 (4, 1, 'patient', '预约挂号', 'appointments', 1, '预约呼吸内科李明医生', DATE_SUB(NOW(), INTERVAL 5 HOUR)),
 (5, 3, 'doctor', '更新患者病历', 'patient_profiles', 2, '更新过敏史信息', DATE_SUB(NOW(), INTERVAL 1 DAY));
+
+-- 验证"未分配科室"记录插入结果
+SELECT 'parent_departments' as table_name, parent_department_id, name FROM parent_departments WHERE parent_department_id = 999
+UNION ALL
+SELECT 'departments' as table_name, department_id, name FROM departments WHERE department_id = 999;
 
 SET FOREIGN_KEY_CHECKS = 1;
 

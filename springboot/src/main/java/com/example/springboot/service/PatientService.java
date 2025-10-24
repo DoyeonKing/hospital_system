@@ -200,6 +200,7 @@ import com.example.springboot.repository.PatientRepository;
 import com.example.springboot.repository.PatientProfileRepository;
 import com.example.springboot.util.PasswordEncoderUtil; // 导入您的密码工具类
 import jakarta.persistence.criteria.JoinType;
+import org.hibernate.Hibernate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -259,6 +260,10 @@ public class PatientService {
         
         if (patient.getStatus() == PatientStatus.locked) {
             throw new IllegalArgumentException("账户已被锁定，请联系管理员");
+        }
+        
+        if (patient.getStatus() == PatientStatus.deleted) {
+            throw new IllegalArgumentException("账户已删除，无法登录");
         }
 
         // 4. 构建用户信息
@@ -465,35 +470,36 @@ public class PatientService {
         Pageable pageable = PageRequest.of(page - 1, pageSize);
 
         // 分页查询患者及其关联的档案信息（使用JOIN FETCH优化关联查询）
+// 分页查询患者及其关联的档案信息（修复JOIN FETCH导致的语义错误）
         Page<Patient> patientPage = patientRepository.findAll((Specification<Patient>) (root, query, cb) -> {
-            root.fetch("patientProfile", JoinType.LEFT); // 关联查询患者档案，避免N+1问题
-            query.distinct(true);
+            // 1. 用普通JOIN替换fetch，避免触发JOIN FETCH的语义校验
+            root.join("patientProfile", JoinType.LEFT); // 仅关联查询，不迫切加载
+            query.distinct(true); // 去重，避免重复记录
             return cb.conjunction();
         }, pageable);
 
-        // 转换为MedicalHistoryResponse
+// 2. 遍历结果时手动初始化关联实体（解决懒加载问题）
         List<MedicalHistoryResponse> content = patientPage.getContent().stream()
                 .map(patient -> {
+                    // 手动初始化patientProfile（因为是LAZY加载）
+                    if (patient.getPatientProfile() != null) {
+                        Hibernate.initialize(patient.getPatientProfile());
+                    }
+                    // 后续转换逻辑不变...
                     MedicalHistoryResponse response = new MedicalHistoryResponse();
-                    // 设置患者ID和姓名
                     response.setId(patient.getPatientId());
                     response.setName(patient.getFullName());
 
-                    // 从患者档案中获取病史、过敏史和黑名单状态
                     PatientProfile profile = patient.getPatientProfile();
                     if (profile != null) {
                         response.setIdCard(profile.getIdCardNumber());
                         response.setPastMedicalHistory(profile.getMedicalHistory());
                         response.setAllergyHistory(profile.getAllergies());
-                        // 关键修改：根据BlacklistStatus枚举判断是否拉黑
                         response.setIsBlacklisted(profile.getBlacklistStatus() == BlacklistStatus.blacklisted);
-                        System.out.println("患者 " + patient.getFullName() + " 有档案，过敏史: " + profile.getAllergies());
                     } else {
-                        // 处理无档案的情况
                         response.setPastMedicalHistory("");
                         response.setAllergyHistory("");
-                        response.setIsBlacklisted(false); // 无档案默认未拉黑
-                        System.out.println("患者 " + patient.getFullName() + " 无档案");
+                        response.setIsBlacklisted(false);
                     }
                     return response;
                 })

@@ -46,7 +46,7 @@ export const useVolunteerTrainingStore = defineStore('volunteerTraining', {
         // 后端API端点
         const response = await request.post('/volunteerTraining/apply', trainingData);
 
-        if (response.code === '200') {
+        if (response.code === '200' || response.code === 200) {
           console.log('Store (VolunteerTraining): Application submitted successfully.', response.data);
           ElMessage.success(response.msg || '培训申请成功提交！'); // 添加前端提示
           // 申请成功后可以进行的操作，例如：

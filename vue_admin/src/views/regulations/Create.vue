@@ -104,7 +104,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useAdminStore } from '@/stores/adminStore';
 import BackButton from '@/components/BackButton.vue';
-// import { createGuideline } from '@/api/guideline'; // 等后端接口完成后启用
+import { createGuideline } from '@/api/guideline';
 
 const router = useRouter();
 const adminStore = useAdminStore();
@@ -160,33 +160,37 @@ const getCategoryTagType = (category) => {
   return types[category] || '';
 };
 
-const handleSubmit = () => {
-  formRef.value.validate((valid) => {
+const handleSubmit = async () => {
+  try {
+    const valid = await formRef.value.validate();
     if (valid) {
       submitting.value = true;
       
-      // 【模拟提交】等后端接口完成后替换为真实API调用
-      setTimeout(() => {
-        ElMessage.success('规范创建成功！');
-        submitting.value = false;
-        router.push('/regulations');
-      }, 1000);
+      const submitData = {
+        title: form.title,
+        content: form.content,
+        category: form.category,
+        status: form.status,
+        createdBy: parseInt(adminStore.currentAdminId) || 1
+      };
       
-      // 【后端接口完成后启用】
-      // const submitData = {
-      //   title: form.title,
-      //   content: form.content,
-      //   category: form.category,
-      //   status: form.status.toUpperCase(), // 转换为大写枚举值
-      //   createdBy: adminStore.adminId || 1
-      // };
-      // await createGuideline(submitData);
-      // ElMessage.success('规范创建成功！');
-      // router.push('/regulations');
+      // 调试信息
+      console.log('adminStore.currentAdminId:', adminStore.currentAdminId);
+      console.log('parseInt result:', parseInt(adminStore.currentAdminId));
+      console.log('submitData:', submitData);
+      await createGuideline(submitData);
+      ElMessage.success('规范创建成功！');
+      router.push('/regulations');
+    }
+  } catch (error) {
+    if (error !== false) { // false表示验证失败
+      ElMessage.error('创建失败：' + (error.message || '未知错误'));
     } else {
       ElMessage.error('请填写完整信息');
     }
-  });
+  } finally {
+    submitting.value = false;
+  }
 };
 
 const handleReset = () => {

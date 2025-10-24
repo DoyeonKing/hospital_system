@@ -15,6 +15,8 @@ import com.example.springboot.dto.user.UserImportResponse;
 import com.example.springboot.dto.user.UserResponse;
 import com.example.springboot.entity.*;
 import com.example.springboot.entity.enums.BlacklistStatus;
+import com.example.springboot.entity.enums.DoctorStatus;
+import com.example.springboot.entity.enums.PatientStatus;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.*;
@@ -132,12 +134,19 @@ public class UserServiceImpl implements UserService {
         Department department = departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found with id: " + request.getDepartmentId()));
 
+        // 身份证号唯一性校验（如果提供了身份证号）
+        if (request.getId_card() != null &&
+                doctorRepository.existsByIdCardNumber(request.getId_card())) {
+            throw new BadRequestException("身份证号已存在: " + request.getId_card());
+        }
+
         // 创建医生
         Doctor doctor = new Doctor();
         doctor.setDepartment(department);  // 设置科室关联
         doctor.setIdentifier(request.getId());
         doctor.setPasswordHash(request.getPassword());
         doctor.setFullName(request.getName());
+        doctor.setIdCardNumber(request.getId_card());  // 设置身份证号
         doctor.setPhoneNumber(request.getPhone());
         doctor.setTitle(request.getTitle());
         doctor.setSpecialty(request.getSpecialty());
@@ -282,6 +291,9 @@ public class UserServiceImpl implements UserService {
         Page<Doctor> doctorPage = doctorRepository.findAll((Specification<Doctor>) (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
+            // 排除已删除的记录
+            predicates.add(cb.notEqual(root.get("status"), DoctorStatus.deleted));
+
             // 工号模糊查询
             if (id != null && !id.isEmpty()) {
                 predicates.add(cb.like(root.get("identifier"), "%" + id + "%"));
@@ -344,6 +356,10 @@ public class UserServiceImpl implements UserService {
         // 查询患者: 使用 JPA Specification 进行动态查询。
         Page<Patient> patientPage = patientRepository.findAll((Specification<Patient>) (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            
+            // 排除已删除的记录
+            predicates.add(cb.notEqual(root.get("status"), PatientStatus.deleted));
+            
             // 按学号/工号/ID (identifier) 模糊查询
             if (id != null && !id.isEmpty()) {
                 predicates.add(cb.like(root.get("identifier"), "%" + id + "%"));
@@ -470,8 +486,21 @@ public class UserServiceImpl implements UserService {
         if (request.getPhoneNumber() != null) {
             patient.setPhoneNumber(request.getPhoneNumber());
         }
-        if (request.getStatus() != null) {
-            patient.setStatus(request.getStatus());
+        if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
+            // 确保状态值有效
+            try {
+                String statusStr = request.getStatus().trim();
+                String lowerStatus = statusStr.toLowerCase();
+                System.out.println("原始状态值: " + request.getStatus());
+                System.out.println("处理后状态值: " + lowerStatus);
+                // 直接使用小写，因为枚举定义就是小写
+                PatientStatus status = PatientStatus.valueOf(lowerStatus);
+                patient.setStatus(status);
+                System.out.println("成功设置状态: " + status);
+            } catch (Exception e) {
+                System.out.println("状态转换失败: " + e.getMessage());
+                throw new BadRequestException("无效的状态值: " + request.getStatus() + ", 有效值: active, inactive, locked, deleted");
+            }
         }
 
         Patient updatedPatient = patientRepository.save(patient);
@@ -550,5 +579,45 @@ public class UserServiceImpl implements UserService {
         response.setRole("DOCTOR");
         response.setUserDetails(doctorService.convertToResponseDto(updatedDoctor));
         return response;
+    }
+
+    @Override
+    @Transactional
+    public void softDeleteUser(Long userId, String role) {
+        if ("DOCTOR".equalsIgnoreCase(role)) {
+            Doctor doctor = doctorRepository.findById(userId.intValue())
+                .orElseThrow(() -> new ResourceNotFoundException("医生不存在"));
+            
+            // 检查是否已经删除
+            if (doctor.getStatus() == DoctorStatus.deleted) {
+                throw new BadRequestException("该医生已被删除");
+            }
+            
+            // 检查是否有未完成的排班（可选的前置检查）
+            // 这里可以添加更复杂的业务逻辑检查
+            
+            // 软删除
+            doctor.setStatus(DoctorStatus.deleted);
+            doctorRepository.save(doctor);
+            
+        } else if ("PATIENT".equalsIgnoreCase(role)) {
+            Patient patient = patientRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("患者不存在"));
+            
+            // 检查是否已经删除
+            if (patient.getStatus() == PatientStatus.deleted) {
+                throw new BadRequestException("该患者已被删除");
+            }
+            
+            // 检查是否有未完成的预约（可选的前置检查）
+            // 这里可以添加更复杂的业务逻辑检查
+            
+            // 软删除
+            patient.setStatus(PatientStatus.deleted);
+            patientRepository.save(patient);
+            
+        } else {
+            throw new BadRequestException("不支持的用户角色: " + role);
+        }
     }
 }

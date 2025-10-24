@@ -67,7 +67,7 @@
 
 <script setup>
 import BackButton from '@/components/BackButton.vue';
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { searchDoctors, searchPatients } from '@/api/user';
 
@@ -83,10 +83,10 @@ const total = ref(0);
 const handleSearch = async () => {
   loading.value = true;
   searchPerformed.value = true;
-  currentPage.value = 1;
 
   try {
     let allResults = [];
+    let totalCount = 0;
 
     // 根据选择的角色决定调用哪个接口
     if (searchForm.role === '' || searchForm.role === 'DOCTOR') {
@@ -107,13 +107,16 @@ const handleSearch = async () => {
             name: doctorDetail.fullName || doctorDetail.name,
             role: 'DOCTOR',
             id_card: doctorDetail.idCardNumber || '-',
-            phone: doctorDetail.phoneNumber || doctorDetail.phone,
+            phone: formatPhoneNumber(doctorDetail.phoneNumber || doctorDetail.phone),
             status: doctorDetail.status || '-',
             departmentName: doctorDetail.departmentName || '-'
           };
         });
         allResults.push(...doctors);
       }
+      
+      // 累加医生总数
+      totalCount += doctorResponse.totalElements || 0;
     }
 
     if (searchForm.role === '' || searchForm.role === 'PATIENT') {
@@ -133,17 +136,20 @@ const handleSearch = async () => {
             name: patientDetail.fullName || patientDetail.name,
             role: 'PATIENT',
             id_card: patientDetail.idCardNumber || patientDetail.id_card || '-',
-            phone: patientDetail.phoneNumber || patientDetail.phone,
+            phone: formatPhoneNumber(patientDetail.phoneNumber || patientDetail.phone),
             status: patientDetail.status || '-',
             patientType: patientDetail.patientType || '-'
           };
         });
         allResults.push(...patients);
       }
+      
+      // 累加患者总数
+      totalCount += patientResponse.totalElements || 0;
     }
 
     filteredUsers.value = allResults;
-    total.value = allResults.length;
+    total.value = totalCount;
 
     if (allResults.length === 0) {
       ElMessage.info('未找到符合条件的用户');
@@ -175,6 +181,18 @@ const handlePageChange = (page) => {
   currentPage.value = page;
   handleSearch();
 };
+
+// 格式化手机号，去掉+86前缀
+const formatPhoneNumber = (phone) => {
+  if (!phone) return '-';
+  // 去掉+86前缀
+  return phone.replace(/^\+86/, '');
+};
+
+// 页面初始化时自动加载数据
+onMounted(() => {
+  handleSearch();
+});
 </script>
 
 <style scoped>.app-container{padding:20px;}.search-form{margin-bottom:20px;}</style>

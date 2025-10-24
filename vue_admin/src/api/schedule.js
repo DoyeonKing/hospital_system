@@ -8,6 +8,24 @@ import request from '@/utils/request'
  * @param {String} params.endDate - 结束日期 (格式: YYYY-MM-DD)
  */
 export function getSchedules(params) {
+  console.log('=== API层请求参数 ===');
+  console.log('接收到的参数:', params);
+  console.log('发送的请求参数:', {
+    departmentId: params.departmentId,
+    startDate: params.startDate,
+    endDate: params.endDate
+  });
+  console.log('请求配置:', {
+    url: '/api/schedules',
+    method: 'get',
+    params: {
+      departmentId: params.departmentId,
+      startDate: params.startDate,
+      endDate: params.endDate
+    }
+  });
+  console.log('==================');
+  
   return request({
     url: '/api/schedules',
     method: 'get',

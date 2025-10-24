@@ -5,6 +5,7 @@ import com.example.springboot.dto.department.DepartmentResponseDTO;
 import com.example.springboot.dto.department.DepartmentQueryDTO;
 import com.example.springboot.dto.department.DepartmentTreeDTO;
 import com.example.springboot.dto.department.DoctorDataDTO;
+import com.example.springboot.dto.department.DepartmentDeleteResult;
 import com.example.springboot.dto.doctor.DoctorResponse;
 import com.example.springboot.entity.Department;
 import com.example.springboot.entity.ParentDepartment;
@@ -25,6 +26,7 @@ import org.hibernate.Hibernate;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
 
 @Service
 @Transactional
@@ -97,17 +99,114 @@ public class DepartmentService {
     }
 
     /**
-     * 根据名称删除科室
+     * 删除科室（支持非空科室删除）
      * 
-     * @param name 要删除的科室名称
-     * @throws RuntimeException 如果科室不存在
+     * @param departmentId 科室ID
+     * @return 删除结果信息
      */
     @Transactional
-    public void deleteDepartmentByName(String name) {
-        Department departmentToDelete = departmentRepository.findByName(name)
-                .orElseThrow(() -> new RuntimeException("要删除的科室不存在: " + name));
+    public DepartmentDeleteResult deleteDepartment(Integer departmentId) {
+        try {
+            System.out.println("=== 开始删除科室: " + departmentId + " ===");
+            
+            // 1. 查找科室
+            Department department = departmentRepository.findById(departmentId)
+                    .orElseThrow(() -> new RuntimeException("科室不存在: " + departmentId));
+            System.out.println("找到科室: " + department.getName());
 
-        departmentRepository.delete(departmentToDelete);
+            // 2. 检查是否为未分配科室（ID=999），禁止删除
+            if (departmentId.equals(999)) {
+                throw new RuntimeException("不能删除未分配科室");
+            }
+
+            // 3. 查询该科室下的医生
+            List<Doctor> doctorsInDepartment = doctorRepository.findByDepartmentDepartmentId(departmentId);
+            System.out.println("科室 " + departmentId + " 下有 " + doctorsInDepartment.size() + " 位医生");
+            
+            DepartmentDeleteResult result = new DepartmentDeleteResult();
+            result.setDepartmentId(departmentId);
+            result.setDepartmentName(department.getName());
+            result.setDoctorCount(doctorsInDepartment.size());
+            result.setMovedDoctors(new ArrayList<>());
+
+            // 4. 如果有医生，先将他们移动到未分配科室
+            if (!doctorsInDepartment.isEmpty()) {
+                Department unassignedDepartment = departmentRepository.findById(999)
+                        .orElseThrow(() -> new RuntimeException("未分配科室不存在，请先执行数据库初始化脚本"));
+                System.out.println("找到未分配科室: " + unassignedDepartment.getName());
+
+                for (Doctor doctor : doctorsInDepartment) {
+                    System.out.println("移动医生: " + doctor.getIdentifier() + " - " + doctor.getFullName());
+                    doctor.setDepartment(unassignedDepartment);
+                    result.getMovedDoctors().add(doctor.getIdentifier());
+                }
+                
+                // 批量保存医生
+                doctorRepository.saveAll(doctorsInDepartment);
+                System.out.println("医生移动完成");
+            }
+
+            // 5. 处理其他外键约束
+            System.out.println("处理其他外键约束...");
+            
+            // 注释掉不存在的症状映射表处理
+            // 处理 symptom_department_mapping 表
+            // try {
+            //     int updatedMappings = departmentRepository.updateSymptomDepartmentMappings(departmentId, 999);
+            //     System.out.println("更新了 " + updatedMappings + " 条症状映射记录");
+            // } catch (Exception e) {
+            //     System.out.println("处理症状映射时发生错误: " + e.getMessage());
+            //     // 继续执行，不中断删除流程
+            // }
+
+            // 处理 locations 表（如果有外键约束）
+            try {
+                int updatedLocations = departmentRepository.updateLocationDepartments(departmentId, 999);
+                System.out.println("更新了 " + updatedLocations + " 条诊室记录");
+            } catch (Exception e) {
+                System.out.println("处理诊室记录时发生错误: " + e.getMessage());
+                // 继续执行，不中断删除流程
+            }
+
+            // 6. 删除科室
+            System.out.println("开始删除科室: " + department.getName());
+            departmentRepository.delete(department);
+            System.out.println("科室删除成功");
+            
+            result.setSuccess(true);
+            System.out.println("=== 科室删除完成 ===");
+            return result;
+            
+        } catch (Exception e) {
+            System.err.println("删除科室时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("删除科室失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 从科室中移除医生（将department_id设置为999）
+     * 
+     * @param departmentId 科室ID
+     * @param doctorIdentifier 医生工号
+     */
+    @Transactional
+    public void removeDoctorFromDepartment(Integer departmentId, String doctorIdentifier) {
+        // 1. 查找医生
+        Doctor doctor = doctorRepository.findByIdentifier(doctorIdentifier)
+                .orElseThrow(() -> new RuntimeException("医生不存在: " + doctorIdentifier));
+
+        // 2. 验证医生是否属于该科室
+        if (doctor.getDepartment() == null || !doctor.getDepartment().getDepartmentId().equals(departmentId)) {
+            throw new RuntimeException("医生不属于该科室");
+        }
+
+        // 3. 将医生移动到未分配科室（ID=999）
+        Department unassignedDepartment = departmentRepository.findById(999)
+                .orElseThrow(() -> new RuntimeException("未分配科室不存在，请先执行数据库初始化脚本"));
+        
+        doctor.setDepartment(unassignedDepartment);
+        doctorRepository.save(doctor);
     }
 
     /**
@@ -252,8 +351,10 @@ public class DepartmentService {
         Department department = departmentRepository.findById(departmentId)
                 .orElseThrow(() -> new RuntimeException("科室不存在: " + departmentId));
 
-        // 获取该科室下的医生
-        List<Doctor> doctors = department.getDoctors();
+        // 获取该科室下的医生，排除已删除的医生
+        List<Doctor> doctors = department.getDoctors().stream()
+                .filter(doctor -> doctor.getStatus() != DoctorStatus.deleted)
+                .toList();
         
         return doctors.stream()
                 .map(this::convertToDoctorResponse)
@@ -298,28 +399,86 @@ public class DepartmentService {
     }
 
     /**
-     * 从科室中移除医生（将department_id设置为999）
+     * 获取所有未分配科室的医生（department_id = 999）
+     * 
+     * @return 未分配医生的列表
+     */
+    @Transactional(readOnly = true)
+    public List<DoctorResponse> getUnassignedDoctors() {
+        try {
+            System.out.println("=== 开始查询未分配医生 ===");
+            
+            // 查询department_id为999的医生
+            List<Doctor> unassignedDoctors = doctorRepository.findByDepartmentDepartmentId(999);
+            System.out.println("查询到的医生数量: " + (unassignedDoctors != null ? unassignedDoctors.size() : "null"));
+            
+            // 确保返回非null的列表
+            if (unassignedDoctors == null) {
+                System.out.println("查询结果为null，返回空列表");
+                unassignedDoctors = new ArrayList<>();
+            }
+            
+            // 打印每个医生的信息
+            for (Doctor doctor : unassignedDoctors) {
+                System.out.println("医生: " + doctor.getIdentifier() + " - " + doctor.getFullName() + 
+                    " (科室ID: " + (doctor.getDepartment() != null ? doctor.getDepartment().getDepartmentId() : "null") + ")");
+            }
+            
+            List<DoctorResponse> result = unassignedDoctors.stream()
+                    .map(this::convertToDoctorResponse)
+                    .toList();
+            
+            System.out.println("转换后的响应数量: " + result.size());
+            System.out.println("=== 查询未分配医生完成 ===");
+            
+            return result;
+        } catch (Exception e) {
+            // 如果出现异常，返回空列表而不是null
+            System.err.println("获取未分配医生时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * 批量将医生添加到指定科室
      * 
      * @param departmentId 科室ID
-     * @param doctorIdentifier 医生工号
+     * @param doctorIdentifiers 医生工号列表
+     * @return 添加成功的医生列表
      */
     @Transactional
-    public void removeDoctorFromDepartment(Integer departmentId, String doctorIdentifier) {
-        // 1. 查找医生
-        Doctor doctor = doctorRepository.findByIdentifier(doctorIdentifier)
-                .orElseThrow(() -> new RuntimeException("医生不存在: " + doctorIdentifier));
+    public List<DoctorResponse> batchAddDoctorsToDepartment(Integer departmentId, List<String> doctorIdentifiers) {
+        // 1. 验证科室是否存在
+        Department department = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new RuntimeException("科室不存在: " + departmentId));
 
-        // 2. 验证医生是否属于该科室
-        if (doctor.getDepartment() == null || !doctor.getDepartment().getDepartmentId().equals(departmentId)) {
-            throw new RuntimeException("医生不属于该科室");
+        // 2. 查找所有指定的医生
+        List<Doctor> doctorsToAdd = new ArrayList<>();
+        for (String identifier : doctorIdentifiers) {
+            Doctor doctor = doctorRepository.findByIdentifier(identifier)
+                    .orElseThrow(() -> new RuntimeException("医生不存在: " + identifier));
+            
+            // 验证医生是否属于未分配科室
+            if (doctor.getDepartment() == null || !doctor.getDepartment().getDepartmentId().equals(999)) {
+                throw new RuntimeException("医生 " + identifier + " 不属于未分配科室，无法添加");
+            }
+            
+            doctorsToAdd.add(doctor);
         }
 
-        // 3. 将医生移动到未分配科室（ID=999）
-        Department unassignedDepartment = departmentRepository.findById(999)
-                .orElseThrow(() -> new RuntimeException("未分配科室不存在，请先执行数据库初始化脚本"));
+        // 3. 批量更新医生的科室
+        for (Doctor doctor : doctorsToAdd) {
+            doctor.setDepartment(department);
+        }
+
+        // 4. 保存所有医生
+        List<Doctor> savedDoctors = doctorRepository.saveAll(doctorsToAdd);
         
-        doctor.setDepartment(unassignedDepartment);
-        doctorRepository.save(doctor);
+        // 5. 转换为响应DTO
+        return savedDoctors.stream()
+                .map(this::convertToDoctorResponse)
+                .toList();
     }
 
     /**

@@ -9,6 +9,7 @@ import com.example.springboot.entity.LeaveRequest;
 import com.example.springboot.entity.Schedule;
 import com.example.springboot.entity.enums.LeaveRequestStatus;
 import com.example.springboot.entity.enums.ScheduleStatus;
+import com.example.springboot.entity.enums.DoctorStatus;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.AdminRepository;
@@ -67,6 +68,12 @@ public class LeaveRequestService {
     public List<LeaveRequestResponse> findLeaveRequestsByDoctor(Integer doctorId) {
         Doctor doctor = doctorRepository.findById(doctorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id " + doctorId));
+        
+        // 检查医生是否已删除
+        if (doctor.getStatus() == DoctorStatus.deleted) {
+            throw new BadRequestException("医生已删除，无法查询请假记录");
+        }
+        
         return leaveRequestRepository.findByDoctor(doctor).stream()
                 .map(this::convertToResponseDto)
                 .collect(Collectors.toList());
@@ -160,8 +167,8 @@ public class LeaveRequestService {
         List<Schedule> affectedSchedules = scheduleRepository.findByDoctorAndScheduleDateBetween(doctor, startDate, endDate);
 
         for (Schedule schedule : affectedSchedules) {
-            LocalDateTime scheduleStartTime = LocalDateTime.of(schedule.getScheduleDate(), schedule.getTimeSlot().getStartTime());
-            LocalDateTime scheduleEndTime = LocalDateTime.of(schedule.getScheduleDate(), schedule.getTimeSlot().getEndTime());
+            LocalDateTime scheduleStartTime = LocalDateTime.of(schedule.getScheduleDate(), schedule.getSlot().getStartTime());
+            LocalDateTime scheduleEndTime = LocalDateTime.of(schedule.getScheduleDate(), schedule.getSlot().getEndTime());
 
             // 检查排班时间是否与请假时间段重叠
             boolean overlaps = !scheduleEndTime.isBefore(startTime) && !scheduleStartTime.isAfter(endTime);

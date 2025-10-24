@@ -15,6 +15,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     List<Appointment> findBySchedule(Schedule schedule);
     boolean existsByPatientAndSchedule(Patient patient, Schedule schedule);
     long countBySchedule(Schedule schedule);
-    List<Appointment> findByScheduleScheduleDateAndScheduleTimeSlotStartTimeBeforeAndStatus(
+    List<Appointment> findByScheduleScheduleDateAndScheduleSlotStartTimeBeforeAndStatus(
             java.time.LocalDate scheduleDate, java.time.LocalTime checkInTime, com.example.springboot.entity.enums.AppointmentStatus status);
 }
