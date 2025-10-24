@@ -97,7 +97,7 @@
                 <div class="shift-label">{{ shift }}</div>
                 <!-- 时间段卡片区域 - 只显示在这个列中 -->
                 <div class="time-slot-cards">
-                  <div v-for="timeSlot in getTimeSlotsForShift(shift)" :key="timeSlot.slot_id"
+                  <div v-for="timeSlot in getTimeSlotsForShift(shift)" :key="timeSlot.slotId || timeSlot.slot_id"
                           class="time-slot-card" 
                           :class="{ 
                             'time-slot-mismatch': !isTimeSlotMatchShift(timeSlot, shift)
@@ -105,8 +105,8 @@
                           draggable="true" 
                        @dragstart="onDragStart($event, { type: 'timeSlot', data: timeSlot })">
                     <div class="time-slot-card-content">
-                      <div class="time-slot-name">{{ timeSlot.slot_name }}</div>
-                      <div class="time-slot-time">{{ timeSlot.start_time }} - {{ timeSlot.end_time }}</div>
+                      <div class="time-slot-name">{{ timeSlot.slotName || timeSlot.slot_name }}</div>
+                      <div class="time-slot-time">{{ (timeSlot.startTime || timeSlot.start_time) }} - {{ (timeSlot.endTime || timeSlot.end_time) }}</div>
                          <!-- 班次不匹配警告 -->
                          <div v-if="!isTimeSlotMatchShift(timeSlot, shift)" class="shift-mismatch-warning">
                            <el-icon class="warning-icon"><Warning /></el-icon>
@@ -187,12 +187,23 @@
             </div>
           </template>
           <div class="draggable-list time-slot-list">
-            <div v-for="timeSlot in timeSlots" :key="timeSlot.slot_id"
+            <!-- 调试信息 -->
+            <div style="padding: 10px; background: #f0f0f0; margin-bottom: 10px; font-size: 12px;">
+              调试信息: timeSlots.length = {{ timeSlots.length }}
+              <el-button size="small" type="primary" @click="loadTimeSlots" style="margin-left: 10px;">
+                重新加载时间段
+              </el-button>
+              <div v-if="timeSlots.length > 0" style="margin-top: 5px;">
+                第一个时间段: {{ JSON.stringify(timeSlots[0]) }}
+              </div>
+            </div>
+            
+            <div v-for="timeSlot in timeSlots" :key="timeSlot.slotId || timeSlot.slot_id"
                  class="time-slot-card" draggable="true" @dragstart="onDragStart($event, { type: 'timeSlot', data: timeSlot })">
               <el-icon :size="20" class="time-slot-icon"><Clock /></el-icon>
               <div class="time-slot-info">
-                <span class="time-slot-name">{{ timeSlot.slot_name }}</span>
-                <span class="time-slot-time">{{ timeSlot.start_time }} - {{ timeSlot.end_time }}</span>
+                <span class="time-slot-name">{{ timeSlot.slotName || timeSlot.slot_name }}</span>
+                <span class="time-slot-time">{{ (timeSlot.startTime || timeSlot.start_time) }} - {{ (timeSlot.endTime || timeSlot.end_time) }}</span>
               </div>
             </div>
             <el-empty v-if="!timeSlots.length" description="暂无时间段" :image-size="60"/>
@@ -239,6 +250,7 @@ import { ElMessage } from 'element-plus';
 import doctorMaleImg from '@/assets/doctor.jpg';
 import doctorFemaleImg from '@/assets/doctor1.jpg';
 import BackButton from '@/components/BackButton.vue';
+import { getTimeSlots } from '@/api/timeslot';
 
 // --- 模拟数据 ---
 const departments = ref([
@@ -265,25 +277,8 @@ const availableLocations = ref([
   { location_id: 201, name: '住院部A栋-101', building: '住院部A栋', floor: '一层', room_number: '101' },
 ]);
 
-// 时间段数据
-const timeSlots = ref([
-  { slot_id: 1, slot_name: '上午08:00-08:30', start_time: '08:00:00', end_time: '08:30:00', period: '上午' },
-  { slot_id: 2, slot_name: '上午08:30-09:00', start_time: '08:30:00', end_time: '09:00:00', period: '上午' },
-  { slot_id: 3, slot_name: '上午09:00-09:30', start_time: '09:00:00', end_time: '09:30:00', period: '上午' },
-  { slot_id: 4, slot_name: '上午09:30-10:00', start_time: '09:30:00', end_time: '10:00:00', period: '上午' },
-  { slot_id: 5, slot_name: '上午10:00-10:30', start_time: '10:00:00', end_time: '10:30:00', period: '上午' },
-  { slot_id: 6, slot_name: '上午10:30-11:00', start_time: '10:30:00', end_time: '11:00:00', period: '上午' },
-  { slot_id: 7, slot_name: '上午11:00-11:30', start_time: '11:00:00', end_time: '11:30:00', period: '上午' },
-  { slot_id: 8, slot_name: '上午11:30-12:00', start_time: '11:30:00', end_time: '12:00:00', period: '上午' },
-  { slot_id: 9, slot_name: '下午14:00-14:30', start_time: '14:00:00', end_time: '14:30:00', period: '下午' },
-  { slot_id: 10, slot_name: '下午14:30-15:00', start_time: '14:30:00', end_time: '15:00:00', period: '下午' },
-  { slot_id: 11, slot_name: '下午15:00-15:30', start_time: '15:00:00', end_time: '15:30:00', period: '下午' },
-  { slot_id: 12, slot_name: '下午15:30-16:00', start_time: '15:30:00', end_time: '16:00:00', period: '下午' },
-  { slot_id: 13, slot_name: '下午16:00-16:30', start_time: '16:00:00', end_time: '16:30:00', period: '下午' },
-  { slot_id: 14, slot_name: '下午16:30-17:00', start_time: '16:30:00', end_time: '17:00:00', period: '下午' },
-  { slot_id: 15, slot_name: '下午17:00-17:30', start_time: '17:00:00', end_time: '17:30:00', period: '下午' },
-  { slot_id: 16, slot_name: '下午17:30-18:00', start_time: '17:30:00', end_time: '18:00:00', period: '下午' },
-]);
+// 时间段数据 - 从API获取
+const timeSlots = ref([]);
 
 
 const scheduleData = ref({
@@ -451,7 +446,11 @@ const getDoctorsForShift = (date, shift) => {
 
 // 获取指定时段的时间段卡片（只显示在时段列中）
 const getTimeSlotsForShift = (shift) => {
-  return timeSlotColumns.value[shift] || [];
+  // 从所有时间段中筛选出匹配的时段
+  return timeSlots.value.filter(timeSlot => {
+    const period = timeSlot.period || timeSlot.period;
+    return period === shift;
+  });
 };
 
 const getDoctorAvatar = (doctorId) => {
@@ -1731,9 +1730,69 @@ watch(() => scheduleData.value, () => {
   }, 500); // 500ms 防抖，给更多时间让数据稳定
 }, { deep: true });
 
+// 获取时间段数据
+const loadTimeSlots = async () => {
+  try {
+    console.log('开始获取时间段数据...');
+    const response = await getTimeSlots();
+    console.log('时间段API响应:', response);
+    
+    // 根据后端返回格式调整解析逻辑
+    if (response && (response.code === 200 || response.code === '200')) {
+      timeSlots.value = response.data || [];
+      console.log('时间段数据加载成功:', timeSlots.value);
+    } else if (response && response.data && (response.data.code === 200 || response.data.code === '200')) {
+      timeSlots.value = response.data.data || [];
+      console.log('时间段数据加载成功:', timeSlots.value);
+    } else {
+      console.error('获取时间段数据失败:', response);
+      // 使用备用数据
+      loadFallbackTimeSlots();
+      ElMessage.warning('使用默认时间段数据');
+    }
+  } catch (error) {
+    console.error('获取时间段数据出错:', error);
+    // 使用备用数据
+    loadFallbackTimeSlots();
+    ElMessage.warning('网络错误，使用默认时间段数据');
+  }
+};
+
+// 备用时间段数据
+const loadFallbackTimeSlots = () => {
+  timeSlots.value = [
+    { slot_id: 1, slot_name: '上午08:00-08:30', start_time: '08:00:00', end_time: '08:30:00', period: '上午' },
+    { slot_id: 2, slot_name: '上午08:30-09:00', start_time: '08:30:00', end_time: '09:00:00', period: '上午' },
+    { slot_id: 3, slot_name: '上午09:00-09:30', start_time: '09:00:00', end_time: '09:30:00', period: '上午' },
+    { slot_id: 4, slot_name: '上午09:30-10:00', start_time: '09:30:00', end_time: '10:00:00', period: '上午' },
+    { slot_id: 5, slot_name: '上午10:00-10:30', start_time: '10:00:00', end_time: '10:30:00', period: '上午' },
+    { slot_id: 6, slot_name: '上午10:30-11:00', start_time: '10:30:00', end_time: '11:00:00', period: '上午' },
+    { slot_id: 7, slot_name: '上午11:00-11:30', start_time: '11:00:00', end_time: '11:30:00', period: '上午' },
+    { slot_id: 8, slot_name: '上午11:30-12:00', start_time: '11:30:00', end_time: '12:00:00', period: '上午' },
+    { slot_id: 9, slot_name: '下午14:00-14:30', start_time: '14:00:00', end_time: '14:30:00', period: '下午' },
+    { slot_id: 10, slot_name: '下午14:30-15:00', start_time: '14:30:00', end_time: '15:00:00', period: '下午' },
+    { slot_id: 11, slot_name: '下午15:00-15:30', start_time: '15:00:00', end_time: '15:30:00', period: '下午' },
+    { slot_id: 12, slot_name: '下午15:30-16:00', start_time: '15:30:00', end_time: '16:00:00', period: '下午' },
+    { slot_id: 13, slot_name: '下午16:00-16:30', start_time: '16:00:00', end_time: '16:30:00', period: '下午' },
+    { slot_id: 14, slot_name: '下午16:30-17:00', start_time: '16:30:00', end_time: '17:00:00', period: '下午' },
+    { slot_id: 15, slot_name: '下午17:00-17:30', start_time: '17:00:00', end_time: '17:30:00', period: '下午' },
+    { slot_id: 16, slot_name: '下午17:30-18:00', start_time: '17:30:00', end_time: '18:00:00', period: '下午' }
+  ];
+  console.log('使用备用时间段数据:', timeSlots.value);
+};
+
 onMounted(() => {
   if (departments.value.length > 0) handleParentSelect(departments.value[0].id);
   convertScheduleToEvents();
+  // 加载时间段数据
+  loadTimeSlots();
+  // 如果API调用失败，立即使用备用数据
+  setTimeout(() => {
+    if (timeSlots.value.length === 0) {
+      console.log('时间段数据为空，使用备用数据');
+      loadFallbackTimeSlots();
+    }
+  }, 2000);
   // 延迟执行冲突检测，确保数据已经加载完成
   setTimeout(() => {
     detectAllConflicts();
