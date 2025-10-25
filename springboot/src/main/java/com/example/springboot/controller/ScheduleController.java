@@ -1,9 +1,13 @@
 package com.example.springboot.controller;
 
 import com.example.springboot.dto.*;
+import com.example.springboot.exception.BadRequestException;
+import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.service.ScheduleService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -67,6 +71,24 @@ public class ScheduleController {
             return ResponseEntity.status(500).build();
         }
     }
+
+    /**
+     * 创建排班
+     */
+    @PostMapping("/create")
+    public ResponseEntity<ScheduleResponse> createSchedule(@Valid @RequestBody ScheduleCreateRequest request) {
+        try {
+            ScheduleResponse schedule = scheduleService.createSchedule(request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(schedule);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (BadRequestException e) {
+            return ResponseEntity.badRequest().body(null);
+        } catch (Exception e) {
+            System.err.println("创建排班时发生错误: " + e.getMessage());
+            return ResponseEntity.status(500).build();
+        }
+    }
     
     /**
      * 获取单个排班详情
@@ -115,19 +137,19 @@ public class ScheduleController {
         }
     }
     
-    /**
-     * 创建排班
-     */
-    @PostMapping
-    public ResponseEntity<ScheduleResponse> createSchedule(@RequestBody ScheduleResponse request) {
-        try {
-            ScheduleResponse schedule = scheduleService.createSchedule(request);
-            return ResponseEntity.ok(schedule);
-        } catch (Exception e) {
-            System.err.println("创建排班时发生错误: " + e.getMessage());
-            return ResponseEntity.status(500).build();
-        }
-    }
+//    /**
+//     * 创建排班
+//     */
+//    @PostMapping
+//    public ResponseEntity<ScheduleResponse> createSchedule(@RequestBody ScheduleResponse request) {
+//        try {
+//            ScheduleResponse schedule = scheduleService.createSchedule(request);
+//            return ResponseEntity.ok(schedule);
+//        } catch (Exception e) {
+//            System.err.println("创建排班时发生错误: " + e.getMessage());
+//            return ResponseEntity.status(500).build();
+//        }
+//    }
     
     /**
      * 删除排班

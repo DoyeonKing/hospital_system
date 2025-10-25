@@ -1,9 +1,6 @@
 package com.example.springboot.service;
 
-import com.example.springboot.dto.ScheduleListRequest;
-import com.example.springboot.dto.ScheduleResponse;
-import com.example.springboot.dto.ScheduleUpdateRequest;
-import com.example.springboot.dto.ScheduleBatchUpdateRequest;
+import com.example.springboot.dto.*;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -36,7 +33,13 @@ public interface ScheduleService {
     /**
      * 创建排班
      */
-    ScheduleResponse createSchedule(ScheduleResponse request);
+    //ScheduleResponse createSchedule(ScheduleResponse request);
+
+    /**
+     * 创建排班
+     */
+    ScheduleResponse createSchedule(ScheduleCreateRequest request);
+
     
     /**
      * 删除排班
