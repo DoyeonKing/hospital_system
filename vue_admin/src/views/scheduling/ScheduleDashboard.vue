@@ -5,17 +5,26 @@
     </div>
     <!-- 左侧科室导航 -->
     <div class="department-sidebar">
-      <el-menu :default-active="activeParent" class="department-menu" @select="handleParentSelect">
-        <el-menu-item v-for="parent in departments" :key="parent.id" :index="parent.id">
-          <span>{{ parent.name }}</span>
-        </el-menu-item>
-      </el-menu>
-
-      <div class="sub-department-panel" v-if="subDepartments.length > 0">
-        <div v-for="sub in subDepartments" :key="sub.id" class="sub-department-item" :class="{ 'active': activeSub === sub.id }" @click="handleSubSelect(sub.id)">
-          {{ sub.name }}
-        </div>
+      <div v-if="loadingDepartments" class="loading-container">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>加载科室数据中...</span>
       </div>
+      <template v-else>
+        <el-menu :default-active="activeParent" class="department-menu" @select="handleParentSelect">
+          <el-menu-item v-for="parent in departments" :key="parent.id" :index="parent.id">
+            <span>{{ parent.name }}</span>
+          </el-menu-item>
+        </el-menu>
+
+        <div class="sub-department-panel" v-if="subDepartments.length > 0">
+          <div v-for="sub in subDepartments" :key="sub.id" class="sub-department-item" :class="{ 'active': activeSub === sub.id }" @click="handleSubSelect(sub.id)">
+            {{ sub.name }}
+          </div>
+        </div>
+        <div v-else-if="activeParent && departments.find(p => p.id === activeParent)?.children?.length === 0" class="no-sub-departments">
+          <el-empty description="该科室暂无子科室" :image-size="60"/>
+        </div>
+      </template>
     </div>
 
     <!-- 右侧内容区 -->
@@ -167,12 +176,17 @@
               <span>待排班医生 (拖拽到上方进行排班)</span>
             </div>
           </template>
-              <div class="draggable-list">
+          <div v-if="loadingDoctors" class="loading-container">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>加载医生数据中...</span>
+          </div>
+          <div v-else class="draggable-list">
             <div v-for="doc in availableDoctors" :key="doc.id"
                  class="doctor-card" draggable="true" @dragstart="onDragStart($event, { type: 'doctor', data: doc })">
               <img :src="doc.gender === 'male' ? doctorMaleImg : doctorFemaleImg" alt="医生头像" class="doctor-avatar">
               <div class="doctor-info">
                 <span class="doctor-name">{{ doc.name }} (ID:{{ doc.identifier }})</span>
+                <span v-if="doc.title" class="doctor-title">{{ doc.title }}</span>
               </div>
             </div>
             <el-empty v-if="!availableDoctors.length" description="该科室暂无医生" :image-size="60"/>
@@ -238,7 +252,7 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 // [新增] 导入 CircleCloseFilled 图标
-import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFilled, Clock, Document, Download, UploadFilled, Upload, Refresh, CircleCheck, CircleClose, Warning } from '@element-plus/icons-vue';
+import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFilled, Clock, Document, Download, UploadFilled, Upload, Refresh, CircleCheck, CircleClose, Warning, Loading } from '@element-plus/icons-vue';
 // [新增] 导入 FullCalendar 组件和插件
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -251,15 +265,14 @@ import doctorMaleImg from '@/assets/doctor.jpg';
 import doctorFemaleImg from '@/assets/doctor1.jpg';
 import BackButton from '@/components/BackButton.vue';
 import { getTimeSlots } from '@/api/timeslot';
+import { getAllParentDepartments, getDepartmentsByParentId, getDoctorsByDepartmentId } from '@/api/department';
 
-// --- 模拟数据 ---
-const departments = ref([
-  { id: 'p1', name: '内科', children: [
-      { id: 's1-1', name: '呼吸内科' }, { id: 's1-2', name: '心血管科' }
-    ]},
-  { id: 'p2', name: '外科', children: [ { id: 's2-1', name: '普外科' } ]},
-  { id: 'p3', name: '妇产科', children: [] },
-]);
+// --- 科室数据（从API获取） ---
+const departments = ref([]);
+const loadingDepartments = ref(false);
+
+// --- 医生数据（从API获取） ---
+const loadingDoctors = ref(false);
 
 const doctorsData = ref({
   's1-2': [
@@ -406,7 +419,11 @@ const selectedDepartmentCode = computed(() => {
 
 const availableDoctors = computed(() => {
   if (!activeSub.value) return [];
-  return doctorsData.value[activeSub.value] || [];
+  // 从科室ID中提取数字ID（去掉前缀 's' 或 'p'）
+  const departmentId = activeSub.value.replace(/^[sp]/, '');
+  console.log('availableDoctors 计算 - activeSub:', activeSub.value, 'departmentId:', departmentId);
+  console.log('doctorsData 中对应科室的医生:', doctorsData.value[departmentId]);
+  return doctorsData.value[departmentId] || [];
 });
 
 // --- 日期和排班表逻辑 ---
@@ -641,25 +658,39 @@ const clearTimeSlotColumns = () => {
 
 // --- 侧边栏选择逻辑 ---
 const handleParentSelect = (index) => {
+  console.log('选择父科室:', index);
   activeParent.value = index;
   const parent = departments.value.find(p => p.id === index);
   if (parent) {
+    console.log('找到父科室:', parent);
     if (parent.children && parent.children.length > 0) {
       activeSub.value = parent.children[0].id;
+      console.log('选择第一个子科室:', parent.children[0]);
     } else {
       activeSub.value = parent.id;
+      console.log('父科室无子科室，选择父科室本身');
     }
   } else {
     activeSub.value = null;
+    console.log('未找到父科室');
   }
   // 切换科室时清空时间段列
   clearTimeSlotColumns();
 };
 
 const handleSubSelect = (id) => {
+  console.log('选择子科室:', id);
   activeSub.value = id;
   // 切换科室时清空时间段列
   clearTimeSlotColumns();
+  
+  // 加载选中科室的医生数据
+  if (id) {
+    // 从科室ID中提取数字ID（去掉前缀 's' 或 'p'）
+    const departmentId = id.replace(/^[sp]/, '');
+    console.log('提取的科室数字ID:', departmentId);
+    loadDoctorsForDepartment(departmentId);
+  }
 };
 
 // [新增] 视图切换函数
@@ -1730,6 +1761,137 @@ watch(() => scheduleData.value, () => {
   }, 500); // 500ms 防抖，给更多时间让数据稳定
 }, { deep: true });
 
+// 加载科室数据
+const loadDepartments = async () => {
+  try {
+    loadingDepartments.value = true;
+    console.log('开始获取科室数据...');
+    
+    // 获取所有父科室
+    const parentResponse = await getAllParentDepartments();
+    console.log('父科室API响应:', parentResponse);
+    
+    if (parentResponse && Array.isArray(parentResponse)) {
+      const parentDepartments = parentResponse;
+      console.log('父科室数据:', parentDepartments);
+      
+      // 为每个父科室获取子科室
+      const departmentsWithChildren = await Promise.all(
+        parentDepartments.map(async (parent) => {
+          try {
+            const childrenResponse = await getDepartmentsByParentId(parent.parentDepartmentId);
+            console.log(`父科室 ${parent.name} 的子科室响应:`, childrenResponse);
+            
+            const children = childrenResponse && Array.isArray(childrenResponse) ? childrenResponse : [];
+            console.log(`父科室 ${parent.name} 的子科室:`, children);
+            
+            return {
+              id: `p${parent.parentDepartmentId}`,
+              name: parent.name,
+              description: parent.description,
+              parentDepartmentId: parent.parentDepartmentId,
+              children: children.map(child => ({
+                id: `s${child.departmentId}`,
+                name: child.name,
+                description: child.description,
+                departmentId: child.departmentId,
+                parentDepartmentId: child.parentDepartmentId
+              }))
+            };
+          } catch (error) {
+            console.error(`获取父科室 ${parent.name} 的子科室失败:`, error);
+            return {
+              id: `p${parent.parentDepartmentId}`,
+              name: parent.name,
+              description: parent.description,
+              parentDepartmentId: parent.parentDepartmentId,
+              children: []
+            };
+          }
+        })
+      );
+      
+      departments.value = departmentsWithChildren;
+      console.log('最终科室数据结构:', departments.value);
+      
+      // 如果有科室数据，默认选择第一个父科室
+      if (departments.value.length > 0) {
+        handleParentSelect(departments.value[0].id);
+      }
+      
+    } else {
+      console.error('获取父科室数据失败:', parentResponse);
+      ElMessage.warning('获取科室数据失败，使用默认数据');
+      loadFallbackDepartments();
+    }
+  } catch (error) {
+    console.error('获取科室数据出错:', error);
+    ElMessage.warning('网络错误，使用默认科室数据');
+    loadFallbackDepartments();
+  } finally {
+    loadingDepartments.value = false;
+  }
+};
+
+// 备用科室数据
+const loadFallbackDepartments = () => {
+  departments.value = [
+    { id: 'p1', name: '内科', children: [
+        { id: 's1-1', name: '呼吸内科' }, { id: 's1-2', name: '心血管科' }
+      ]},
+    { id: 'p2', name: '外科', children: [ { id: 's2-1', name: '普外科' } ]},
+    { id: 'p3', name: '妇产科', children: [] },
+  ];
+  if (departments.value.length > 0) {
+    handleParentSelect(departments.value[0].id);
+  }
+};
+
+// 加载选中科室的医生数据
+const loadDoctorsForDepartment = async (departmentId) => {
+  if (!departmentId) {
+    console.log('没有科室ID，清空医生数据');
+    doctorsData.value = {};
+    return;
+  }
+
+  try {
+    loadingDoctors.value = true;
+    console.log('开始获取科室医生数据，科室ID:', departmentId);
+    
+    const response = await getDoctorsByDepartmentId(departmentId);
+    console.log('科室医生API响应:', response);
+    
+    if (response && Array.isArray(response)) {
+      // 转换医生数据格式，适配前端显示
+      const doctors = response.map(doctor => ({
+        id: doctor.doctorId || doctor.id,
+        name: doctor.fullName || doctor.name,
+        identifier: doctor.identifier,
+        title: doctor.title || '医生',
+        gender: doctor.gender || 'male', // 默认性别
+        specialty: doctor.specialty || '',
+        phoneNumber: doctor.phoneNumber || ''
+      }));
+      
+      // 将医生数据存储到对应的科室ID下
+      doctorsData.value[departmentId] = doctors;
+      console.log(`科室 ${departmentId} 的医生数据:`, doctors);
+      console.log('当前 doctorsData:', doctorsData.value);
+      
+    } else {
+      console.error('获取科室医生数据失败:', response);
+      doctorsData.value[departmentId] = [];
+    }
+  } catch (error) {
+    console.error('获取科室医生数据出错:', error);
+    doctorsData.value[departmentId] = [];
+    ElMessage.warning('获取医生数据失败');
+  } finally {
+    loadingDoctors.value = false;
+  }
+};
+
 // 获取时间段数据
 const loadTimeSlots = async () => {
   try {
@@ -1782,7 +1944,8 @@ const loadFallbackTimeSlots = () => {
 };
 
 onMounted(() => {
-  if (departments.value.length > 0) handleParentSelect(departments.value[0].id);
+  // 加载科室数据
+  loadDepartments();
   convertScheduleToEvents();
   // 加载时间段数据
   loadTimeSlots();
@@ -1892,6 +2055,25 @@ onMounted(() => {
   background-color: #fff;
   border-right: 1px solid #e2e8f0;
   flex-shrink: 0;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #909399;
+  gap: 12px;
+}
+
+.loading-container .el-icon {
+  font-size: 24px;
+}
+
+.no-sub-departments {
+  padding: 20px;
+  text-align: center;
 }
 .department-menu {
   width: 120px;
