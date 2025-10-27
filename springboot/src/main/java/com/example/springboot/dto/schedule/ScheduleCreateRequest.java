@@ -1,4 +1,4 @@
-package com.example.springboot.dto;
+package com.example.springboot.dto.schedule;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;

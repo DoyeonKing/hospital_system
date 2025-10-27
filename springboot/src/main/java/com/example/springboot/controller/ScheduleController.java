@@ -1,6 +1,6 @@
 package com.example.springboot.controller;
 
-import com.example.springboot.dto.*;
+import com.example.springboot.dto.schedule.*;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.service.ScheduleService;
@@ -68,6 +68,24 @@ public class ScheduleController {
         } catch (Exception e) {
             System.err.println("查询排班数据时发生错误:");
             e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * 根据参数删除排班
+     */
+    @DeleteMapping("/delete")
+    public ResponseEntity<Void> deleteScheduleByParams(@Valid @RequestBody ScheduleDeleteRequest request) {
+        try {
+            scheduleService.deleteScheduleByParams(request);
+            return ResponseEntity.ok().build();
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (BadRequestException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            System.err.println("删除排班时发生错误: " + e.getMessage());
             return ResponseEntity.status(500).build();
         }
     }

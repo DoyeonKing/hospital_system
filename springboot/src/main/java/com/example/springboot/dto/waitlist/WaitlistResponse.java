@@ -1,7 +1,7 @@
 package com.example.springboot.dto.waitlist;
 
 import com.example.springboot.dto.patient.PatientResponse; // 导入患者响应DTO
-import com.example.springboot.dto.ScheduleResponse; // 导入排班响应DTO
+import com.example.springboot.dto.schedule.ScheduleResponse; // 导入排班响应DTO
 import com.example.springboot.entity.enums.WaitlistStatus;
 import lombok.Data;
 

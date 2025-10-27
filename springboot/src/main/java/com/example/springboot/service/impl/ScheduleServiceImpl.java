@@ -1,6 +1,6 @@
 package com.example.springboot.service.impl;
 
-import com.example.springboot.dto.*;
+import com.example.springboot.dto.schedule.*;
 import com.example.springboot.entity.Doctor;
 import com.example.springboot.entity.Location;
 import com.example.springboot.entity.Schedule;
@@ -20,7 +20,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -119,6 +118,32 @@ public class ScheduleServiceImpl implements ScheduleService {
             throw new RuntimeException("排班不存在");
         }
         scheduleRepository.deleteById(scheduleId);
+    }
+
+    @Override
+    public void deleteScheduleByParams(ScheduleDeleteRequest request) {
+        // 1. 获取关联实体
+        Doctor doctor = doctorRepository.findById(request.getDoctorId())
+                .orElseThrow(() -> new ResourceNotFoundException("医生不存在: " + request.getDoctorId()));
+
+        TimeSlot slot = timeSlotRepository.findById(request.getSlotId())
+                .orElseThrow(() -> new ResourceNotFoundException("时间段不存在: " + request.getSlotId()));
+
+        Location location = locationRepository.findById(request.getLocationId())
+                .orElseThrow(() -> new ResourceNotFoundException("就诊地点不存在: " + request.getLocationId()));
+
+        // 2. 查询符合条件的排班
+        Schedule schedule = scheduleRepository
+                .findByDoctorAndScheduleDateAndSlot(doctor, request.getScheduleDate(), slot)
+                .orElseThrow(() -> new ResourceNotFoundException("未找到符合条件的排班记录"));
+
+        // 3. 校验排班地点是否匹配（避免同一医生同一时段在不同地点的排班被误删）
+        if (!schedule.getLocation().getLocationId().equals(request.getLocationId())) {
+            throw new BadRequestException("排班地点不匹配，无法删除");
+        }
+
+        // 4. 执行删除
+        scheduleRepository.delete(schedule);
     }
 
     @Override

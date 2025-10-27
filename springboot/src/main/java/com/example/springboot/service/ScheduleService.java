@@ -1,6 +1,6 @@
 package com.example.springboot.service;
 
-import com.example.springboot.dto.*;
+import com.example.springboot.dto.schedule.*;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -45,4 +45,9 @@ public interface ScheduleService {
      * 删除排班
      */
     void deleteSchedule(Integer scheduleId);
+
+    /**
+     * 根据医生、时段、门诊室和日期删除排班
+     */
+    void deleteScheduleByParams(ScheduleDeleteRequest request);
 }

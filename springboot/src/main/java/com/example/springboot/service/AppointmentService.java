@@ -4,7 +4,7 @@ import com.example.springboot.common.Constants;
 import com.example.springboot.dto.appointment.AppointmentCreateRequest;
 import com.example.springboot.dto.appointment.AppointmentResponse;
 import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
-import com.example.springboot.dto.ScheduleResponse;
+import com.example.springboot.dto.schedule.ScheduleResponse;
 import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.Schedule;
