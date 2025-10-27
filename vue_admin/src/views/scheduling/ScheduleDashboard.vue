@@ -274,7 +274,7 @@ import BackButton from '@/components/BackButton.vue';
 import { getTimeSlots } from '@/api/timeslot';
 import { getAllParentDepartments, getDepartmentsByParentId, getDoctorsByDepartmentId } from '@/api/department';
 import { getLocationNamesByDepartmentId } from '@/api/location';
-import { createSchedule } from '@/api/schedule';
+import { createSchedule, getSchedules } from '@/api/schedule';
 
 // --- 科室数据（从API获取） ---
 const departments = ref([]);
@@ -730,6 +730,8 @@ const handleSubSelect = (id) => {
     console.log('提取的科室数字ID:', departmentId);
     loadDoctorsForDepartment(departmentId);
     loadLocationsForDepartment(departmentId);
+    // 加载该科室的排班数据
+    loadSchedulesFromBackend();
   }
 };
 
@@ -1978,6 +1980,114 @@ const loadLocationsForDepartment = async (departmentId) => {
   }
 };
 
+// 从后端加载排班数据
+const loadSchedulesFromBackend = async () => {
+  try {
+    console.log('开始从后端加载排班数据...');
+    
+    // 获取当前选中的科室ID
+    const departmentId = activeSub.value ? activeSub.value.replace(/^[sp]/, '') : null;
+    if (!departmentId) {
+      console.log('没有选中科室，跳过排班数据加载');
+      return;
+    }
+    
+    // 构建查询参数
+    const params = {
+      departmentId: departmentId,
+      startDate: getCurrentWeekStart(),
+      endDate: getCurrentWeekEnd(),
+      page: 0,
+      size: 100
+    };
+    
+    console.log('排班查询参数:', params);
+    
+    const response = await getSchedules(params);
+    console.log('排班数据API响应:', response);
+    
+    if (response && response.content) {
+      // 转换后端数据格式为前端格式
+      const schedules = response.content;
+      const newScheduleData = {};
+      
+      console.log('后端返回的排班数据:', schedules);
+      console.log('当前选中的科室ID:', activeSub.value);
+      
+      schedules.forEach(schedule => {
+        const key = `s${schedule.departmentId}`;
+        console.log('处理排班记录:', schedule, '键:', key);
+        if (!newScheduleData[key]) {
+          newScheduleData[key] = [];
+        }
+        
+        // 查找是否已存在相同日期和时段的记录
+        const existingIndex = newScheduleData[key].findIndex(item => 
+          item.date === schedule.scheduleDate && item.shift === getShiftFromTimeSlot(schedule.slotName)
+        );
+        
+        const doctorInfo = {
+          id: schedule.doctorId,
+          name: schedule.doctorName,
+          identifier: schedule.doctorId.toString(),
+          location: schedule.location
+        };
+        
+        if (existingIndex >= 0) {
+          // 如果已存在，添加医生到现有记录
+          newScheduleData[key][existingIndex].doctors.push(doctorInfo);
+        } else {
+          // 创建新记录
+          newScheduleData[key].push({
+            date: schedule.scheduleDate,
+            shift: getShiftFromTimeSlot(schedule.slotName),
+            doctors: [doctorInfo]
+          });
+        }
+      });
+      
+      // 更新前端数据
+      scheduleData.value = newScheduleData;
+      console.log('排班数据加载完成:', scheduleData.value);
+      console.log('当前选中的科室数据:', scheduleData.value[activeSub.value]);
+      
+    } else {
+      console.log('没有获取到排班数据');
+    }
+    
+  } catch (error) {
+    console.error('加载排班数据失败:', error);
+    ElMessage.warning('加载排班数据失败');
+  }
+};
+
+// 根据时间段名称判断班次
+const getShiftFromTimeSlot = (slotName) => {
+  if (!slotName) return '上午';
+  const name = slotName.toLowerCase();
+  if (name.includes('下午') || name.includes('pm') || name.includes('afternoon')) {
+    return '下午';
+  }
+  return '上午';
+};
+
+// 获取当前周的开始日期
+const getCurrentWeekStart = () => {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // 周一
+  const monday = new Date(today.setDate(diff));
+  return monday.toISOString().split('T')[0];
+};
+
+// 获取当前周的结束日期
+const getCurrentWeekEnd = () => {
+  const start = getCurrentWeekStart();
+  const startDate = new Date(start);
+  const endDate = new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000); // 加6天
+  return endDate.toISOString().split('T')[0];
+};
+
 // 保存排班到后端
 const saveScheduleToBackend = async (doctor, date, shift, timeSlot, location) => {
   // 设置保存状态
@@ -1987,12 +2097,12 @@ const saveScheduleToBackend = async (doctor, date, shift, timeSlot, location) =>
   try {
     // 构建排班数据
     const scheduleData = {
-      doctorId: doctor.id,
-      scheduleDate: date,
-      slotId: timeSlot.slotId || timeSlot.slot_id || 1, // 使用时间段ID，默认为1
-      locationId: location?.location_id || 1, // 使用办公地点ID，默认为1
+      doctorId: parseInt(doctor.id), // 确保是整数
+      scheduleDate: date, // 日期字符串，格式：YYYY-MM-DD
+      slotId: parseInt(timeSlot.slotId || timeSlot.slot_id || 1), // 确保是整数
+      locationId: parseInt(location?.location_id || 1), // 确保是整数
       totalSlots: 10, // 默认总号源数
-      fee: 5.00, // 默认挂号费
+      fee: 5.00, // 使用数字格式
       remarks: `排班：${doctor.name} - ${timeSlot.slotName || timeSlot.slot_name} - ${location?.name || '默认地点'}`
     };
 
@@ -2035,6 +2145,10 @@ const saveScheduleToBackend = async (doctor, date, shift, timeSlot, location) =>
         fee: 5.00
       });
       
+      // 保存成功后重新加载排班数据
+      console.log('开始重新加载排班数据...');
+      await loadSchedulesFromBackend();
+      
       return response;
     } else {
       scheduleStatus.value.saving = false;
@@ -2056,9 +2170,25 @@ const saveScheduleToBackend = async (doctor, date, shift, timeSlot, location) =>
     
     // 更详细的错误提示
     let errorMessage = '排班保存失败';
+    let errorDetails = '';
+    
     if (error.response) {
-      // 服务器返回的错误
-      errorMessage = `服务器错误：${error.response.status} - ${error.response.data?.message || error.response.statusText}`;
+      const responseData = error.response.data;
+      console.log('后端错误响应:', responseData);
+      
+      if (responseData && responseData.code === '400') {
+        // 处理验证错误
+        if (responseData.data && typeof responseData.data === 'object') {
+          const validationErrors = Object.entries(responseData.data)
+            .map(([field, message]) => `${field}: ${message}`)
+            .join('\n');
+          errorDetails = `验证错误：\n${validationErrors}`;
+        } else {
+          errorDetails = responseData.msg || '参数验证失败';
+        }
+      } else {
+        errorMessage = `服务器错误：${error.response.status} - ${responseData?.msg || error.response.statusText}`;
+      }
     } else if (error.request) {
       // 网络错误
       errorMessage = '网络连接失败，请检查后端服务是否启动';
@@ -2067,8 +2197,10 @@ const saveScheduleToBackend = async (doctor, date, shift, timeSlot, location) =>
       errorMessage = error.message || '未知错误';
     }
     
+    const finalMessage = errorDetails ? `${errorMessage}\n${errorDetails}` : errorMessage;
+    
     ElMessage.error({
-      message: `❌ ${errorMessage}\n医生：${doctor.name}\n日期：${date} ${shift}`,
+      message: `❌ ${finalMessage}\n医生：${doctor.name}\n日期：${date} ${shift}`,
       duration: 8000,
       showClose: true
     });
@@ -2137,6 +2269,8 @@ onMounted(() => {
   convertScheduleToEvents();
   // 加载时间段数据
   loadTimeSlots();
+  // 加载排班数据
+  loadSchedulesFromBackend();
   // 如果API调用失败，立即使用备用数据
   setTimeout(() => {
     if (timeSlots.value.length === 0) {
