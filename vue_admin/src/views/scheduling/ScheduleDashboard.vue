@@ -274,7 +274,7 @@ import BackButton from '@/components/BackButton.vue';
 import { getTimeSlots } from '@/api/timeslot';
 import { getAllParentDepartments, getDepartmentsByParentId, getDoctorsByDepartmentId } from '@/api/department';
 import { getLocationNamesByDepartmentId } from '@/api/location';
-import { createSchedule, getSchedules } from '@/api/schedule';
+import { createSchedule, getSchedules, deleteScheduleByParams } from '@/api/schedule';
 
 // --- 科室数据（从API获取） ---
 const departments = ref([]);
@@ -299,22 +299,13 @@ const doctorsData = ref({
   'p3': [ {id: 6, name: '王莉', identifier: 'D006', title: '主任医师', gender: 'female'} ],
 });
 
-const availableLocations = ref([
-  { location_id: 101, name: '门诊楼-201诊室', building: '门诊楼', floor: '二层', room_number: '201' },
-  { location_id: 102, name: '门诊楼-203诊室', building: '门诊楼', floor: '二层', room_number: '203' },
-  { location_id: 103, name: '门诊楼-305诊室', building: '门诊楼', floor: '三层', room_number: '305' },
-  { location_id: 201, name: '住院部A栋-101', building: '住院部A栋', floor: '一层', room_number: '101' },
-]);
+const availableLocations = ref([]);
 
 // 时间段数据 - 从API获取
 const timeSlots = ref([]);
 
 
-const scheduleData = ref({
-  'p3': [
-    { date: '2025-10-21', shift: '上午', doctors: [{id: 6, name: '王莉', location: null}] },
-  ]
-});
+const scheduleData = ref({});
 
 // 存储拖拽到时段列中的时间段卡片
 const timeSlotColumns = ref({
@@ -495,7 +486,8 @@ const getTimeSlotsForShift = (shift) => {
   
   // 如果没有拖拽的时间段，则从所有时间段中筛选出匹配的时段
   return timeSlots.value.filter(timeSlot => {
-    const period = timeSlot.period || timeSlot.period;
+    const period = timeSlot.period || timeSlot.period_name;
+    console.log(`检查时间段 ${timeSlot.slot_name || timeSlot.slotName}: period=${period}, shift=${shift}`);
     return period === shift;
   });
 };
@@ -538,7 +530,7 @@ const handleDoctorDrop = async (dragData, toDate, toShift) => {
   const { data: doctor, source } = dragData;
   if (source.date && source.shift) {
     if (source.date === toDate && source.shift === toShift) return;
-    removeDoctorFromShift(doctor, source.date, source.shift, false);
+    await removeDoctorFromShift(doctor, source.date, source.shift, false);
   }
   addDoctorToShift(doctor, toDate, toShift);
   
@@ -548,8 +540,18 @@ const handleDoctorDrop = async (dragData, toDate, toShift) => {
     const timeSlotsForShift = getTimeSlotsForShift(toShift);
     const timeSlot = timeSlotsForShift.length > 0 ? timeSlotsForShift[0] : null;
     
-    // 获取默认办公地点
-    const location = availableLocations.value.length > 0 ? availableLocations.value[0] : null;
+    // 获取医生实际分配的地点，如果没有则使用默认地点
+    let location = null;
+    if (doctor.location) {
+      // 根据医生分配的地点名称找到对应的location对象
+      location = availableLocations.value.find(loc => loc.name === doctor.location);
+    }
+    
+    // 如果没找到对应地点，使用默认地点
+    if (!location && availableLocations.value.length > 0) {
+      location = availableLocations.value[0];
+      console.log('医生未分配地点，使用默认地点:', location.name);
+    }
     
     if (timeSlot) {
       await saveScheduleToBackend(doctor, toDate, toShift, timeSlot, location);
@@ -663,14 +665,103 @@ const addDoctorToShift = (doctor, date, shift) => {
   }
 };
 
-const removeDoctorFromShift = (doctor, date, shift, showMessage = true) => {
+const removeDoctorFromShift = async (doctor, date, shift, showMessage = true) => {
   if (!activeSub.value || !scheduleData.value[activeSub.value]) return;
   const shiftEntry = scheduleData.value[activeSub.value].find(s => s.date === date && s.shift === shift);
   if (shiftEntry) {
     const docIndex = shiftEntry.doctors.findIndex(d => d.id === doctor.id);
     if (docIndex > -1) {
+      // 先从前端数据中移除
       shiftEntry.doctors.splice(docIndex, 1);
-      if (showMessage) ElMessage.success(`已取消 ${doctor.name} 在 ${date} ${shift} 的排班`);
+      
+      // 尝试从后端删除排班记录
+      try {
+        // 获取当前时段的时间段信息
+        const timeSlotsForShift = getTimeSlotsForShift(shift);
+        console.log(`获取时间段数据 for ${shift}:`, timeSlotsForShift);
+        console.log(`所有时间段数据:`, timeSlots.value);
+        console.log(`时间段数据结构示例:`, timeSlots.value[0]);
+        
+        // 优先使用拖拽到时段列的时间段，如果没有则使用默认时间段
+        let timeSlot = null;
+        if (timeSlotsForShift.length > 0) {
+          timeSlot = timeSlotsForShift[0];
+          console.log(`使用拖拽时间段 for ${shift}:`, timeSlot);
+        } else {
+          // 如果没有找到对应时段的时间段，使用默认时间段
+          const defaultTimeSlots = timeSlots.value.filter(ts => ts.period === shift);
+          console.log(`筛选 ${shift} 时段的时间段:`, defaultTimeSlots);
+          if (defaultTimeSlots.length > 0) {
+            timeSlot = defaultTimeSlots[0];
+            console.log(`使用默认时间段 for ${shift}:`, timeSlot);
+          } else {
+            console.warn(`没有找到 ${shift} 时段的时间段`);
+            // 如果仍然没有找到，使用第一个时间段作为默认值
+            if (timeSlots.value.length > 0) {
+              timeSlot = timeSlots.value[0];
+              console.log(`使用第一个时间段作为默认值:`, timeSlot);
+            }
+          }
+        }
+        
+        // 获取医生分配的地点
+        let location = null;
+        if (doctor.location) {
+          location = availableLocations.value.find(loc => loc.name === doctor.location);
+          console.log(`查找医生地点 "${doctor.location}":`, location);
+        }
+        
+        // 如果没找到对应地点，使用默认地点
+        if (!location && availableLocations.value.length > 0) {
+          location = availableLocations.value[0];
+          console.log(`使用默认地点:`, location);
+        }
+        
+        console.log(`时间段信息:`, timeSlot);
+        console.log(`地点信息:`, location);
+        
+        if (timeSlot && location) {
+          // 构建删除参数
+          const deleteData = {
+            doctorId: parseInt(doctor.id),
+            slotId: parseInt(timeSlot.slotId || timeSlot.slot_id || 1),
+            locationId: parseInt(location.location_id || 1),
+            scheduleDate: date // 确保日期格式为 YYYY-MM-DD
+          };
+          
+          console.log('删除排班参数:', deleteData);
+          console.log('日期格式检查:', {
+            originalDate: date,
+            dateType: typeof date,
+            isValidFormat: /^\d{4}-\d{2}-\d{2}$/.test(date)
+          });
+          
+          // 调用后端删除接口
+          await deleteScheduleByParams(deleteData);
+          
+          console.log(`✅ 成功从后端删除排班: ${doctor.name} - ${date} ${shift}`);
+          
+          if (showMessage) {
+            ElMessage.success(`已取消 ${doctor.name} 在 ${date} ${shift} 的排班`);
+          }
+        } else {
+          console.warn('无法删除后端排班记录：缺少时间段或地点信息');
+          console.warn('时间段:', timeSlot);
+          console.warn('地点:', location);
+          console.warn('可用时间段:', timeSlots.value);
+          console.warn('可用地点:', availableLocations.value);
+          if (showMessage) {
+            ElMessage.warning(`已从前端移除 ${doctor.name}，但后端记录可能未删除`);
+          }
+        }
+      } catch (error) {
+        console.error('删除后端排班记录失败:', error);
+        if (showMessage) {
+          ElMessage.error(`删除排班失败: ${error.message || '未知错误'}`);
+        }
+        // 如果后端删除失败，可以选择是否回滚前端状态
+        // shiftEntry.doctors.splice(docIndex, 0, doctor);
+      }
       
       console.log(`移除医生 ${doctor.name} 从 ${date} ${shift}`);
       
@@ -2037,16 +2128,36 @@ const loadSchedulesFromBackend = async () => {
           item.date === schedule.scheduleDate && item.shift === getShiftFromTimeSlot(schedule.slotName)
         );
         
+        // 检查location是否在当前可用地点列表中
+        let validLocation = null;
+        if (schedule.location) {
+          // 尝试在可用地点列表中找到匹配的地点
+          const matchedLocation = availableLocations.value.find(loc => loc.name === schedule.location);
+          if (matchedLocation) {
+            validLocation = schedule.location;
+            console.log(`✅ 找到匹配的地点: ${schedule.location}`);
+          } else {
+            console.warn(`⚠️ 排班中的地点 "${schedule.location}" 不在当前可用地点列表中`);
+            console.log('当前可用地点:', availableLocations.value.map(loc => loc.name));
+            // 如果找不到匹配的地点，使用第一个可用地点作为默认值
+            if (availableLocations.value.length > 0) {
+              validLocation = availableLocations.value[0].name;
+              console.log(`🔄 使用默认地点: ${validLocation}`);
+            }
+          }
+        }
+        
         const doctorInfo = {
           id: schedule.doctorId,
           name: schedule.doctorName,
           identifier: schedule.doctorId.toString(),
-          location: schedule.location
+          location: validLocation
         };
         
         if (existingIndex >= 0) {
           // 如果已存在，添加医生到现有记录
           newScheduleData[key][existingIndex].doctors.push(doctorInfo);
+          console.log(`✅ 添加医生到现有记录: ${doctorInfo.name} - ${schedule.scheduleDate} ${getShiftFromTimeSlot(schedule.slotName)}`);
         } else {
           // 创建新记录
           newScheduleData[key].push({
@@ -2054,6 +2165,7 @@ const loadSchedulesFromBackend = async () => {
             shift: getShiftFromTimeSlot(schedule.slotName),
             doctors: [doctorInfo]
           });
+          console.log(`✅ 创建新排班记录: ${doctorInfo.name} - ${schedule.scheduleDate} ${getShiftFromTimeSlot(schedule.slotName)}`);
         }
       });
       
@@ -2119,6 +2231,12 @@ const saveScheduleToBackend = async (doctor, date, shift, timeSlot, location) =>
     };
 
     console.log('保存排班数据:', scheduleData);
+    console.log('使用的地点信息:', {
+      locationId: scheduleData.locationId,
+      locationName: location?.name || '默认地点',
+      doctorName: doctor.name,
+      doctorAssignedLocation: doctor.location
+    });
     
     const response = await createSchedule(scheduleData);
     console.log('排班保存成功:', response);
@@ -2160,6 +2278,17 @@ const saveScheduleToBackend = async (doctor, date, shift, timeSlot, location) =>
       // 保存成功后重新加载排班数据
       console.log('开始重新加载排班数据...');
       await loadSchedulesFromBackend();
+      
+      // 重新加载后验证医生是否正确显示
+      setTimeout(() => {
+        const doctorsInShift = getDoctorsForShift(date, shift);
+        console.log(`重新加载后 ${date} ${shift} 的医生:`, doctorsInShift);
+        if (doctorsInShift.length === 0) {
+          console.warn('⚠️ 重新加载后医生未显示，可能存在数据同步问题');
+        } else {
+          console.log('✅ 医生显示正常');
+        }
+      }, 500);
       
       return response;
     } else {

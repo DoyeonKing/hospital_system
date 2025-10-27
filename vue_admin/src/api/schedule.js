@@ -93,3 +93,20 @@ export function deleteSchedule(scheduleId) {
         method: 'delete'
     });
 }
+
+/**
+ * 根据参数删除排班
+ * DELETE /api/schedules/delete
+ * @param {Object} deleteData - 删除参数
+ * @param {number} deleteData.doctorId - 医生ID
+ * @param {number} deleteData.slotId - 时间段ID
+ * @param {number} deleteData.locationId - 地点ID
+ * @param {string} deleteData.scheduleDate - 排班日期 (YYYY-MM-DD)
+ */
+export function deleteScheduleByParams(deleteData) {
+    return request({
+        url: '/api/schedules/delete',
+        method: 'delete',
+        data: deleteData
+    });
+}
