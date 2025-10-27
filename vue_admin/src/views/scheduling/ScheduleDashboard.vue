@@ -323,7 +323,17 @@ const timeSlotColumns = ref({
 });
 
 // --- 状态管理 ---
-const currentMonday = ref(new Date('2025-10-20'));
+// 获取当前周的周一日期
+const getCurrentWeekMonday = () => {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // 周一
+  const monday = new Date(today);
+  monday.setDate(diff);
+  return monday;
+};
+
+const currentMonday = ref(getCurrentWeekMonday());
 const activeParent = ref(null);
 const activeSub = ref(null);
 
@@ -459,7 +469,8 @@ const weekDates = computed(() => {
 
 const changeWeek = (offset) => {
   if (offset === 0) {
-    currentMonday.value = new Date('2025-10-20');
+    // 点击"本周"按钮，跳转到当前周的周一
+    currentMonday.value = getCurrentWeekMonday();
   } else {
     const newDate = new Date(currentMonday.value);
     newDate.setDate(newDate.getDate() + (offset * 7));
@@ -2076,7 +2087,8 @@ const getCurrentWeekStart = () => {
   const today = new Date();
   const dayOfWeek = today.getDay();
   const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // 周一
-  const monday = new Date(today.setDate(diff));
+  const monday = new Date(today);
+  monday.setDate(diff);
   return monday.toISOString().split('T')[0];
 };
 
@@ -2426,6 +2438,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 20px;
   overflow: auto;
+  min-width: 0;
 }
 .schedule-card {
   flex-shrink: 0;
@@ -2445,7 +2458,8 @@ onMounted(() => {
   width: 100%;
   border-collapse: collapse;
   text-align: center;
-  table-layout: fixed;
+  table-layout: auto;
+  max-width: 100%;
 }
 .schedule-table th, .schedule-table td {
   border: 1px solid #ebeef5;
@@ -2544,12 +2558,13 @@ onMounted(() => {
   margin-top: 20px;
   flex-wrap: nowrap;
   overflow-x: auto;
+  width: 100%;
 }
 .draggable-list-card {
-  flex-shrink: 0;
-  min-width: 280px;
-  max-width: 320px;
-  width: 300px;
+  flex: 1;
+  min-width: 300px;
+  max-width: none;
+  width: auto;
 }
 .draggable-list {
   display: flex;
@@ -2557,6 +2572,7 @@ onMounted(() => {
   gap: 8px;
   max-height: 400px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .doctor-card {
@@ -2635,7 +2651,7 @@ onMounted(() => {
 
 /* 时间段卡片样式 */
 .time-slot-column {
-  width: 250px;
+  width: 220px;
   vertical-align: top;
   background-color: #f8f9fa;
   min-height: 120px;
@@ -2657,6 +2673,7 @@ onMounted(() => {
   gap: 4px;
   max-height: 300px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 4px;
 }
 
@@ -2664,7 +2681,7 @@ onMounted(() => {
   background-color: #e6f7ff;
   border: 1px solid #91d5ff;
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 8px 12px;
   cursor: grab;
   transition: all 0.2s;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -2672,6 +2689,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .time-slot-card:hover {
@@ -2690,6 +2709,8 @@ onMounted(() => {
 
 .time-slot-card-content {
   flex: 1;
+  min-width: 0;
+  padding-right: 8px;
 }
 
 .time-slot-name {
@@ -2697,11 +2718,17 @@ onMounted(() => {
   font-weight: 500;
   color: #1890ff;
   margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .time-slot-time {
   font-size: 10px;
   color: #8c8c8c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .time-slot-card .remove-icon {
