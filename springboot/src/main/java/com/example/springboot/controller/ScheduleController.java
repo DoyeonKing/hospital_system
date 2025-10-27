@@ -7,6 +7,8 @@ import com.example.springboot.service.ScheduleService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -89,6 +91,27 @@ public class ScheduleController {
             return ResponseEntity.status(500).build();
         }
     }
+
+    /**
+     * 查询所有排班记录（支持分页参数）
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Page<ScheduleResponse>> searchAllSchedules(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        try {
+            Pageable pageable = PageRequest.of(page, size);
+            // 构建空的查询条件，查询所有记录
+            ScheduleListRequest request = new ScheduleListRequest();
+            Page<ScheduleResponse> schedules = scheduleService.getSchedules(request, pageable);
+            return ResponseEntity.ok(schedules);
+        } catch (Exception e) {
+            System.err.println("查询所有排班记录时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
 
     /**
      * 创建排班
