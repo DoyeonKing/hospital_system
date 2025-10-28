@@ -1,6 +1,7 @@
 // 路径：src/main/java/com/example/springboot/controller/LocationController.java
 package com.example.springboot.controller;
 
+import com.example.springboot.entity.Location;
 import com.example.springboot.service.LocationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,7 @@ public class LocationController {
 
     /**
      * 根据科室ID获取门诊室名称列表
+     * 
      * @param departmentId 科室ID
      * @return 门诊室名称列表
      */
@@ -30,6 +32,22 @@ public class LocationController {
             return new ResponseEntity<>(locationNames, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>("获取门诊室名称失败: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * 根据科室ID获取门诊室完整信息列表
+     * 
+     * @param departmentId 科室ID
+     * @return 门诊室完整信息列表
+     */
+    @GetMapping("/department/{departmentId}")
+    public ResponseEntity<?> getLocationsByDepartmentId(@PathVariable Integer departmentId) {
+        try {
+            List<Location> locations = locationService.getLocationsByDepartmentId(departmentId);
+            return new ResponseEntity<>(locations, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("获取门诊室信息失败: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

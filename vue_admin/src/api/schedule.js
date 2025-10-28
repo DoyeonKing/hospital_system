@@ -95,6 +95,20 @@ export function deleteSchedule(scheduleId) {
 }
 
 /**
+ * 查询所有排班记录（支持分页参数）
+ * GET /api/schedules/search
+ * @param {number} [page=0] - 页码
+ * @param {number} [size=100] - 每页大小
+ */
+export function getAllSchedules(page = 0, size = 100) {
+    return request({
+        url: '/api/schedules/search',
+        method: 'get',
+        params: { page, size }
+    });
+}
+
+/**
  * 根据参数删除排班
  * DELETE /api/schedules/delete
  * @param {Object} deleteData - 删除参数

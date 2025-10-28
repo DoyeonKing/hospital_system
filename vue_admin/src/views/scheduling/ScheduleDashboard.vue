@@ -51,6 +51,23 @@
              </div>
              
              <div class="header-controls">
+               <!-- 自动填充按钮 -->
+               <el-button 
+                 type="success" 
+                 :icon="Refresh" 
+                 @click="autoFillScheduleData"
+                 class="auto-fill-btn">
+                 自动填充排班数据
+               </el-button>
+               
+               <!-- 测试排班创建按钮 -->
+               <el-button 
+                 type="warning" 
+                 @click="testScheduleCreation"
+                 class="test-btn">
+                 测试排班创建
+               </el-button>
+               
                <!-- 冲突信息显示 -->
                <div class="conflict-controls">
                  <div v-if="conflictData.hasConflicts" class="conflict-summary">
@@ -273,8 +290,8 @@ import doctorFemaleImg from '@/assets/doctor1.jpg';
 import BackButton from '@/components/BackButton.vue';
 import { getTimeSlots } from '@/api/timeslot';
 import { getAllParentDepartments, getDepartmentsByParentId, getDoctorsByDepartmentId } from '@/api/department';
-import { getLocationNamesByDepartmentId } from '@/api/location';
-import { createSchedule, getSchedules, deleteScheduleByParams } from '@/api/schedule';
+import { getLocationNamesByDepartmentId, getLocationsByDepartmentId } from '@/api/location';
+import { createSchedule, getSchedules, deleteScheduleByParams, getAllSchedules } from '@/api/schedule';
 
 // --- 科室数据（从API获取） ---
 const departments = ref([]);
@@ -479,17 +496,8 @@ const getDoctorsForShift = (date, shift) => {
 
 // 获取指定时段的时间段卡片（只显示在时段列中）
 const getTimeSlotsForShift = (shift) => {
-  // 优先显示拖拽到时段列的时间段
-  if (timeSlotColumns.value[shift] && timeSlotColumns.value[shift].length > 0) {
-    return timeSlotColumns.value[shift];
-  }
-  
-  // 如果没有拖拽的时间段，则从所有时间段中筛选出匹配的时段
-  return timeSlots.value.filter(timeSlot => {
-    const period = timeSlot.period || timeSlot.period_name;
-    console.log(`检查时间段 ${timeSlot.slot_name || timeSlot.slotName}: period=${period}, shift=${shift}`);
-    return period === shift;
-  });
+  // 只显示手动拖拽到时段列的时间段，不自动筛选
+  return timeSlotColumns.value[shift] || [];
 };
 
 const getDoctorAvatar = (doctorId) => {
@@ -500,6 +508,38 @@ const getDoctorAvatar = (doctorId) => {
     }
   }
   return doctorMaleImg;
+};
+
+// [新增] 检查排班冲突 - 在创建排班前检查
+const checkScheduleConflict = (doctor, date, shift) => {
+  // 检查医生重复排班冲突
+  const existingDoctors = getDoctorsForShift(date, shift);
+  const isDoctorAlreadyScheduled = existingDoctors.some(d => d.id === doctor.id);
+  
+  if (isDoctorAlreadyScheduled) {
+    return {
+      hasConflict: true,
+      message: `医生 ${doctor.name} 在 ${date} ${shift} 已经被排班`
+    };
+  }
+  
+  // 检查办公室冲突（同一时间段同一地点被多个医生使用）
+  if (doctor.location) {
+    const isLocationTaken = existingDoctors.some(d => d.location === doctor.location);
+    
+    if (isLocationTaken) {
+      const conflictingDoctor = existingDoctors.find(d => d.location === doctor.location);
+      return {
+        hasConflict: true,
+        message: `地点 ${doctor.location} 在 ${date} ${shift} 已被医生 ${conflictingDoctor.name} 占用`
+      };
+    }
+  }
+  
+  return {
+    hasConflict: false,
+    message: ''
+  };
 };
 
 // --- 拖拽逻辑 ---
@@ -532,6 +572,14 @@ const handleDoctorDrop = async (dragData, toDate, toShift) => {
     if (source.date === toDate && source.shift === toShift) return;
     await removeDoctorFromShift(doctor, source.date, source.shift, false);
   }
+  
+  // [新增] 在添加医生前检查冲突
+  const conflictCheck = checkScheduleConflict(doctor, toDate, toShift);
+  if (conflictCheck.hasConflict) {
+    ElMessage.error(`无法创建排班：${conflictCheck.message}`);
+    return;
+  }
+  
   addDoctorToShift(doctor, toDate, toShift);
   
   // 保存排班到后端
@@ -540,23 +588,29 @@ const handleDoctorDrop = async (dragData, toDate, toShift) => {
     const timeSlotsForShift = getTimeSlotsForShift(toShift);
     const timeSlot = timeSlotsForShift.length > 0 ? timeSlotsForShift[0] : null;
     
-    // 获取医生实际分配的地点，如果没有则使用默认地点
+    // 获取医生实际分配的地点，如果没有则不保存排班
     let location = null;
+    console.log('当前选中的科室ID:', activeSub.value);
+    console.log('当前availableLocations.value:', availableLocations.value);
+    console.log('医生地点信息:', doctor.location);
+    
     if (doctor.location) {
       // 根据医生分配的地点名称找到对应的location对象
       location = availableLocations.value.find(loc => loc.name === doctor.location);
+      console.log('调试地点查找:', {
+        doctorLocation: doctor.location,
+        availableLocations: availableLocations.value,
+        foundLocation: location
+      });
     }
     
-    // 如果没找到对应地点，使用默认地点
-    if (!location && availableLocations.value.length > 0) {
-      location = availableLocations.value[0];
-      console.log('医生未分配地点，使用默认地点:', location.name);
-    }
-    
-    if (timeSlot) {
+    if (timeSlot && location) {
       await saveScheduleToBackend(doctor, toDate, toShift, timeSlot, location);
-    } else {
+    } else if (!timeSlot) {
       console.warn('没有找到对应的时间段信息，无法保存排班');
+    } else if (!location) {
+      console.warn('医生未分配地点，无法保存排班。请先拖拽地点到医生卡片上');
+      ElMessage.warning('请先拖拽地点到医生卡片上，然后再进行排班');
     }
   } catch (error) {
     console.error('保存排班失败:', error);
@@ -565,7 +619,7 @@ const handleDoctorDrop = async (dragData, toDate, toShift) => {
   }
 };
 
-const handleLocationDrop = (dragData, toDate, toShift, targetElement) => {
+const handleLocationDrop = async (dragData, toDate, toShift, targetElement) => {
   const { data: location } = dragData;
 
   const doctorCard = targetElement.closest('.doctor-card-in-table');
@@ -600,6 +654,25 @@ const handleLocationDrop = (dragData, toDate, toShift, targetElement) => {
     ElMessage.success(`已将【${targetDoctor.name}】医生的地点从“${oldLocation}”更换为“${location.name}”`);
   } else if (!oldLocation) {
     ElMessage.success(`已为【${targetDoctor.name}】医生分配地点：${location.name}`);
+  }
+
+  // 在地点分配后，若当前单元格已有医生并且该班次存在时间段，则立即持久化保存
+  try {
+    // 仅当存在具体日期与班次时才尝试保存
+    if (toDate && toShift) {
+      const timeSlotsForShift = getTimeSlotsForShift(toShift);
+      const timeSlot = timeSlotsForShift.length > 0 ? timeSlotsForShift[0] : null;
+
+      if (timeSlot) {
+        // 直接使用拖拽过来的 location 对象，避免依赖 availableLocations 列表
+        await saveScheduleToBackend(targetDoctor, toDate, toShift, timeSlot, location);
+      } else {
+        console.warn('没有找到对应的时间段信息，无法保存排班');
+        ElMessage.warning('请先将时间段卡片拖拽到上方“上午/下午”列');
+      }
+    }
+  } catch (error) {
+    console.error('分配地点后保存排班失败:', error);
   }
 };
 
@@ -658,7 +731,7 @@ const addDoctorToShift = (doctor, date, shift) => {
   }
 
   if (!shiftEntry.doctors.some(d => d.id === doctor.id)) {
-    shiftEntry.doctors.push({ ...doctor, location: null });
+    shiftEntry.doctors.push({ ...doctor }); // 保留医生的原始地点信息
     ElMessage.success(`已将 ${doctor.name} 排班到 ${date} ${shift}`);
   } else {
     ElMessage.warning(`${doctor.name} 医生已在该班次中。`);
@@ -676,32 +749,23 @@ const removeDoctorFromShift = async (doctor, date, shift, showMessage = true) =>
       
       // 尝试从后端删除排班记录
       try {
-        // 获取当前时段的时间段信息
+        // 获取当前时段的时间段信息（只使用手动拖拽的时间段）
         const timeSlotsForShift = getTimeSlotsForShift(shift);
         console.log(`获取时间段数据 for ${shift}:`, timeSlotsForShift);
         console.log(`所有时间段数据:`, timeSlots.value);
-        console.log(`时间段数据结构示例:`, timeSlots.value[0]);
         
-        // 优先使用拖拽到时段列的时间段，如果没有则使用默认时间段
+        // 只使用手动拖拽到时段列的时间段
         let timeSlot = null;
         if (timeSlotsForShift.length > 0) {
           timeSlot = timeSlotsForShift[0];
           console.log(`使用拖拽时间段 for ${shift}:`, timeSlot);
         } else {
-          // 如果没有找到对应时段的时间段，使用默认时间段
-          const defaultTimeSlots = timeSlots.value.filter(ts => ts.period === shift);
-          console.log(`筛选 ${shift} 时段的时间段:`, defaultTimeSlots);
-          if (defaultTimeSlots.length > 0) {
-            timeSlot = defaultTimeSlots[0];
-            console.log(`使用默认时间段 for ${shift}:`, timeSlot);
-          } else {
-            console.warn(`没有找到 ${shift} 时段的时间段`);
-            // 如果仍然没有找到，使用第一个时间段作为默认值
-            if (timeSlots.value.length > 0) {
-              timeSlot = timeSlots.value[0];
-              console.log(`使用第一个时间段作为默认值:`, timeSlot);
-            }
+          console.warn(`没有找到 ${shift} 时段的手动拖拽时间段，请先拖拽时间段卡片到时段列`);
+          // 如果时间段列为空，提示用户先拖拽时间段
+          if (showMessage) {
+            ElMessage.warning(`请先拖拽时间段卡片到"${shift}"时段列，然后再删除医生排班`);
           }
+          return;
         }
         
         // 获取医生分配的地点
@@ -709,12 +773,6 @@ const removeDoctorFromShift = async (doctor, date, shift, showMessage = true) =>
         if (doctor.location) {
           location = availableLocations.value.find(loc => loc.name === doctor.location);
           console.log(`查找医生地点 "${doctor.location}":`, location);
-        }
-        
-        // 如果没找到对应地点，使用默认地点
-        if (!location && availableLocations.value.length > 0) {
-          location = availableLocations.value[0];
-          console.log(`使用默认地点:`, location);
         }
         
         console.log(`时间段信息:`, timeSlot);
@@ -745,13 +803,16 @@ const removeDoctorFromShift = async (doctor, date, shift, showMessage = true) =>
             ElMessage.success(`已取消 ${doctor.name} 在 ${date} ${shift} 的排班`);
           }
         } else {
-          console.warn('无法删除后端排班记录：缺少时间段或地点信息');
-          console.warn('时间段:', timeSlot);
-          console.warn('地点:', location);
-          console.warn('可用时间段:', timeSlots.value);
-          console.warn('可用地点:', availableLocations.value);
-          if (showMessage) {
-            ElMessage.warning(`已从前端移除 ${doctor.name}，但后端记录可能未删除`);
+          if (!timeSlot) {
+            console.warn('无法删除后端排班记录：缺少时间段信息');
+            if (showMessage) {
+              ElMessage.warning('无法删除后端排班记录：缺少时间段信息');
+            }
+          } else if (!location) {
+            console.warn('无法删除后端排班记录：医生未分配地点');
+            if (showMessage) {
+              ElMessage.warning('无法删除后端排班记录：医生未分配地点');
+            }
           }
         }
       } catch (error) {
@@ -819,21 +880,29 @@ const handleParentSelect = (index) => {
   clearTimeSlotColumns();
 };
 
-const handleSubSelect = (id) => {
+const handleSubSelect = async (id) => {
   console.log('选择子科室:', id);
   activeSub.value = id;
-  // 切换科室时清空时间段列
-  clearTimeSlotColumns();
   
   // 加载选中科室的医生和办公地点数据
   if (id) {
     // 从科室ID中提取数字ID（去掉前缀 's' 或 'p'）
     const departmentId = id.replace(/^[sp]/, '');
     console.log('提取的科室数字ID:', departmentId);
-    loadDoctorsForDepartment(departmentId);
-    loadLocationsForDepartment(departmentId);
-    // 加载该科室的排班数据
-    loadSchedulesFromBackend();
+    
+    // 并行加载基础数据
+    await Promise.all([
+      loadDoctorsForDepartment(departmentId),
+      loadLocationsForDepartment(departmentId)
+    ]);
+    
+    // 加载排班数据并自动填充时间段
+    await loadSchedulesFromBackend();
+    
+    // 延迟自动填充，确保基础数据已加载
+    setTimeout(() => {
+      autoFillScheduleData();
+    }, 500);
   }
 };
 
@@ -1525,10 +1594,10 @@ const detectDoctorDoubleBooking = (schedules) => {
   return conflicts;
 };
 
-// [新增] 检测办公室冲突 - 修改为同一日期同一办公室被多人使用即为冲突
+// [新增] 检测办公室冲突 - 修改为同一日期同一时间段同一办公室被多人使用即为冲突
 const detectOfficeConflicts = (schedules) => {
   const conflicts = [];
-  const officeDateMap = new Map(); // 改为按日期和办公室分组
+  const officeTimeSlotMap = new Map(); // 改为按日期、时间段和办公室分组
   
   console.log('开始检测办公室冲突，排班数据:', schedules);
   
@@ -1539,20 +1608,20 @@ const detectOfficeConflicts = (schedules) => {
     
     doctors.forEach(doctor => {
       if (doctor.location) {
-        // 改为按日期和办公室分组，不区分时间段
-        const officeDateKey = `${doctor.location}-${date}`;
+        // 改为按日期、时间段和办公室分组
+        const officeDateKey = `${doctor.location}-${date}-${shift}`;
         
-        console.log(`检查医生 ${doctor.name} 在办公室 ${doctor.location} 日期 ${date}`);
+        console.log(`检查医生 ${doctor.name} 在办公室 ${doctor.location} 日期 ${date} 时间段 ${shift}`);
         
-        if (officeDateMap.has(officeDateKey)) {
-          const existingDoctors = officeDateMap.get(officeDateKey);
+        if (officeTimeSlotMap.has(officeDateKey)) {
+          const existingDoctors = officeTimeSlotMap.get(officeDateKey);
           
           // 检查是否已经记录了这个医生
           const alreadyRecorded = existingDoctors.some(existing => existing.id === doctor.id);
           
           if (!alreadyRecorded) {
             existingDoctors.push({ ...doctor, date, shift });
-            console.log(`发现办公室冲突: ${doctor.location} 在 ${date} 被多个医生使用`);
+            console.log(`发现办公室冲突: ${doctor.location} 在 ${date} ${shift} 被多个医生使用`);
             
             // 为所有使用这个办公室的医生创建冲突记录
             existingDoctors.forEach(existingDoctor => {
@@ -1560,12 +1629,13 @@ const detectOfficeConflicts = (schedules) => {
                 type: 'office_conflict',
                 severity: 'critical',
                 title: '办公室冲突',
-                description: `办公室 ${doctor.location} 在 ${date} 被多个医生使用`,
+                description: `办公室 ${doctor.location} 在 ${date} ${shift} 被多个医生使用`,
                 details: [
                   `办公室: ${doctor.location}`,
                   `日期: ${date}`,
+                  `时间段: ${shift}`,
                   `使用医生: ${existingDoctors.map(d => d.name).join(', ')}`,
-                  `建议: 每个办公室每天只能分配给一个医生`
+                  `建议: 每个办公室在同一时间段只能分配给一个医生`
                 ],
                 location: doctor.location,
                 date: date,
@@ -1576,8 +1646,8 @@ const detectOfficeConflicts = (schedules) => {
             });
           }
         } else {
-          officeDateMap.set(officeDateKey, [{ ...doctor, date, shift }]);
-          console.log(`记录医生 ${doctor.name} 在办公室 ${doctor.location}`);
+          officeTimeSlotMap.set(officeDateKey, [{ ...doctor, date, shift }]);
+          console.log(`记录医生 ${doctor.name} 在办公室 ${doctor.location} 时间段 ${shift}`);
         }
       }
     });
@@ -1913,6 +1983,7 @@ watch(() => scheduleData.value, () => {
 
 // [新增] 单独监听 scheduleData 变化进行冲突检测，避免递归
 let conflictDetectionTimeout = null;
+let updateTimeout = null;
 watch(() => scheduleData.value, () => {
   // 使用防抖避免频繁触发冲突检测
   if (conflictDetectionTimeout) {
@@ -1921,7 +1992,21 @@ watch(() => scheduleData.value, () => {
   conflictDetectionTimeout = setTimeout(() => {
     console.log('排班数据发生变化，重新检测冲突...');
     detectAllConflicts();
-  }, 500); // 500ms 防抖，给更多时间让数据稳定
+  }, 300); // 减少到300ms防抖，提高响应速度
+}, { deep: true });
+
+// [新增] 监听时间段列变化，防抖更新
+watch(() => timeSlotColumns.value, () => {
+  if (updateTimeout) {
+    clearTimeout(updateTimeout);
+  }
+  updateTimeout = setTimeout(() => {
+    console.log('时间段列发生变化，触发UI更新');
+    // 强制触发响应式更新
+    nextTick(() => {
+      console.log('UI更新完成');
+    });
+  }, 100); // 100ms防抖，快速响应UI变化
 }, { deep: true });
 
 // 加载科室数据
@@ -2053,26 +2138,33 @@ const loadDoctorsForDepartment = async (departmentId) => {
 // 加载选中科室的办公地点数据
 const loadLocationsForDepartment = async (departmentId) => {
   if (!departmentId) {
+    console.log('科室ID为空，清空地点数据');
     availableLocations.value = [];
     return;
   }
 
   try {
-    const response = await getLocationNamesByDepartmentId(departmentId);
+    console.log('开始加载科室地点数据，科室ID:', departmentId);
+    const response = await getLocationsByDepartmentId(departmentId);
+    console.log('地点API响应:', response);
+    console.log('响应类型:', typeof response, '是否为数组:', Array.isArray(response));
     
     if (response && Array.isArray(response)) {
-      // 转换办公地点数据格式，适配前端显示
-      const locations = response.map((locationName, index) => ({
-        location_id: index + 1, // 生成临时ID
-        name: locationName,
-        building: '门诊楼', // 默认建筑
-        floor: '一层', // 默认楼层
-        room_number: locationName.split('-').pop() || '001' // 从名称中提取房间号
+      // 直接使用后端返回的完整Location信息
+      const locations = response.map(location => ({
+        location_id: location.locationId, // 使用真实的数据库ID
+        name: location.locationName,
+        building: location.building || '门诊楼',
+        floor: location.floorLevel ? `${location.floorLevel}层` : '一层',
+        room_number: location.roomNumber || '001'
       }));
       
       availableLocations.value = locations;
+      console.log('成功加载的地点数据:', locations);
+      console.log('availableLocations.value 长度:', availableLocations.value.length);
     } else {
       console.error('获取科室办公地点数据失败:', response);
+      console.error('响应不是数组或为空');
       availableLocations.value = [];
     }
   } catch (error) {
@@ -2139,12 +2231,16 @@ const loadSchedulesFromBackend = async () => {
           } else {
             console.warn(`⚠️ 排班中的地点 "${schedule.location}" 不在当前可用地点列表中`);
             console.log('当前可用地点:', availableLocations.value.map(loc => loc.name));
-            // 如果找不到匹配的地点，使用第一个可用地点作为默认值
-            if (availableLocations.value.length > 0) {
-              validLocation = availableLocations.value[0].name;
-              console.log(`🔄 使用默认地点: ${validLocation}`);
-            }
+            // 如果找不到匹配的地点，不设置默认值，保持为null
+            validLocation = null;
+            console.log(`❌ 排班地点无效，不加载该排班记录`);
           }
+        }
+        
+        // 如果地点无效，跳过该排班记录
+        if (schedule.location && !validLocation) {
+          console.log(`跳过无效地点的排班记录: ${schedule.doctorName} - ${schedule.location}`);
+          return; // 跳过当前排班记录
         }
         
         const doctorInfo = {
@@ -2173,6 +2269,9 @@ const loadSchedulesFromBackend = async () => {
       scheduleData.value = newScheduleData;
       console.log('排班数据加载完成:', scheduleData.value);
       console.log('当前选中的科室数据:', scheduleData.value[activeSub.value]);
+      
+      // [新增] 加载排班数据后自动填充时间段
+      await autoFillTimeSlotsFromSchedules(schedules);
       
     } else {
       console.log('没有获取到排班数据');
@@ -2223,27 +2322,72 @@ const saveScheduleToBackend = async (doctor, date, shift, timeSlot, location) =>
     const scheduleData = {
       doctorId: parseInt(doctor.id), // 确保是整数
       scheduleDate: date, // 日期字符串，格式：YYYY-MM-DD
-      slotId: parseInt(timeSlot.slotId || timeSlot.slot_id || 1), // 确保是整数
-      locationId: parseInt(location?.location_id || 1), // 确保是整数
+      slotId: (() => {
+        // 优先使用数字格式的slotId
+        if (timeSlot.slotId && !isNaN(parseInt(timeSlot.slotId))) {
+          return parseInt(timeSlot.slotId);
+        }
+        // 其次使用slot_id，但需要检查是否为有效数字
+        if (timeSlot.slot_id) {
+          const parsed = parseInt(timeSlot.slot_id);
+          if (!isNaN(parsed)) {
+            return parsed;
+          }
+        }
+        // 如果都无效，返回默认值1
+        console.warn('时间段ID无效，使用默认值1:', timeSlot);
+        return 1;
+      })(),
+      locationId: parseInt(location?.location_id), // 确保是整数
       totalSlots: 10, // 默认总号源数
-      fee: 5.00, // 使用数字格式
-      remarks: `排班：${doctor.name} - ${timeSlot.slotName || timeSlot.slot_name} - ${location?.name || '默认地点'}`
+      fee: "5.00", // 使用字符串格式，后端会转换为BigDecimal
+      remarks: `排班：${doctor.name} - ${timeSlot.slotName || timeSlot.slot_name} - ${location?.name || '未分配地点'}`
     };
 
     console.log('保存排班数据:', scheduleData);
+    console.log('时间段信息调试:', {
+      timeSlot: timeSlot,
+      slotId: timeSlot?.slotId,
+      slot_id: timeSlot?.slot_id,
+      parsedSlotId: scheduleData.slotId
+    });
     console.log('使用的地点信息:', {
       locationId: scheduleData.locationId,
-      locationName: location?.name || '默认地点',
+      locationName: location?.name || '未分配地点',
       doctorName: doctor.name,
       doctorAssignedLocation: doctor.location
     });
     
     const response = await createSchedule(scheduleData);
-    console.log('排班保存成功:', response);
+    console.log('排班保存响应:', response);
+    console.log('响应类型:', typeof response);
+    console.log('响应结构:', JSON.stringify(response, null, 2));
     
-    // 检查响应状态
-    if (response && (response.scheduleId || response.data?.scheduleId)) {
-      const scheduleId = response.scheduleId || response.data?.scheduleId;
+    // 检查响应状态 - 支持多种响应格式
+    let scheduleId = null;
+    if (response) {
+      // 直接响应格式
+      if (response.scheduleId) {
+        scheduleId = response.scheduleId;
+        console.log('找到scheduleId (直接):', scheduleId);
+      }
+      // 嵌套data格式
+      else if (response.data && response.data.scheduleId) {
+        scheduleId = response.data.scheduleId;
+        console.log('找到scheduleId (data):', scheduleId);
+      }
+      // 检查其他可能的字段名
+      else if (response.id) {
+        scheduleId = response.id;
+        console.log('找到scheduleId (id):', scheduleId);
+      }
+      else if (response.data && response.data.id) {
+        scheduleId = response.data.id;
+        console.log('找到scheduleId (data.id):', scheduleId);
+      }
+    }
+    
+    if (scheduleId) {
       
       // 更新保存状态
       scheduleStatus.value.saving = false;
@@ -2253,12 +2397,12 @@ const saveScheduleToBackend = async (doctor, date, shift, timeSlot, location) =>
         date: date,
         shift: shift,
         timeSlot: timeSlot.slotName || timeSlot.slot_name,
-        location: location?.name || '默认地点',
+        location: location?.name || '未分配地点',
         timestamp: new Date().toLocaleString()
       };
       
       ElMessage.success({
-        message: `✅ 排班保存成功！\n医生：${doctor.name}\n日期：${date} ${shift}\n时间段：${timeSlot.slotName || timeSlot.slot_name}\n地点：${location?.name || '默认地点'}\n排班ID：${scheduleId}`,
+        message: `✅ 排班保存成功！\n医生：${doctor.name}\n日期：${date} ${shift}\n时间段：${timeSlot.slotName || timeSlot.slot_name}\n地点：${location?.name || '未分配地点'}\n排班ID：${scheduleId}`,
         duration: 5000,
         showClose: true
       });
@@ -2270,30 +2414,34 @@ const saveScheduleToBackend = async (doctor, date, shift, timeSlot, location) =>
         date: date,
         shift: shift,
         timeSlot: timeSlot.slotName || timeSlot.slot_name,
-        location: location?.name || '默认地点',
+        location: location?.name || '未分配地点',
         totalSlots: 10,
         fee: 5.00
       });
       
-      // 保存成功后重新加载排班数据
-      console.log('开始重新加载排班数据...');
-      await loadSchedulesFromBackend();
+      // [优化] 保存成功后不重新加载排班数据，直接更新前端状态
+      console.log('排班保存成功，前端状态已更新');
       
-      // 重新加载后验证医生是否正确显示
+      // 验证医生是否正确显示
       setTimeout(() => {
         const doctorsInShift = getDoctorsForShift(date, shift);
-        console.log(`重新加载后 ${date} ${shift} 的医生:`, doctorsInShift);
+        console.log(`保存后 ${date} ${shift} 的医生:`, doctorsInShift);
         if (doctorsInShift.length === 0) {
-          console.warn('⚠️ 重新加载后医生未显示，可能存在数据同步问题');
+          console.warn('⚠️ 保存后医生未显示，可能存在数据同步问题');
         } else {
           console.log('✅ 医生显示正常');
         }
-      }, 500);
+      }, 100);
       
       return response;
     } else {
       scheduleStatus.value.saving = false;
-      ElMessage.warning('排班保存成功，但未返回排班ID');
+      console.warn('排班保存响应格式异常:', response);
+      ElMessage.warning({
+        message: `排班保存成功，但响应格式异常\n响应内容: ${JSON.stringify(response, null, 2)}`,
+        duration: 8000,
+        showClose: true
+      });
       return response;
     }
   } catch (error) {
@@ -2381,44 +2529,295 @@ const loadTimeSlots = async () => {
   }
 };
 
+// [新增] 自动填充排班数据
+const autoFillScheduleData = async () => {
+  try {
+    console.log('开始自动填充排班数据...');
+    
+    // 1. 获取所有排班记录
+    const response = await getAllSchedules(0, 1000); // 获取前1000条记录
+    console.log('所有排班数据API响应:', response);
+    
+    if (!response || !response.content || response.content.length === 0) {
+      console.log('没有找到排班数据');
+      return;
+    }
+    
+    const allSchedules = response.content;
+    console.log('获取到的排班记录数量:', allSchedules.length);
+    
+    // 2. 获取当前周的排班数据
+    const currentWeekStart = getCurrentWeekStart();
+    const currentWeekEnd = getCurrentWeekEnd();
+    
+    const currentWeekSchedules = allSchedules.filter(schedule => {
+      const scheduleDate = schedule.scheduleDate;
+      return scheduleDate >= currentWeekStart && scheduleDate <= currentWeekEnd;
+    });
+    
+    console.log('当前周的排班记录:', currentWeekSchedules);
+    
+    if (currentWeekSchedules.length === 0) {
+      console.log('当前周没有排班数据');
+      return;
+    }
+    
+    // 3. 自动填充医生卡片（仅当医生数据为空时）
+    if (!availableDoctors.value || availableDoctors.value.length === 0) {
+      await autoFillDoctors(currentWeekSchedules);
+    }
+    
+    // 4. 自动填充地点卡片（仅当地点数据为空时）
+    if (!availableLocations.value || availableLocations.value.length === 0) {
+      await autoFillLocations(currentWeekSchedules);
+    }
+    
+    // 5. 自动填充时间段卡片（仅当时间段列为空时）
+    if ((!timeSlotColumns.value['上午'] || timeSlotColumns.value['上午'].length === 0) &&
+        (!timeSlotColumns.value['下午'] || timeSlotColumns.value['下午'].length === 0)) {
+      await autoFillTimeSlots(currentWeekSchedules);
+    }
+    
+    ElMessage.success('排班数据自动填充完成！');
+    
+  } catch (error) {
+    console.error('自动填充排班数据失败:', error);
+    ElMessage.error('自动填充排班数据失败: ' + error.message);
+  }
+};
+
+// [新增] 自动填充时间段卡片
+const autoFillTimeSlots = async (schedules) => {
+  console.log('开始自动填充时间段卡片...');
+  
+  // 按班次分组时间段
+  const morningSlots = new Set();
+  const afternoonSlots = new Set();
+  
+  schedules.forEach(schedule => {
+    if (schedule.slotName) {
+      const slotName = schedule.slotName.toLowerCase();
+      if (slotName.includes('上午') || slotName.includes('am') || slotName.includes('morning')) {
+        morningSlots.add(schedule.slotName);
+      } else if (slotName.includes('下午') || slotName.includes('pm') || slotName.includes('afternoon')) {
+        afternoonSlots.add(schedule.slotName);
+      }
+    }
+  });
+  
+  // 填充上午时间段
+  if (morningSlots.size > 0) {
+    timeSlotColumns.value['上午'] = Array.from(morningSlots).map((slotName, index) => ({
+      slot_id: index + 1, // 使用数字ID，从1开始
+      slot_name: slotName,
+      start_time: '08:00:00',
+      end_time: '12:00:00'
+    }));
+    console.log('填充上午时间段:', timeSlotColumns.value['上午']);
+  }
+  
+  // 填充下午时间段
+  if (afternoonSlots.size > 0) {
+    timeSlotColumns.value['下午'] = Array.from(afternoonSlots).map((slotName, index) => ({
+      slot_id: index + 10, // 使用数字ID，从10开始，避免与上午冲突
+      slot_name: slotName,
+      start_time: '14:00:00',
+      end_time: '18:00:00'
+    }));
+    console.log('填充下午时间段:', timeSlotColumns.value['下午']);
+  }
+};
+
+// [新增] 自动填充医生卡片
+const autoFillDoctors = async (schedules) => {
+  console.log('开始自动填充医生卡片...');
+  
+  // 收集所有医生信息
+  const doctorMap = new Map();
+  
+  schedules.forEach(schedule => {
+    if (schedule.doctorId && schedule.doctorName) {
+      const doctorKey = schedule.doctorId;
+      if (!doctorMap.has(doctorKey)) {
+        doctorMap.set(doctorKey, {
+          id: schedule.doctorId,
+          name: schedule.doctorName,
+          identifier: schedule.doctorId.toString(),
+          title: schedule.doctorTitle || '医生',
+          gender: 'male', // 默认性别
+          specialty: schedule.doctorSpecialty || '',
+          phoneNumber: schedule.doctorPhone || ''
+        });
+      }
+    }
+  });
+  
+  // 更新医生数据
+  const doctors = Array.from(doctorMap.values());
+  if (doctors.length > 0) {
+    // 获取当前选中的科室ID
+    const departmentId = activeSub.value ? activeSub.value.replace(/^[sp]/, '') : '1';
+    doctorsData.value[departmentId] = doctors;
+    console.log('填充医生数据:', doctors);
+  }
+};
+
+// [新增] 自动填充地点卡片
+const autoFillLocations = async (schedules) => {
+  console.log('开始自动填充地点卡片...');
+  
+  // 收集所有地点信息
+  const locationMap = new Map();
+  
+  schedules.forEach(schedule => {
+    if (schedule.locationId && schedule.locationName) {
+      const locationKey = schedule.locationId;
+      if (!locationMap.has(locationKey)) {
+        locationMap.set(locationKey, {
+          location_id: schedule.locationId,
+          name: schedule.locationName,
+          building: schedule.locationBuilding || '门诊楼',
+          floor: schedule.locationFloor ? `${schedule.locationFloor}层` : '一层',
+          room_number: schedule.locationRoomNumber || '001'
+        });
+      }
+    }
+  });
+  
+  // 更新地点数据
+  const locations = Array.from(locationMap.values());
+  if (locations.length > 0) {
+    availableLocations.value = locations;
+    console.log('填充地点数据:', locations);
+  }
+};
+
+// [新增] 测试排班创建接口
+const testScheduleCreation = async () => {
+  try {
+    console.log('开始测试排班创建接口...');
+    
+    const testData = {
+      doctorId: 1,
+      scheduleDate: "2025-01-01",
+      slotId: 1,
+      locationId: 1,
+      totalSlots: 10,
+      fee: "5.00",
+      remarks: "测试排班"
+    };
+    
+    console.log('发送测试数据:', testData);
+    const response = await createSchedule(testData);
+    console.log('测试响应:', response);
+    
+    ElMessage.success('排班创建接口测试成功！');
+  } catch (error) {
+    console.error('排班创建接口测试失败:', error);
+    ElMessage.error('排班创建接口测试失败: ' + error.message);
+  }
+};
+
+// [新增] 从排班数据自动填充时间段（专门用于loadSchedulesFromBackend）
+const autoFillTimeSlotsFromSchedules = async (schedules) => {
+  console.log('从排班数据自动填充时间段...');
+  
+  // 按班次分组时间段
+  const morningSlots = new Set();
+  const afternoonSlots = new Set();
+  
+  schedules.forEach(schedule => {
+    if (schedule.slotName) {
+      const slotName = schedule.slotName.toLowerCase();
+      if (slotName.includes('上午') || slotName.includes('am') || slotName.includes('morning')) {
+        morningSlots.add(schedule.slotName);
+      } else if (slotName.includes('下午') || slotName.includes('pm') || slotName.includes('afternoon')) {
+        afternoonSlots.add(schedule.slotName);
+      }
+    }
+  });
+  
+  // 填充上午时间段（保留现有的，添加新的）
+  if (morningSlots.size > 0) {
+    const existingMorning = timeSlotColumns.value['上午'] || [];
+    const newMorningSlots = Array.from(morningSlots).map((slotName, index) => ({
+      slot_id: index + 1, // 使用数字ID，从1开始
+      slot_name: slotName,
+      start_time: '08:00:00',
+      end_time: '12:00:00'
+    }));
+    
+    // 合并现有和新的时间段，避免重复
+    const combinedMorning = [...existingMorning];
+    newMorningSlots.forEach(newSlot => {
+      if (!combinedMorning.some(existing => existing.slot_name === newSlot.slot_name)) {
+        combinedMorning.push(newSlot);
+      }
+    });
+    
+    timeSlotColumns.value['上午'] = combinedMorning;
+    console.log('填充上午时间段:', timeSlotColumns.value['上午']);
+  }
+  
+  // 填充下午时间段（保留现有的，添加新的）
+  if (afternoonSlots.size > 0) {
+    const existingAfternoon = timeSlotColumns.value['下午'] || [];
+    const newAfternoonSlots = Array.from(afternoonSlots).map((slotName, index) => ({
+      slot_id: index + 10, // 使用数字ID，从10开始，避免与上午冲突
+      slot_name: slotName,
+      start_time: '14:00:00',
+      end_time: '18:00:00'
+    }));
+    
+    // 合并现有和新的时间段，避免重复
+    const combinedAfternoon = [...existingAfternoon];
+    newAfternoonSlots.forEach(newSlot => {
+      if (!combinedAfternoon.some(existing => existing.slot_name === newSlot.slot_name)) {
+        combinedAfternoon.push(newSlot);
+      }
+    });
+    
+    timeSlotColumns.value['下午'] = combinedAfternoon;
+    console.log('填充下午时间段:', timeSlotColumns.value['下午']);
+  }
+};
+
 // 备用时间段数据
 const loadFallbackTimeSlots = () => {
   timeSlots.value = [
-    { slot_id: 1, slot_name: '上午08:00-08:30', start_time: '08:00:00', end_time: '08:30:00', period: '上午' },
-    { slot_id: 2, slot_name: '上午08:30-09:00', start_time: '08:30:00', end_time: '09:00:00', period: '上午' },
-    { slot_id: 3, slot_name: '上午09:00-09:30', start_time: '09:00:00', end_time: '09:30:00', period: '上午' },
-    { slot_id: 4, slot_name: '上午09:30-10:00', start_time: '09:30:00', end_time: '10:00:00', period: '上午' },
-    { slot_id: 5, slot_name: '上午10:00-10:30', start_time: '10:00:00', end_time: '10:30:00', period: '上午' },
-    { slot_id: 6, slot_name: '上午10:30-11:00', start_time: '10:30:00', end_time: '11:00:00', period: '上午' },
-    { slot_id: 7, slot_name: '上午11:00-11:30', start_time: '11:00:00', end_time: '11:30:00', period: '上午' },
-    { slot_id: 8, slot_name: '上午11:30-12:00', start_time: '11:30:00', end_time: '12:00:00', period: '上午' },
-    { slot_id: 9, slot_name: '下午14:00-14:30', start_time: '14:00:00', end_time: '14:30:00', period: '下午' },
-    { slot_id: 10, slot_name: '下午14:30-15:00', start_time: '14:30:00', end_time: '15:00:00', period: '下午' },
-    { slot_id: 11, slot_name: '下午15:00-15:30', start_time: '15:00:00', end_time: '15:30:00', period: '下午' },
-    { slot_id: 12, slot_name: '下午15:30-16:00', start_time: '15:30:00', end_time: '16:00:00', period: '下午' },
-    { slot_id: 13, slot_name: '下午16:00-16:30', start_time: '16:00:00', end_time: '16:30:00', period: '下午' },
-    { slot_id: 14, slot_name: '下午16:30-17:00', start_time: '16:30:00', end_time: '17:00:00', period: '下午' },
-    { slot_id: 15, slot_name: '下午17:00-17:30', start_time: '17:00:00', end_time: '17:30:00', period: '下午' },
-    { slot_id: 16, slot_name: '下午17:30-18:00', start_time: '17:30:00', end_time: '18:00:00', period: '下午' }
+    { slot_id: 1, slot_name: '上午 08:00-08:30', start_time: '08:00:00', end_time: '08:30:00' },
+    { slot_id: 2, slot_name: '上午 08:30-09:00', start_time: '08:30:00', end_time: '09:00:00' },
+    { slot_id: 3, slot_name: '上午 09:00-09:30', start_time: '09:00:00', end_time: '09:30:00' },
+    { slot_id: 4, slot_name: '上午 09:30-10:00', start_time: '09:30:00', end_time: '10:00:00' },
+    { slot_id: 5, slot_name: '上午 10:00-10:30', start_time: '10:00:00', end_time: '10:30:00' },
+    { slot_id: 6, slot_name: '上午 10:30-11:00', start_time: '10:30:00', end_time: '11:00:00' },
+    { slot_id: 7, slot_name: '上午 11:00-11:30', start_time: '11:00:00', end_time: '11:30:00' },
+    { slot_id: 8, slot_name: '上午 11:30-12:00', start_time: '11:30:00', end_time: '12:00:00' },
+    { slot_id: 9, slot_name: '下午 14:00-14:30', start_time: '14:00:00', end_time: '14:30:00' },
+    { slot_id: 10, slot_name: '下午 14:30-15:00', start_time: '14:30:00', end_time: '15:00:00' },
+    { slot_id: 11, slot_name: '下午 15:00-15:30', start_time: '15:00:00', end_time: '15:30:00' },
+    { slot_id: 12, slot_name: '下午 15:30-16:00', start_time: '15:30:00', end_time: '16:00:00' },
+    { slot_id: 13, slot_name: '下午 16:00-16:30', start_time: '16:00:00', end_time: '16:30:00' },
+    { slot_id: 14, slot_name: '下午 16:30-17:00', start_time: '16:30:00', end_time: '17:00:00' },
+    { slot_id: 15, slot_name: '晚间 18:00-18:30', start_time: '18:00:00', end_time: '18:30:00' },
+    { slot_id: 16, slot_name: '晚间 18:30-19:00', start_time: '18:30:00', end_time: '19:00:00' }
   ];
   console.log('使用备用时间段数据:', timeSlots.value);
 };
 
-onMounted(() => {
+onMounted(async () => {
   // 加载科室数据
-  loadDepartments();
+  await loadDepartments();
   convertScheduleToEvents();
   // 加载时间段数据
-  loadTimeSlots();
-  // 加载排班数据
-  loadSchedulesFromBackend();
+  await loadTimeSlots();
+  
   // 如果API调用失败，立即使用备用数据
-  setTimeout(() => {
-    if (timeSlots.value.length === 0) {
-      console.log('时间段数据为空，使用备用数据');
-      loadFallbackTimeSlots();
-    }
-  }, 2000);
+  if (timeSlots.value.length === 0) {
+    console.log('时间段数据为空，使用备用数据');
+    loadFallbackTimeSlots();
+  }
+  
   // 延迟执行冲突检测，确保数据已经加载完成
   setTimeout(() => {
     detectAllConflicts();
@@ -2439,6 +2838,14 @@ onMounted(() => {
   display: flex;
   gap: 16px;
   align-items: center;
+}
+
+.auto-fill-btn {
+  margin-right: 16px;
+}
+
+.test-btn {
+  margin-right: 16px;
 }
 
 .view-switcher {
