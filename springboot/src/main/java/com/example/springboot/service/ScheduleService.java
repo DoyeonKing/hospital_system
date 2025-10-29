@@ -1,10 +1,8 @@
 package com.example.springboot.service;
 
-import com.example.springboot.dto.ScheduleListRequest;
-import com.example.springboot.dto.ScheduleResponse;
-import com.example.springboot.dto.ScheduleUpdateRequest;
-import com.example.springboot.dto.ScheduleBatchUpdateRequest;
+import com.example.springboot.dto.schedule.*;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -36,10 +34,24 @@ public interface ScheduleService {
     /**
      * 创建排班
      */
-    ScheduleResponse createSchedule(ScheduleResponse request);
+    //ScheduleResponse createSchedule(ScheduleResponse request);
+
+    /**
+     * 创建排班
+     */
+    ScheduleResponse createSchedule(ScheduleCreateRequest request);
+
     
     /**
      * 删除排班
      */
     void deleteSchedule(Integer scheduleId);
+
+    /**
+     * 根据医生、时段、门诊室和日期删除排班
+     */
+    void deleteScheduleByParams(ScheduleDeleteRequest request);
+
+    // 在原有方法基础上新增带分页参数的重载方法
+    Page<ScheduleResponse> getSchedules(ScheduleListRequest request, Pageable pageable);
 }

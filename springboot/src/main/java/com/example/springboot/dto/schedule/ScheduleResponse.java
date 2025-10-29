@@ -1,4 +1,4 @@
-package com.example.springboot.dto;
+package com.example.springboot.dto.schedule;
 
 import com.example.springboot.entity.Schedule;
 import lombok.Data;

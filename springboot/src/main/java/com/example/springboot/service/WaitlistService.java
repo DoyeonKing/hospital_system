@@ -3,7 +3,7 @@ package com.example.springboot.service;
 import com.example.springboot.dto.waitlist.WaitlistCreateRequest;
 import com.example.springboot.dto.waitlist.WaitlistResponse;
 import com.example.springboot.dto.waitlist.WaitlistUpdateRequest;
-import com.example.springboot.dto.ScheduleResponse;
+import com.example.springboot.dto.schedule.ScheduleResponse;
 import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.Schedule;

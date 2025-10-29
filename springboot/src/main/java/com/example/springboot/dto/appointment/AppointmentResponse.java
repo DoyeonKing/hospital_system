@@ -1,8 +1,7 @@
 package com.example.springboot.dto.appointment;
 
-import com.example.springboot.dto.doctor.DoctorResponse; // 导入医生响应DTO
 import com.example.springboot.dto.patient.PatientResponse; // 导入患者响应DTO
-import com.example.springboot.dto.ScheduleResponse; // 导入排班响应DTO
+import com.example.springboot.dto.schedule.ScheduleResponse; // 导入排班响应DTO
 import com.example.springboot.entity.enums.AppointmentStatus;
 import com.example.springboot.entity.enums.PaymentStatus;
 import lombok.Data;

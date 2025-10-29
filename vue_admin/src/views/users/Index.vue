@@ -96,7 +96,7 @@ import BackButton from '@/components/BackButton.vue';
 }
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(6, 1fr);
   gap: 20px;
 }
 .feature-card-link { text-decoration: none; }

@@ -1,4 +1,4 @@
-package com.example.springboot.dto;
+package com.example.springboot.dto.schedule;
 
 import lombok.Data;
 import java.time.LocalDate;

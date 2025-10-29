@@ -1,111 +1,126 @@
 import request from '@/utils/request'
 
 /**
- * 获取排班列表（按科室和时间范围）
+ * 创建排班
+ * POST /api/schedules/create
+ * @param {Object} scheduleData - 排班数据
+ * @param {number} scheduleData.doctorId - 医生ID
+ * @param {string} scheduleData.scheduleDate - 出诊日期 (YYYY-MM-DD)
+ * @param {number} scheduleData.slotId - 时间段ID
+ * @param {number} scheduleData.locationId - 就诊地点ID
+ * @param {number} [scheduleData.totalSlots=10] - 总号源数
+ * @param {number} [scheduleData.fee=5.00] - 挂号费
+ * @param {string} [scheduleData.remarks] - 备注信息
+ */
+export function createSchedule(scheduleData) {
+    return request({
+        url: '/api/schedules/create',
+        method: 'post',
+        data: scheduleData
+    });
+}
+
+/**
+ * 获取排班列表
+ * GET /api/schedules
  * @param {Object} params - 查询参数
- * @param {Number} params.departmentId - 科室ID
- * @param {String} params.startDate - 开始日期 (格式: YYYY-MM-DD)
- * @param {String} params.endDate - 结束日期 (格式: YYYY-MM-DD)
+ * @param {string} [params.startDate] - 开始日期
+ * @param {string} [params.endDate] - 结束日期
+ * @param {number} [params.page=0] - 页码
+ * @param {number} [params.size=10] - 每页大小
  */
-export function getSchedules(params) {
-  console.log('=== API层请求参数 ===');
-  console.log('接收到的参数:', params);
-  console.log('发送的请求参数:', {
-    departmentId: params.departmentId,
-    startDate: params.startDate,
-    endDate: params.endDate
-  });
-  console.log('请求配置:', {
-    url: '/api/schedules',
-    method: 'get',
-    params: {
-      departmentId: params.departmentId,
-      startDate: params.startDate,
-      endDate: params.endDate
-    }
-  });
-  console.log('==================');
-  
-  return request({
-    url: '/api/schedules',
-    method: 'get',
-    params: {
-      departmentId: params.departmentId,
-      startDate: params.startDate,
-      endDate: params.endDate
-    }
-  })
+export function getSchedules(params = {}) {
+    return request({
+        url: '/api/schedules',
+        method: 'get',
+        params: params
+    });
 }
 
 /**
- * 批量更新排班（号源限额和费用）
- * @param {Object} data - 更新数据
- * @param {Array} data.updates - 更新列表
- * @param {Number} data.updates[].scheduleId - 排班ID
- * @param {Number} data.updates[].totalSlots - 号源限额
- * @param {Number} data.updates[].fee - 挂号费用
- */
-export function batchUpdateSchedules(data) {
-  return request({
-    url: '/api/schedules/batch-update',
-    method: 'put',
-    data: {
-      updates: data.updates.map(item => ({
-        scheduleId: item.scheduleId,
-        totalSlots: item.totalSlots,
-        fee: item.fee
-      }))
-    }
-  })
-}
-
-/**
- * 单个更新排班（可选，如果需要单个更新接口）
- * @param {Number} scheduleId - 排班ID
- * @param {Object} data - 更新数据
- */
-export function updateSchedule(scheduleId, data) {
-  return request({
-    url: `/api/schedules/${scheduleId}`,
-    method: 'put',
-    data: {
-      totalSlots: data.totalSlots,
-      fee: data.fee
-    }
-  })
-}
-
-/**
- * 获取单个排班详情
- * @param {Number} scheduleId - 排班ID
+ * 获取排班详情
+ * GET /api/schedules/{id}
+ * @param {number} scheduleId - 排班ID
  */
 export function getScheduleById(scheduleId) {
-  return request({
-    url: `/api/schedules/${scheduleId}`,
-    method: 'get'
-  })
+    return request({
+        url: `/api/schedules/${scheduleId}`,
+        method: 'get'
+    });
 }
 
 /**
- * 创建排班
- * @param {Object} data - 排班数据
+ * 更新排班
+ * PUT /api/schedules/{id}
+ * @param {number} scheduleId - 排班ID
+ * @param {Object} updateData - 更新数据
+ * @param {number} [updateData.totalSlots] - 总号源数
+ * @param {number} [updateData.fee] - 挂号费
  */
-export function createSchedule(data) {
-  return request({
-    url: '/api/schedules',
-    method: 'post',
-    data
-  })
+export function updateSchedule(scheduleId, updateData) {
+    return request({
+        url: `/api/schedules/${scheduleId}`,
+        method: 'put',
+        data: updateData
+    });
+}
+
+/**
+ * 批量更新排班
+ * PUT /api/schedules/batch-update
+ * @param {Object} batchData - 批量更新数据
+ * @param {Array} batchData.updates - 更新项列表
+ * @param {number} batchData.updates[].scheduleId - 排班ID
+ * @param {number} [batchData.updates[].totalSlots] - 总号源数
+ * @param {number} [batchData.updates[].fee] - 挂号费
+ */
+export function batchUpdateSchedules(batchData) {
+    return request({
+        url: '/api/schedules/batch-update',
+        method: 'put',
+        data: batchData
+    });
 }
 
 /**
  * 删除排班
- * @param {Number} scheduleId - 排班ID
+ * DELETE /api/schedules/{id}
+ * @param {number} scheduleId - 排班ID
  */
 export function deleteSchedule(scheduleId) {
-  return request({
-    url: `/api/schedules/${scheduleId}`,
-    method: 'delete'
-  })
+    return request({
+        url: `/api/schedules/${scheduleId}`,
+        method: 'delete'
+    });
 }
 
+/**
+ * 查询所有排班记录（支持分页参数）
+ * GET /api/schedules/search
+ * @param {number} [page=0] - 页码
+ * @param {number} [size=100] - 每页大小
+ */
+export function getAllSchedules(page = 0, size = 100) {
+    return request({
+        url: '/api/schedules/search',
+        method: 'get',
+        params: { page, size }
+    });
+}
+
+/**
+ * 根据参数删除排班
+ * DELETE /api/schedules/delete
+ * @param {Object} deleteData - 删除参数
+ * @param {number} deleteData.doctorId - 医生ID
+ * @param {number} deleteData.slotId - 时间段ID
+ * @param {number} deleteData.locationId - 地点ID
+ * @param {string} deleteData.scheduleDate - 排班日期 (YYYY-MM-DD)
+ */
+export function deleteScheduleByParams(deleteData) {
+    return request({
+        url: '/api/schedules/delete',
+        method: 'delete',
+        data: deleteData
+    });
+}

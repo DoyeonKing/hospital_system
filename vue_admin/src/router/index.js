@@ -30,6 +30,9 @@ import RegulationIndex from '@/views/regulations/Index.vue';
 import CreateRegulation from '@/views/regulations/Create.vue';
 import EditRegulation from '@/views/regulations/Edit.vue';
 
+// ===== 新增：导入费用管理页面组件 =====
+import FeeManagement from '@/views/fees/FeeManagement.vue';
+
 // 通用视图组件导入
 const NotFoundView = () => import('../views/404.vue');
 
@@ -63,10 +66,6 @@ const routes = [
         meta: { title: '创建新科室', requiresAuth: true },
         component: CreateDepartment
     },
-    // 【已移除】/departments/manage 路由，因为文件已删除
-    // 【已移除】/departments/view 路由，因为文件已删除
-
-    // 【解决跳转 404 的关键】科室成员带参数路由
     {
         path: '/departments/members/:id', // 必须使用 :id 接收科室 ID 参数
         name: 'DepartmentMembers',
@@ -75,7 +74,7 @@ const routes = [
     },
 
     // =======================================================
-    // 用户管理路由 (保持不变)
+    // 用户管理路由
     // =======================================================
     {
         path: '/users',
@@ -121,7 +120,7 @@ const routes = [
     },
     // =======================================================
 
-    // ===== 新增：排班管理相关的所有路由 =====
+    // ===== 排班管理相关的所有路由 =====
     {
         path: '/scheduling/shifts',
         name: 'ShiftManagement',
@@ -142,7 +141,7 @@ const routes = [
     },
     // =======================================================
 
-    // ===== 新增：就医规范管理相关路由 =====
+    // ===== 就医规范管理相关路由 =====
     {
         path: '/regulations',
         name: 'RegulationIndex',
@@ -160,6 +159,15 @@ const routes = [
         name: 'EditRegulation',
         meta: { title: '编辑就医规范', requiresAuth: true },
         component: EditRegulation
+    },
+    // =======================================================
+
+    // ===== 费用规则管理路由 =====
+    {
+        path: '/fees',
+        name: 'FeeManagement',
+        meta: { title: '费用规则管理', requiresAuth: true },
+        component: FeeManagement
     },
     // =======================================================
 
