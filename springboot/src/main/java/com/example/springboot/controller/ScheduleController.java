@@ -1,6 +1,8 @@
 package com.example.springboot.controller;
 
 import com.example.springboot.dto.schedule.*;
+import com.example.springboot.dto.auto.*;
+import com.example.springboot.service.AutoScheduleService;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.service.ScheduleService;
@@ -25,6 +27,9 @@ public class ScheduleController {
     
     @Autowired
     private ScheduleService scheduleService;
+
+    @Autowired
+    private AutoScheduleService autoScheduleService;
     
     /**
      * 获取排班列表
@@ -72,6 +77,23 @@ public class ScheduleController {
             e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
+    }
+
+    /**
+     * 自动生成排班
+     */
+    @PostMapping("/auto-generate")
+    public ResponseEntity<AutoScheduleResponse> autoGenerate(@Valid @RequestBody AutoScheduleRequest request) {
+        AutoScheduleResponse resp = autoScheduleService.autoGenerateSchedule(request);
+        return ResponseEntity.ok(resp);
+    }
+
+    /**
+     * 获取默认排班规则
+     */
+    @GetMapping("/auto-generate/rules")
+    public ResponseEntity<ScheduleRules> getDefaultRules() {
+        return ResponseEntity.ok(new ScheduleRules());
     }
 
     /**
