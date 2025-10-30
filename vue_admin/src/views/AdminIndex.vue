@@ -90,12 +90,23 @@
           <p>为不同号别设置挂号费用</p>
         </div>
       </router-link>
+
+      <!-- 医生工时统计入口 -->
+      <router-link to="/scheduling/doctor-hours" class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #E6F0FF;">
+            <el-icon :size="32" color="#3B82F6"><DataAnalysis /></el-icon>
+          </div>
+          <h3>医生工时统计</h3>
+          <p>统计医生排班时长与出诊次数</p>
+        </div>
+      </router-link>
     </div>
   </div>
 </template>
 
 <script setup>
-import { Tickets, UserFilled, Calendar, Money, Document } from '@element-plus/icons-vue';
+import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import doctorImage from '@/assets/doctor.jpg';

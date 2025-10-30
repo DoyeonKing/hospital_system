@@ -24,6 +24,7 @@ import UserHistory from '@/views/users/History.vue';
 import ShiftManagement from '@/views/scheduling/ShiftManagement.vue';
 import ScheduleDashboard from '@/views/scheduling/ScheduleDashboard.vue';
 import ScheduleFeeManagement from '@/views/scheduling/ScheduleFeeManagement.vue';
+import DoctorWorkHours from '@/views/scheduling/DoctorWorkHours.vue';
 
 // ===== 新增：导入就医规范管理页面组件 =====
 import RegulationIndex from '@/views/regulations/Index.vue';
@@ -138,6 +139,12 @@ const routes = [
         name: 'ScheduleFeeManagement',
         meta: { title: '号别管理', requiresAuth: true },
         component: ScheduleFeeManagement
+    },
+    {
+        path: '/scheduling/doctor-hours',
+        name: 'DoctorWorkHours',
+        meta: { title: '医生工时统计', requiresAuth: true },
+        component: DoctorWorkHours
     },
     // =======================================================
 
