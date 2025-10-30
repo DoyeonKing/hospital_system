@@ -45,10 +45,7 @@ function request(options) {
 			},
 			fail: (err) => {
 				console.error('请求失败:', err)
-				uni.showToast({
-					title: '网络错误，请稍后重试',
-					icon: 'none'
-				})
+				// 不显示toast，让调用方处理错误
 				reject(err)
 			}
 		})
