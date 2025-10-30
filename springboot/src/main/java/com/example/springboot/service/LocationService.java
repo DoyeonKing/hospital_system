@@ -16,6 +16,7 @@ public class LocationService {
 
     /**
      * 根据科室ID获取所有门诊室名称
+     * 
      * @param departmentId 科室ID
      * @return 门诊室名称列表
      */
@@ -27,5 +28,16 @@ public class LocationService {
         return locations.stream()
                 .map(Location::getLocationName)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 根据科室ID获取所有门诊室完整信息
+     * 
+     * @param departmentId 科室ID
+     * @return 门诊室完整信息列表
+     */
+    public List<Location> getLocationsByDepartmentId(Integer departmentId) {
+        // 查询该科室下的所有门诊室
+        return locationRepository.findByDepartmentDepartmentId(departmentId);
     }
 }
