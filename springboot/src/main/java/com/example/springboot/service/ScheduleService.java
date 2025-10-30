@@ -2,6 +2,7 @@ package com.example.springboot.service;
 
 import com.example.springboot.dto.schedule.*;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -50,4 +51,7 @@ public interface ScheduleService {
      * 根据医生、时段、门诊室和日期删除排班
      */
     void deleteScheduleByParams(ScheduleDeleteRequest request);
+
+    // 在原有方法基础上新增带分页参数的重载方法
+    Page<ScheduleResponse> getSchedules(ScheduleListRequest request, Pageable pageable);
 }

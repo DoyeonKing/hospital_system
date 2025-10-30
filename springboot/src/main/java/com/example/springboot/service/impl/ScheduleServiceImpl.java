@@ -42,14 +42,32 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Autowired
     private LocationRepository locationRepository;
+
+
     
+//    @Override
+//    @Transactional(readOnly = true)
+//    public Page<ScheduleResponse> getSchedules(ScheduleListRequest request) {
+//        // 创建分页参数
+//        Pageable pageable = PageRequest.of(0, 100); // 设置较大的页面大小
+//
+//        // 执行查询
+//        Page<Schedule> schedulePage = scheduleRepository.findSchedulesWithDetails(
+//                request.getDepartmentId(),
+//                request.getStartDate(),
+//                request.getEndDate(),
+//                null, // 不筛选状态
+//                pageable
+//        );
+//
+//        // 转换为响应DTO
+//        return schedulePage.map(ScheduleResponse::fromEntity);
+//    }
+
     @Override
     @Transactional(readOnly = true)
-    public Page<ScheduleResponse> getSchedules(ScheduleListRequest request) {
-        // 创建分页参数
-        Pageable pageable = PageRequest.of(0, 100); // 设置较大的页面大小
-        
-        // 执行查询
+    public Page<ScheduleResponse> getSchedules(ScheduleListRequest request, Pageable pageable) {
+        // 使用传入的分页参数
         Page<Schedule> schedulePage = scheduleRepository.findSchedulesWithDetails(
                 request.getDepartmentId(),
                 request.getStartDate(),
@@ -57,9 +75,16 @@ public class ScheduleServiceImpl implements ScheduleService {
                 null, // 不筛选状态
                 pageable
         );
-        
-        // 转换为响应DTO
         return schedulePage.map(ScheduleResponse::fromEntity);
+    }
+
+    // 保留原有方法并复用新方法
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ScheduleResponse> getSchedules(ScheduleListRequest request) {
+        // 默认分页参数
+        Pageable defaultPageable = PageRequest.of(0, 100);
+        return getSchedules(request, defaultPageable);
     }
     
     @Override
