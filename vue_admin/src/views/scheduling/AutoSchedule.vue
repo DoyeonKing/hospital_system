@@ -10,27 +10,49 @@
       
       <el-form :model="form" :rules="rules" ref="formRef" label-width="140px">
         <!-- 基础配置 -->
-        <el-form-item label="选择科室" prop="departmentId">
-          <el-tree-select
-            v-model="form.departmentId"
-            :data="departmentTree"
-            :props="{ 
-              label: 'name', 
-              value: 'id', 
-              children: 'children'
-            }"
-            node-key="id"
-            placeholder="请选择科室"
-            check-strictly
-            :render-after-expand="false"
-            default-expand-all
-            filterable
-            clearable
-            style="width: 100%"
-          />
-          <!-- 临时调试：显示加载的科室数量 -->
-          <div style="font-size: 12px; color: #999; margin-top: 4px;">
-            {{ departmentTree.length > 0 ? `已加载 ${departmentTree.length} 个科室` : '正在加载科室数据...' }}
+        <el-form-item label="选择科室" required>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-select 
+                v-model="selectedParentDept" 
+                placeholder="请先选择一级科室"
+                @change="handleParentDeptChange"
+                clearable
+                filterable
+                style="width: 100%">
+                <el-option
+                  v-for="parent in departmentTree"
+                  :key="parent.id"
+                  :label="parent.name"
+                  :value="parent.id">
+                  <span>{{ parent.name }}</span>
+                  <span style="float: right; color: #8492a6; font-size: 12px;">{{ parent.children?.length || 0 }}个子科室</span>
+                </el-option>
+              </el-select>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item prop="departmentId" style="margin-bottom: 0;">
+                <el-select 
+                  v-model="form.departmentId" 
+                  placeholder="请选择具体科室"
+                  :disabled="!selectedParentDept || availableSubDepts.length === 0"
+                  clearable
+                  filterable
+                  style="width: 100%">
+                  <el-option
+                    v-for="sub in availableSubDepts"
+                    :key="sub.id"
+                    :label="sub.name"
+                    :value="sub.id">
+                    <span>{{ sub.name }}</span>
+                  </el-option>
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <!-- 显示当前选择 -->
+          <div v-if="selectedDepartmentInfo" style="font-size: 12px; color: #409EFF; margin-top: 8px;">
+            ✓ 已选择: {{ selectedDepartmentInfo }}
           </div>
         </el-form-item>
         
@@ -332,7 +354,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { SuccessFilled, CircleCloseFilled, MagicStick, View, Check } from '@element-plus/icons-vue'
@@ -347,6 +369,9 @@ const departmentTree = ref([])
 const result = ref(null)
 const previewLoading = ref(false)
 const generateLoading = ref(false)
+
+// 🆕 科室选择相关
+const selectedParentDept = ref(null)
 
 const form = reactive({
   departmentId: null,
@@ -377,6 +402,42 @@ const rules = {
   endDate: [
     { required: true, message: '请选择结束日期', trigger: 'change' }
   ]
+}
+
+// 🆕 可用的子科室列表（根据选中的父科室）
+const availableSubDepts = computed(() => {
+  if (!selectedParentDept.value) return []
+  const parent = departmentTree.value.find(p => p.id === selectedParentDept.value)
+  return parent?.children || []
+})
+
+// 🆕 显示选中的科室信息
+const selectedDepartmentInfo = computed(() => {
+  if (!form.departmentId || !selectedParentDept.value) return ''
+  
+  const parent = departmentTree.value.find(p => p.id === selectedParentDept.value)
+  const sub = availableSubDepts.value.find(s => s.id === form.departmentId)
+  
+  if (parent && sub) {
+    return `${parent.name} → ${sub.name}`
+  }
+  return ''
+})
+
+// 🆕 父科室变化处理
+const handleParentDeptChange = (parentId) => {
+  console.log('父科室变化:', parentId)
+  // 清空子科室选择
+  form.departmentId = null
+  
+  // 如果选中的父科室没有子科室，自动将父科室ID设为departmentId
+  if (parentId) {
+    const parent = departmentTree.value.find(p => p.id === parentId)
+    if (parent && (!parent.children || parent.children.length === 0)) {
+      form.departmentId = parentId
+      ElMessage.info(`${parent.name} 没有子科室，已自动选择`)
+    }
+  }
 }
 
 // 日期禁用逻辑
@@ -565,6 +626,7 @@ const renderWorkloadChart = (workloadDistribution) => {
 const handleReset = () => {
   formRef.value.resetFields()
   result.value = null
+  selectedParentDept.value = null  // 🆕 清空父科室选择
   form.rules = {
     minDoctorsPerSlot: 1,
     maxDoctorsPerSlot: 3,

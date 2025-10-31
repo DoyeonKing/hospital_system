@@ -13,12 +13,14 @@
         <el-menu :default-active="activeParent" class="department-menu" @select="handleParentSelect">
           <el-menu-item v-for="parent in departments" :key="parent.id" :index="parent.id">
             <span>{{ parent.name }}</span>
+            <span style="font-size: 11px; color: #999; margin-left: 8px;">ID:{{ parent.id }}</span>
           </el-menu-item>
         </el-menu>
 
         <div class="sub-department-panel" v-if="subDepartments.length > 0">
           <div v-for="sub in subDepartments" :key="sub.id" class="sub-department-item" :class="{ 'active': activeSub === sub.id }" @click="handleSubSelect(sub.id)">
             {{ sub.name }}
+            <span style="font-size: 11px; color: #999; margin-left: 8px;">ID:{{ sub.id }}</span>
           </div>
         </div>
         <div v-else-if="activeParent && departments.find(p => p.id === activeParent)?.children?.length === 0" class="no-sub-departments">
@@ -33,6 +35,11 @@
         <template #header>
           <div class="card-header">
              <span>{{ selectedDepartmentName }} ({{ selectedDepartmentCode }}) - 排班管理</span>
+             
+             <!-- 🔍 调试信息 -->
+             <div style="font-size: 12px; color: #999; margin-top: 4px;">
+               调试: activeSub={{ activeSub }}, activeParent={{ activeParent }}
+             </div>
              
              <!-- 排班状态指示器 -->
              <div class="schedule-status-indicator">
@@ -444,12 +451,36 @@ const calendarOptions = computed(() => ({
 
 const selectedDepartmentName = computed(() => {
   if (!activeSub.value) return '请选择科室';
-  const parentAsSub = departments.value.find(p => p.id === activeSub.value);
-  if (parentAsSub) return parentAsSub.name;
-  for (const parent of departments.value) {
-    const sub = parent.children.find(c => c.id === activeSub.value);
-    if (sub) return sub.name;
+  
+  console.log('🔍 ===== 开始计算科室名称 =====');
+  console.log('🔍 activeSub.value:', activeSub.value, 'typeof:', typeof activeSub.value);
+  console.log('🔍 departments.value:', JSON.stringify(departments.value, null, 2));
+  
+  // 先尝试作为父科室查找
+  const parentAsSub = departments.value.find(p => {
+    console.log('🔍 比较父科室:', p.id, '(type:', typeof p.id, ') === ', activeSub.value, '(type:', typeof activeSub.value, ') ?', p.id === activeSub.value);
+    return p.id === activeSub.value;
+  });
+  
+  if (parentAsSub) {
+    console.log('✅ 找到父科室:', parentAsSub.name);
+    return parentAsSub.name;
   }
+  
+  // 作为子科室查找
+  for (const parent of departments.value) {
+    console.log('🔍 在父科室', parent.name, '中查找子科室，子科室列表:', parent.children);
+    const sub = parent.children.find(c => {
+      console.log('🔍   比较子科室:', c.id, '(type:', typeof c.id, ') === ', activeSub.value, '(type:', typeof activeSub.value, ') ?', c.id === activeSub.value);
+      return c.id === activeSub.value;
+    });
+    if (sub) {
+      console.log('✅ 找到子科室:', sub.name, '(父科室:', parent.name, ')');
+      return sub.name;
+    }
+  }
+  
+  console.log('❌ 未找到科室，activeSub.value =', activeSub.value);
   return '未知科室';
 });
 
@@ -876,35 +907,42 @@ const clearTimeSlotColumns = () => {
 
 // --- 侧边栏选择逻辑 ---
 const handleParentSelect = (index) => {
-  console.log('选择父科室:', index);
+  console.log('🟢 选择父科室 - 传入index:', index);
   activeParent.value = index;
+  console.log('🟢 所有departments:', departments.value);
   const parent = departments.value.find(p => p.id === index);
   if (parent) {
-    console.log('找到父科室:', parent);
+    console.log('🟢 找到父科室:', parent.name, 'ID:', parent.id);
+    console.log('🟢 子科室:', parent.children);
     if (parent.children && parent.children.length > 0) {
       activeSub.value = parent.children[0].id;
-      console.log('选择第一个子科室:', parent.children[0]);
+      console.log('🟢 自动选择第一个子科室:', parent.children[0].name, 'ID:', parent.children[0].id);
     } else {
       activeSub.value = parent.id;
-      console.log('父科室无子科室，选择父科室本身');
+      console.log('🟢 父科室无子科室，选择父科室本身 ID:', parent.id);
     }
   } else {
     activeSub.value = null;
-    console.log('未找到父科室');
+    console.log('🟢 未找到父科室');
   }
+  console.log('🟢 最终设置的activeSub.value:', activeSub.value);
   // 切换科室时清空时间段列
   clearTimeSlotColumns();
 };
 
 const handleSubSelect = async (id) => {
-  console.log('选择子科室:', id);
+  console.log('🔵 选择子科室 - 传入ID:', id);
+  console.log('🔵 当前departments:', departments.value);
+  console.log('🔵 当前subDepartments:', subDepartments.value);
+  
   activeSub.value = id;
+  console.log('🔵 设置后的activeSub.value:', activeSub.value);
   
   // 加载选中科室的医生和办公地点数据
   if (id) {
     // 从科室ID中提取数字ID（去掉前缀 's' 或 'p'）
     const departmentId = id.replace(/^[sp]/, '');
-    console.log('提取的科室数字ID:', departmentId);
+    console.log('🔵 提取的科室数字ID:', departmentId);
     
     // 并行加载基础数据
     await Promise.all([
