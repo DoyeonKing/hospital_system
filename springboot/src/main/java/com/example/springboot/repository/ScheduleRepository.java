@@ -27,6 +27,9 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
      */
     List<Schedule> findByScheduleDateBetweenAndDoctorIn(LocalDate startDate, LocalDate endDate, List<Doctor> doctors);
     
+    // 根据日期范围查找排班
+    List<Schedule> findByScheduleDateBetween(LocalDate startDate, LocalDate endDate);
+    
     /**
      * 分页查询排班列表（含关联信息）
      */

@@ -1,10 +1,12 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.dto.*;
 import com.example.springboot.dto.schedule.*;
 import com.example.springboot.dto.auto.*;
 import com.example.springboot.service.AutoScheduleService;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
+import com.example.springboot.service.AutoScheduleService;
 import com.example.springboot.service.ScheduleService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,13 +26,12 @@ import java.util.List;
 @RequestMapping("/api/schedules")
 @CrossOrigin(origins = "*")
 public class ScheduleController {
-    
+
     @Autowired
     private ScheduleService scheduleService;
 
     @Autowired
     private AutoScheduleService autoScheduleService;
-    
     /**
      * 获取排班列表
      */
@@ -39,14 +40,17 @@ public class ScheduleController {
             @RequestParam(required = false) Integer departmentId,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate) {
-        
+
         try {
             System.out.println("=== 后端接收到的请求参数 ===");
-            System.out.println("departmentId: " + departmentId + " (类型: " + (departmentId != null ? departmentId.getClass().getSimpleName() : "null") + ")");
-            System.out.println("startDate: " + startDate + " (类型: " + (startDate != null ? startDate.getClass().getSimpleName() : "null") + ")");
-            System.out.println("endDate: " + endDate + " (类型: " + (endDate != null ? endDate.getClass().getSimpleName() : "null") + ")");
+            System.out.println("departmentId: " + departmentId + " (类型: "
+                    + (departmentId != null ? departmentId.getClass().getSimpleName() : "null") + ")");
+            System.out.println("startDate: " + startDate + " (类型: "
+                    + (startDate != null ? startDate.getClass().getSimpleName() : "null") + ")");
+            System.out.println("endDate: " + endDate + " (类型: "
+                    + (endDate != null ? endDate.getClass().getSimpleName() : "null") + ")");
             System.out.println("=============================");
-            
+
             ScheduleListRequest request = new ScheduleListRequest();
             request.setDepartmentId(departmentId);
             if (startDate != null && !startDate.isEmpty()) {
@@ -67,7 +71,7 @@ public class ScheduleController {
                     System.err.println("解析结束日期失败: " + endDate + ", 错误: " + e.getMessage());
                 }
             }
-            
+
             System.out.println("准备调用服务层...");
             Page<ScheduleResponse> schedules = scheduleService.getSchedules(request);
             System.out.println("查询结果: " + schedules.getTotalElements() + " 条记录");
@@ -102,14 +106,26 @@ public class ScheduleController {
     @DeleteMapping("/delete")
     public ResponseEntity<Void> deleteScheduleByParams(@Valid @RequestBody ScheduleDeleteRequest request) {
         try {
+            System.out.println("=== 后端接收到的删除请求 ===");
+            System.out.println("doctorId: " + request.getDoctorId());
+            System.out.println("slotId: " + request.getSlotId());
+            System.out.println("locationId: " + request.getLocationId());
+            System.out.println("scheduleDate: " + request.getScheduleDate() + " (类型: "
+                    + request.getScheduleDate().getClass().getSimpleName() + ")");
+            System.out.println("=============================");
+
             scheduleService.deleteScheduleByParams(request);
+            System.out.println("✅ 排班删除成功");
             return ResponseEntity.ok().build();
         } catch (ResourceNotFoundException e) {
+            System.err.println("❌ 资源未找到: " + e.getMessage());
             return ResponseEntity.notFound().build();
         } catch (BadRequestException e) {
+            System.err.println("❌ 请求错误: " + e.getMessage());
             return ResponseEntity.badRequest().build();
         } catch (Exception e) {
-            System.err.println("删除排班时发生错误: " + e.getMessage());
+            System.err.println("❌ 删除排班时发生错误: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
     }
@@ -152,7 +168,7 @@ public class ScheduleController {
             return ResponseEntity.status(500).build();
         }
     }
-    
+
     /**
      * 获取单个排班详情
      */
@@ -166,7 +182,7 @@ public class ScheduleController {
             return ResponseEntity.status(500).build();
         }
     }
-    
+
     /**
      * 更新单个排班
      */
@@ -182,7 +198,7 @@ public class ScheduleController {
             return ResponseEntity.status(500).build();
         }
     }
-    
+
     /**
      * 批量更新排班
      */
@@ -199,21 +215,22 @@ public class ScheduleController {
             return ResponseEntity.status(500).build();
         }
     }
-    
-//    /**
-//     * 创建排班
-//     */
-//    @PostMapping
-//    public ResponseEntity<ScheduleResponse> createSchedule(@RequestBody ScheduleResponse request) {
-//        try {
-//            ScheduleResponse schedule = scheduleService.createSchedule(request);
-//            return ResponseEntity.ok(schedule);
-//        } catch (Exception e) {
-//            System.err.println("创建排班时发生错误: " + e.getMessage());
-//            return ResponseEntity.status(500).build();
-//        }
-//    }
-    
+
+    // /**
+    // * 创建排班
+    // */
+    // @PostMapping
+    // public ResponseEntity<ScheduleResponse> createSchedule(@RequestBody
+    // ScheduleResponse request) {
+    // try {
+    // ScheduleResponse schedule = scheduleService.createSchedule(request);
+    // return ResponseEntity.ok(schedule);
+    // } catch (Exception e) {
+    // System.err.println("创建排班时发生错误: " + e.getMessage());
+    // return ResponseEntity.status(500).build();
+    // }
+    // }
+
     /**
      * 删除排班
      */
@@ -224,6 +241,53 @@ public class ScheduleController {
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             System.err.println("删除排班时发生错误: " + e.getMessage());
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * 自动生成排班
+     */
+    @PostMapping("/auto-generate")
+    public ResponseEntity<AutoScheduleResponse> autoGenerateSchedule(
+            @Valid @RequestBody AutoScheduleRequest request) {
+        try {
+            System.out.println("=== 收到自动排班请求 ===");
+            System.out.println("departmentId: " + request.getDepartmentId());
+            System.out.println("startDate: " + request.getStartDate());
+            System.out.println("endDate: " + request.getEndDate());
+            System.out.println("previewOnly: " + request.getPreviewOnly());
+            System.out.println("=============================");
+            
+            AutoScheduleResponse response = autoScheduleService.autoGenerateSchedule(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            System.err.println("❌ 参数错误: " + e.getMessage());
+            AutoScheduleResponse errorResponse = new AutoScheduleResponse();
+            errorResponse.setSuccess(false);
+            errorResponse.setMessage(e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (Exception e) {
+            System.err.println("❌ 自动排班时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            AutoScheduleResponse errorResponse = new AutoScheduleResponse();
+            errorResponse.setSuccess(false);
+            errorResponse.setMessage("自动排班失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    /**
+     * 获取默认排班规则
+     */
+    @GetMapping("/auto-generate/rules")
+    public ResponseEntity<ScheduleRules> getDefaultRules() {
+        try {
+            ScheduleRules rules = new ScheduleRules();
+            // 默认值已在ScheduleRules类中设置
+            return ResponseEntity.ok(rules);
+        } catch (Exception e) {
+            System.err.println("获取默认规则时发生错误: " + e.getMessage());
             return ResponseEntity.status(500).build();
         }
     }
