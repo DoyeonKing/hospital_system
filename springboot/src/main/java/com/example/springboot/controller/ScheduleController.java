@@ -1,8 +1,10 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.dto.*;
 import com.example.springboot.dto.schedule.*;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
+import com.example.springboot.service.AutoScheduleService;
 import com.example.springboot.service.ScheduleService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,9 @@ public class ScheduleController {
 
     @Autowired
     private ScheduleService scheduleService;
+
+    @Autowired
+    private AutoScheduleService autoScheduleService;
 
     /**
      * 获取排班列表
@@ -218,6 +223,53 @@ public class ScheduleController {
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             System.err.println("删除排班时发生错误: " + e.getMessage());
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * 自动生成排班
+     */
+    @PostMapping("/auto-generate")
+    public ResponseEntity<AutoScheduleResponse> autoGenerateSchedule(
+            @Valid @RequestBody AutoScheduleRequest request) {
+        try {
+            System.out.println("=== 收到自动排班请求 ===");
+            System.out.println("departmentId: " + request.getDepartmentId());
+            System.out.println("startDate: " + request.getStartDate());
+            System.out.println("endDate: " + request.getEndDate());
+            System.out.println("previewOnly: " + request.getPreviewOnly());
+            System.out.println("=============================");
+            
+            AutoScheduleResponse response = autoScheduleService.autoGenerateSchedule(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            System.err.println("❌ 参数错误: " + e.getMessage());
+            AutoScheduleResponse errorResponse = new AutoScheduleResponse();
+            errorResponse.setSuccess(false);
+            errorResponse.setMessage(e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (Exception e) {
+            System.err.println("❌ 自动排班时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            AutoScheduleResponse errorResponse = new AutoScheduleResponse();
+            errorResponse.setSuccess(false);
+            errorResponse.setMessage("自动排班失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    /**
+     * 获取默认排班规则
+     */
+    @GetMapping("/auto-generate/rules")
+    public ResponseEntity<ScheduleRules> getDefaultRules() {
+        try {
+            ScheduleRules rules = new ScheduleRules();
+            // 默认值已在ScheduleRules类中设置
+            return ResponseEntity.ok(rules);
+        } catch (Exception e) {
+            System.err.println("获取默认规则时发生错误: " + e.getMessage());
             return ResponseEntity.status(500).build();
         }
     }
