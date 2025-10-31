@@ -293,7 +293,7 @@
 		width: 96rpx;
 		height: 96rpx;
 		margin-bottom: 16rpx;
-		border-radius: 16rpx;
+		border-radius: 24rpx;
 		box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
 		opacity: 0.95;
 	}
