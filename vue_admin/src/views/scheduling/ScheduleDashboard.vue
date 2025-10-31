@@ -51,6 +51,15 @@
              </div>
              
              <div class="header-controls">
+               <!-- 自动排班按钮 -->
+               <el-button 
+                 type="primary" 
+                 :icon="MagicStick" 
+                 @click="goToAutoSchedule"
+                 class="auto-schedule-btn">
+                 自动排班
+               </el-button>
+               
                <!-- 自动填充按钮 -->
                <el-button 
                  type="success" 
@@ -275,8 +284,9 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 // [新增] 导入 CircleCloseFilled 图标
-import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFilled, Clock, Document, Download, UploadFilled, Upload, Refresh, CircleCheck, CircleClose, Warning, Loading } from '@element-plus/icons-vue';
+import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFilled, Clock, Document, Download, UploadFilled, Upload, Refresh, CircleCheck, CircleClose, Warning, Loading, MagicStick } from '@element-plus/icons-vue';
 // [新增] 导入 FullCalendar 组件和插件
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -292,6 +302,8 @@ import { getTimeSlots } from '@/api/timeslot';
 import { getAllParentDepartments, getDepartmentsByParentId, getDoctorsByDepartmentId } from '@/api/department';
 import { getLocationNamesByDepartmentId, getLocationsByDepartmentId } from '@/api/location';
 import { createSchedule, getSchedules, deleteScheduleByParams, getAllSchedules } from '@/api/schedule';
+
+const router = useRouter();
 
 // --- 科室数据（从API获取） ---
 const departments = ref([]);
@@ -426,7 +438,8 @@ const calendarOptions = computed(() => ({
     hour12: false
   },
   droppable: true,
-  dropAccept: '.time-slot-card, .location-card'
+  dropAccept: '.time-slot-card, .location-card',
+  datesSet: handleCalendarDatesSet  // 🔥 新增：日期范围变化时自动加载数据
 }));
 
 const selectedDepartmentName = computed(() => {
@@ -475,7 +488,7 @@ const weekDates = computed(() => {
   });
 });
 
-const changeWeek = (offset) => {
+const changeWeek = async (offset) => {
   if (offset === 0) {
     // 点击"本周"按钮，跳转到当前周的周一
     currentMonday.value = getCurrentWeekMonday();
@@ -486,6 +499,9 @@ const changeWeek = (offset) => {
   }
   // 切换周次时清空时间段列
   clearTimeSlotColumns();
+  
+  // 🔥 新增：重新加载新周次的排班数据
+  await loadSchedulesFromBackend();
 };
 
 const getDoctorsForShift = (date, shift) => {
@@ -942,6 +958,100 @@ const handleEventClick = (info) => {
 
 const handleDateClick = (info) => {
   console.log('点击日期:', info.dateStr);
+};
+
+// 🔥 新增：日历日期范围变化时加载数据
+const handleCalendarDatesSet = async (dateInfo) => {
+  console.log('🔥 日历日期范围变化:', dateInfo.startStr, '到', dateInfo.endStr);
+  
+  // 仅在日历视图下加载数据（周视图有自己的加载机制）
+  if (currentView.value === 'week') {
+    return;
+  }
+  
+  if (!activeSub.value) {
+    console.log('未选择科室，跳过数据加载');
+    return;
+  }
+  
+  try {
+    const departmentId = activeSub.value.replace(/^[sp]/, '');
+    
+    // 根据视图类型确定日期范围
+    let startDate, endDate;
+    if (currentView.value === 'day') {
+      // 日视图：加载前后各3天的数据
+      const centerDate = new Date(dateInfo.start);
+      startDate = new Date(centerDate);
+      startDate.setDate(startDate.getDate() - 3);
+      endDate = new Date(centerDate);
+      endDate.setDate(endDate.getDate() + 3);
+    } else {
+      // 月视图：使用日历提供的范围
+      startDate = dateInfo.start;
+      endDate = dateInfo.end;
+    }
+    
+    const params = {
+      departmentId: departmentId,
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate),
+      page: 0,
+      size: 500  // 增加size以容纳更多数据
+    };
+    
+    console.log('📅 日历视图加载排班数据:', params);
+    
+    const response = await getSchedules(params);
+    
+    if (response && response.content) {
+      const schedules = response.content;
+      const newScheduleData = {};
+      const key = activeSub.value;
+      
+      if (!newScheduleData[key]) {
+        newScheduleData[key] = [];
+      }
+      
+      schedules.forEach(schedule => {
+        const existingIndex = newScheduleData[key].findIndex(item => 
+          item.date === schedule.scheduleDate && item.shift === getShiftFromTimeSlot(schedule.slotName, schedule.startTime)
+        );
+        
+        const doctorInfo = {
+          id: schedule.doctorId,
+          name: schedule.doctorName,
+          identifier: schedule.doctorId.toString(),
+          location: schedule.location
+        };
+        
+        if (existingIndex >= 0) {
+          newScheduleData[key][existingIndex].doctors.push(doctorInfo);
+        } else {
+          newScheduleData[key].push({
+            date: schedule.scheduleDate,
+            shift: getShiftFromTimeSlot(schedule.slotName, schedule.startTime),
+            doctors: [doctorInfo]
+          });
+        }
+      });
+      
+      // 更新数据（会触发 convertScheduleToEvents）
+      scheduleData.value = newScheduleData;
+      console.log('✅ 日历视图数据加载完成');
+    }
+  } catch (error) {
+    console.error('❌ 日历视图加载数据失败:', error);
+  }
+};
+
+// 辅助函数：格式化日期为 YYYY-MM-DD
+const formatDate = (date) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 // [新增] 日历拖拽事件处理
@@ -2217,7 +2327,7 @@ const loadSchedulesFromBackend = async () => {
         
         // 查找是否已存在相同日期和时段的记录
         const existingIndex = newScheduleData[key].findIndex(item => 
-          item.date === schedule.scheduleDate && item.shift === getShiftFromTimeSlot(schedule.slotName)
+          item.date === schedule.scheduleDate && item.shift === getShiftFromTimeSlot(schedule.slotName, schedule.startTime)
         );
         
         // 检查location是否在当前可用地点列表中
@@ -2253,15 +2363,15 @@ const loadSchedulesFromBackend = async () => {
         if (existingIndex >= 0) {
           // 如果已存在，添加医生到现有记录
           newScheduleData[key][existingIndex].doctors.push(doctorInfo);
-          console.log(`✅ 添加医生到现有记录: ${doctorInfo.name} - ${schedule.scheduleDate} ${getShiftFromTimeSlot(schedule.slotName)}`);
+          console.log(`✅ 添加医生到现有记录: ${doctorInfo.name} - ${schedule.scheduleDate} ${getShiftFromTimeSlot(schedule.slotName, schedule.startTime)}`);
         } else {
           // 创建新记录
           newScheduleData[key].push({
             date: schedule.scheduleDate,
-            shift: getShiftFromTimeSlot(schedule.slotName),
+            shift: getShiftFromTimeSlot(schedule.slotName, schedule.startTime),
             doctors: [doctorInfo]
           });
-          console.log(`✅ 创建新排班记录: ${doctorInfo.name} - ${schedule.scheduleDate} ${getShiftFromTimeSlot(schedule.slotName)}`);
+          console.log(`✅ 创建新排班记录: ${doctorInfo.name} - ${schedule.scheduleDate} ${getShiftFromTimeSlot(schedule.slotName, schedule.startTime)}`);
         }
       });
       
@@ -2283,32 +2393,45 @@ const loadSchedulesFromBackend = async () => {
   }
 };
 
-// 根据时间段名称判断班次
-const getShiftFromTimeSlot = (slotName) => {
+// 根据时间段名称或时间判断班次
+const getShiftFromTimeSlot = (slotName, startTime) => {
+  // 🔥 优先使用时间判断（更可靠）
+  if (startTime) {
+    const time = typeof startTime === 'string' ? startTime : startTime.toString();
+    // 如果时间 >= 12:00，就是下午
+    if (time >= '12:00') {
+      console.log(`⏰ 根据时间判断为下午: ${time}`);
+      return '下午';
+    } else {
+      console.log(`⏰ 根据时间判断为上午: ${time}`);
+      return '上午';
+    }
+  }
+  
+  // 🔥 备用：使用名称判断
   if (!slotName) return '上午';
   const name = slotName.toLowerCase();
   if (name.includes('下午') || name.includes('pm') || name.includes('afternoon')) {
+    console.log(`📝 根据名称判断为下午: ${slotName}`);
     return '下午';
   }
+  console.log(`📝 根据名称判断为上午: ${slotName}`);
   return '上午';
 };
 
 // 获取当前周的开始日期
 const getCurrentWeekStart = () => {
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // 周一
-  const monday = new Date(today);
-  monday.setDate(diff);
+  // 🔥 修复：使用视图显示的周一日期，而不是当前真实日期
+  const monday = new Date(currentMonday.value);
   return monday.toISOString().split('T')[0];
 };
 
 // 获取当前周的结束日期
 const getCurrentWeekEnd = () => {
-  const start = getCurrentWeekStart();
-  const startDate = new Date(start);
-  const endDate = new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000); // 加6天
-  return endDate.toISOString().split('T')[0];
+  // 🔥 修复：基于视图显示的周一计算周日
+  const monday = new Date(currentMonday.value);
+  const sunday = new Date(monday.getTime() + 6 * 24 * 60 * 60 * 1000); // 加6天
+  return sunday.toISOString().split('T')[0];
 };
 
 // 保存排班到后端
@@ -2529,6 +2652,11 @@ const loadTimeSlots = async () => {
   }
 };
 
+// 跳转到自动排班页面
+const goToAutoSchedule = () => {
+  router.push('/scheduling/auto-schedule');
+};
+
 // [新增] 自动填充排班数据
 const autoFillScheduleData = async () => {
   try {
@@ -2720,66 +2848,75 @@ const testScheduleCreation = async () => {
 
 // [新增] 从排班数据自动填充时间段（专门用于loadSchedulesFromBackend）
 const autoFillTimeSlotsFromSchedules = async (schedules) => {
-  console.log('从排班数据自动填充时间段...');
+  console.log('🔥 从排班数据自动填充时间段...', schedules);
   
-  // 按班次分组时间段
-  const morningSlots = new Set();
-  const afternoonSlots = new Set();
+  // 🔥 使用 Map 存储完整的时间段信息（包括slotId, slotName, startTime, endTime）
+  const morningSlotMap = new Map(); // key: slotId, value: {slotId, slotName, startTime, endTime}
+  const afternoonSlotMap = new Map();
   
   schedules.forEach(schedule => {
-    if (schedule.slotName) {
+    console.log('处理排班记录:', schedule);
+    
+    if (schedule.slotName && schedule.slotId) {
       const slotName = schedule.slotName.toLowerCase();
-      if (slotName.includes('上午') || slotName.includes('am') || slotName.includes('morning')) {
-        morningSlots.add(schedule.slotName);
-      } else if (slotName.includes('下午') || slotName.includes('pm') || slotName.includes('afternoon')) {
-        afternoonSlots.add(schedule.slotName);
+      const slotInfo = {
+        slotId: schedule.slotId,           // 🔥 camelCase
+        slot_id: schedule.slotId,          // snake_case（兼容）
+        slotName: schedule.slotName,       // 🔥 camelCase
+        slot_name: schedule.slotName,      // snake_case（兼容）
+        startTime: schedule.startTime || '08:00:00',  // 🔥 camelCase
+        start_time: schedule.startTime || '08:00:00', // snake_case（兼容）
+        endTime: schedule.endTime || '12:00:00',      // 🔥 camelCase
+        end_time: schedule.endTime || '12:00:00'      // snake_case（兼容）
+      };
+      
+      if (slotName.includes('上午') || slotName.includes('am') || slotName.includes('morning') || 
+          (schedule.startTime && schedule.startTime < '12:00')) {
+        morningSlotMap.set(schedule.slotId, slotInfo);
+        console.log('✅ 添加上午时段:', slotInfo);
+      } else if (slotName.includes('下午') || slotName.includes('pm') || slotName.includes('afternoon') ||
+                 (schedule.startTime && schedule.startTime >= '12:00')) {
+        afternoonSlotMap.set(schedule.slotId, slotInfo);
+        console.log('✅ 添加下午时段:', slotInfo);
       }
     }
   });
   
   // 填充上午时间段（保留现有的，添加新的）
-  if (morningSlots.size > 0) {
+  if (morningSlotMap.size > 0) {
     const existingMorning = timeSlotColumns.value['上午'] || [];
-    const newMorningSlots = Array.from(morningSlots).map((slotName, index) => ({
-      slot_id: index + 1, // 使用数字ID，从1开始
-      slot_name: slotName,
-      start_time: '08:00:00',
-      end_time: '12:00:00'
-    }));
+    const newMorningSlots = Array.from(morningSlotMap.values());
     
     // 合并现有和新的时间段，避免重复
     const combinedMorning = [...existingMorning];
     newMorningSlots.forEach(newSlot => {
-      if (!combinedMorning.some(existing => existing.slot_name === newSlot.slot_name)) {
+      if (!combinedMorning.some(existing => existing.slot_id === newSlot.slot_id)) {
         combinedMorning.push(newSlot);
       }
     });
     
     timeSlotColumns.value['上午'] = combinedMorning;
-    console.log('填充上午时间段:', timeSlotColumns.value['上午']);
+    console.log('✅ 填充上午时间段:', timeSlotColumns.value['上午']);
   }
   
   // 填充下午时间段（保留现有的，添加新的）
-  if (afternoonSlots.size > 0) {
+  if (afternoonSlotMap.size > 0) {
     const existingAfternoon = timeSlotColumns.value['下午'] || [];
-    const newAfternoonSlots = Array.from(afternoonSlots).map((slotName, index) => ({
-      slot_id: index + 10, // 使用数字ID，从10开始，避免与上午冲突
-      slot_name: slotName,
-      start_time: '14:00:00',
-      end_time: '18:00:00'
-    }));
+    const newAfternoonSlots = Array.from(afternoonSlotMap.values());
     
     // 合并现有和新的时间段，避免重复
     const combinedAfternoon = [...existingAfternoon];
     newAfternoonSlots.forEach(newSlot => {
-      if (!combinedAfternoon.some(existing => existing.slot_name === newSlot.slot_name)) {
+      if (!combinedAfternoon.some(existing => existing.slot_id === newSlot.slot_id)) {
         combinedAfternoon.push(newSlot);
       }
     });
     
     timeSlotColumns.value['下午'] = combinedAfternoon;
-    console.log('填充下午时间段:', timeSlotColumns.value['下午']);
+    console.log('✅ 填充下午时间段:', timeSlotColumns.value['下午']);
   }
+  
+  console.log('🎉 时间段填充完成！上午:', timeSlotColumns.value['上午'], '下午:', timeSlotColumns.value['下午']);
 };
 
 // 备用时间段数据
@@ -2831,6 +2968,7 @@ onMounted(async () => {
   display: flex;
   height: calc(100vh - 50px);
   background-color: #f7fafc;
+  overflow: hidden; /* 防止整个页面滚动 */
 }
 
 /* [新增] 头部控制按钮样式 */
@@ -2925,6 +3063,23 @@ onMounted(async () => {
   background-color: #fff;
   border-right: 1px solid #e2e8f0;
   flex-shrink: 0;
+  overflow-y: auto; /* 垂直滚动 */
+  max-height: calc(100vh - 50px); /* 限制最大高度 */
+  scroll-behavior: smooth; /* 平滑滚动 */
+}
+
+/* 自定义滚动条样式 */
+.department-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.department-sidebar::-webkit-scrollbar-thumb {
+  background-color: #d0d7de;
+  border-radius: 3px;
+}
+
+.department-sidebar::-webkit-scrollbar-thumb:hover {
+  background-color: #b0b7be;
 }
 
 .loading-container {
@@ -2973,11 +3128,41 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  overflow: auto;
+  overflow-y: scroll; /* 始终显示垂直滚动条 */
+  overflow-x: hidden; /* 隐藏横向滚动 */
   min-width: 0;
+  height: calc(100vh - 50px); /* 固定高度 */
+  scroll-behavior: smooth; /* 平滑滚动 */
+}
+
+/* 自定义滚动条样式 */
+.schedule-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.schedule-content::-webkit-scrollbar-thumb {
+  background-color: #d0d7de;
+  border-radius: 4px;
+}
+
+.schedule-content::-webkit-scrollbar-thumb:hover {
+  background-color: #b0b7be;
+}
+
+.schedule-content::-webkit-scrollbar-track {
+  background-color: #f5f5f5;
 }
 .schedule-card {
   flex-shrink: 0;
+  flex-grow: 0;
+  min-height: min-content; /* 确保内容可以自然增长 */
+}
+
+/* 确保排班卡片的 body 不受高度限制 */
+.schedule-card :deep(.el-card__body) {
+  overflow: visible;
+  height: auto;
+  max-height: none;
 }
 .card-header {
   display: flex;
@@ -3093,21 +3278,32 @@ onMounted(async () => {
   gap: 16px;
   margin-top: 20px;
   flex-wrap: nowrap;
-  overflow-x: auto;
+  overflow-x: auto; /* 保留横向滚动 */
+  overflow-y: visible; /* 允许内容垂直增长 */
   width: 100%;
+  min-height: min-content; /* 确保可以自然增长 */
 }
 .draggable-list-card {
   flex: 1;
   min-width: 300px;
   max-width: none;
   width: auto;
+  height: auto; /* 允许高度自动调整 */
+  overflow: visible; /* 允许内容溢出到外层 */
+}
+
+/* 确保 el-card 的 body 不受高度限制 */
+.draggable-list-card :deep(.el-card__body) {
+  overflow: visible;
+  height: auto;
+  max-height: none;
 }
 .draggable-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 400px;
-  overflow-y: auto;
+  /* 移除max-height限制，让内容自然增长，触发外层滚动 */
+  overflow-y: visible;
   overflow-x: hidden;
 }
 

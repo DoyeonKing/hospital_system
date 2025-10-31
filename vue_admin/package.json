@@ -16,6 +16,7 @@
     "@fullcalendar/timegrid": "^6.1.15",
     "@fullcalendar/vue3": "^6.1.15",
     "axios": "^1.12.2",
+    "echarts": "^6.0.0",
     "element-plus": "^2.9.6",
     "pinia": "^2.3.1",
     "sass": "^1.79.3",
@@ -32,4 +33,3 @@
     "vite-plugin-vue-devtools": "^7.7.2"
   }
 }
-

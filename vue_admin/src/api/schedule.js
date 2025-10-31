@@ -124,3 +124,49 @@ export function deleteScheduleByParams(deleteData) {
         data: deleteData
     });
 }
+
+/**
+ * 自动生成排班
+ * POST /api/schedules/auto-generate
+ * @param {Object} data - 自动排班参数
+ * @param {number} data.departmentId - 科室ID
+ * @param {string} data.startDate - 开始日期 (YYYY-MM-DD)
+ * @param {string} data.endDate - 结束日期 (YYYY-MM-DD)
+ * @param {boolean} [data.overwriteExisting=false] - 是否覆盖已有排班
+ * @param {boolean} [data.previewOnly=false] - 是否仅预览
+ * @param {Object} [data.rules] - 排班规则配置
+ */
+export function autoGenerateSchedule(data) {
+    return request({
+        url: '/api/schedules/auto-generate',
+        method: 'post',
+        data
+    });
+}
+
+/**
+ * 预览自动排班（不保存）
+ * POST /api/schedules/auto-generate
+ * @param {Object} data - 自动排班参数
+ */
+export function previewAutoSchedule(data) {
+    return request({
+        url: '/api/schedules/auto-generate',
+        method: 'post',
+        data: {
+            ...data,
+            previewOnly: true
+        }
+    });
+}
+
+/**
+ * 获取默认排班规则
+ * GET /api/schedules/auto-generate/rules
+ */
+export function getDefaultScheduleRules() {
+    return request({
+        url: '/api/schedules/auto-generate/rules',
+        method: 'get'
+    });
+}

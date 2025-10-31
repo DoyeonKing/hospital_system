@@ -1,6 +1,7 @@
 package com.example.springboot.repository;
 
 import com.example.springboot.entity.Doctor;
+import com.example.springboot.entity.enums.DoctorStatus;
 import org.apache.ibatis.annotations.Param;
 import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -31,4 +32,7 @@ public interface DoctorRepository extends JpaRepository<Doctor, Integer>, JpaSpe
             Pageable pageable);
     // 根据科室ID查找该科室下的所有医生
     List<Doctor> findByDepartmentDepartmentId(Integer departmentId);
+    
+    // 根据科室ID和状态查找医生
+    List<Doctor> findByDepartmentDepartmentIdAndStatus(Integer departmentId, DoctorStatus status);
 }
