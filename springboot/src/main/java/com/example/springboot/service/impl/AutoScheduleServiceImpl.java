@@ -45,7 +45,15 @@ public class AutoScheduleServiceImpl implements AutoScheduleService {
                 .filter(d -> d.getStatus() != null && d.getStatus().name().equalsIgnoreCase("active"))
                 .collect(Collectors.toList());
         List<TimeSlot> timeSlots = timeSlotRepository.findAll();
+        if (request.getTimeSlotIds() != null && !request.getTimeSlotIds().isEmpty()) {
+            Set<Integer> allow = new HashSet<>(request.getTimeSlotIds());
+            timeSlots = timeSlots.stream().filter(ts -> allow.contains(ts.getSlotId())).collect(Collectors.toList());
+        }
         List<Location> locations = locationRepository.findByDepartmentDepartmentId(request.getDepartmentId());
+        if (request.getLocationIds() != null && !request.getLocationIds().isEmpty()) {
+            Set<Integer> allowLoc = new HashSet<>(request.getLocationIds());
+            locations = locations.stream().filter(l -> allowLoc.contains(l.getLocationId())).collect(Collectors.toList());
+        }
         List<Schedule> existing = scheduleRepository.findAll().stream()
                 .filter(s -> !s.getScheduleDate().isBefore(request.getStartDate()) && !s.getScheduleDate().isAfter(request.getEndDate()))
                 .collect(Collectors.toList());
@@ -98,11 +106,19 @@ public class AutoScheduleServiceImpl implements AutoScheduleService {
                 schedule.setScheduleDate(currentDay);
                 schedule.setSlot(slot);
                 schedule.setLocation(assigned);
-                schedule.setTotalSlots(Optional.ofNullable(request.getRules().getDefaultTotalSlots()).orElse(20));
+                Integer totalSlotsVal = request.getTotalSlots() != null ? request.getTotalSlots() : request.getRules().getDefaultTotalSlots();
+                schedule.setTotalSlots(Optional.ofNullable(totalSlotsVal).orElse(20));
                 schedule.setBookedSlots(0);
-                schedule.setFee(Optional.ofNullable(request.getRules().getDefaultFee()).orElse(new BigDecimal("5.00")));
-                schedule.setStatus(ScheduleStatus.available);
-                schedule.setRemarks("自动排班生成");
+                BigDecimal feeVal = request.getFee() != null ? request.getFee() : request.getRules().getDefaultFee();
+                schedule.setFee(Optional.ofNullable(feeVal).orElse(new BigDecimal("5.00")));
+                ScheduleStatus statusVal;
+                try {
+                    statusVal = request.getStatus() != null ? ScheduleStatus.valueOf(request.getStatus()) : ScheduleStatus.available;
+                } catch (IllegalArgumentException ex) {
+                    statusVal = ScheduleStatus.available;
+                }
+                schedule.setStatus(statusVal);
+                schedule.setRemarks(Optional.ofNullable(request.getRemarks()).orElse("自动排班生成"));
 
                 generated.add(schedule);
                 workload.merge(selected.getDoctorId(), 1, Integer::sum);
@@ -111,8 +127,21 @@ public class AutoScheduleServiceImpl implements AutoScheduleService {
         }
 
         List<ScheduleConflict> conflicts = conflictDetector.detectConflicts(generated, existing);
-        if (!Boolean.TRUE.equals(request.getPreviewOnly()) && conflicts.isEmpty()) {
-            scheduleRepository.saveAll(generated);
+
+        // 覆盖已有排班（删除后再保存）
+        if (!Boolean.TRUE.equals(request.getPreviewOnly())) {
+            if (Boolean.TRUE.equals(request.getOverwriteExisting())) {
+                List<Schedule> toDelete = scheduleRepository
+                        .findByScheduleDateBetweenAndDoctorIn(request.getStartDate(), request.getEndDate(), doctors);
+                if (!toDelete.isEmpty()) {
+                    scheduleRepository.deleteAll(toDelete);
+                }
+                // 覆盖模式下，不与被覆盖范围内的旧数据比较冲突
+                conflicts = conflictDetector.detectConflicts(generated, Collections.emptyList());
+            }
+            if (conflicts.isEmpty() && !generated.isEmpty()) {
+                scheduleRepository.saveAll(generated);
+            }
         }
 
         Map<Integer, DoctorWorkload> distribution = workloadCalculator.calculateWorkloadDistribution(generated, doctors);
