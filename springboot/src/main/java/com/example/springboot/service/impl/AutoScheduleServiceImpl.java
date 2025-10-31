@@ -98,97 +98,126 @@ public class AutoScheduleServiceImpl implements AutoScheduleService {
             // 4. 主算法循环 - CSP + 贪心策略
             LocalDate currentDate = request.getStartDate();
             while (!currentDate.isAfter(request.getEndDate())) {
-                // 🔥 新增：记录当天已排班的医生，避免同一天重复排班
-                Set<Integer> doctorsAssignedToday = new HashSet<>();
-                
                 for (TimeSlot slot : timeSlots) {
-                    // 4.1 筛选可用医生（排除今天已排班的医生）
-                    List<Doctor> availableDoctors = filterAvailableDoctors(
-                        doctors, currentDate, slot, workloadMap, 
-                        leaveMap, generatedSchedules, existingSchedules, request.getRules()
-                    );
+                    // 🔥 获取该时段需要的医生人数
+                    int minDoctors = Math.max(1, request.getRules().getMinDoctorsPerSlot());
+                    int maxDoctors = Math.max(minDoctors, request.getRules().getMaxDoctorsPerSlot());
                     
-                    // 🔥 排除当天已排班的医生
-                    availableDoctors = availableDoctors.stream()
-                        .filter(d -> !doctorsAssignedToday.contains(d.getDoctorId()))
-                        .collect(Collectors.toList());
+                    // 🔥 记录该时段已分配的医生数量和已使用的诊室
+                    Set<Integer> slotDoctorsAssigned = new HashSet<>();
+                    Set<Integer> slotLocationsUsed = new HashSet<>();
                     
-                    if (availableDoctors.isEmpty()) {
-                        // 检查是否启用严格模式
-                        if (request.getRules().getStrictMode() != null && request.getRules().getStrictMode()) {
-                            // 严格模式：不放宽限制，直接记录为未分配
-                            log.warn("⚠️ 严格模式：{}的时段{}无可用医生，不放宽限制", currentDate, slot.getSlotName());
-                            UnassignedSlot unassigned = new UnassignedSlot();
-                            unassigned.setDate(currentDate);
-                            unassigned.setSlotId(slot.getSlotId());
-                            unassigned.setSlotName(slot.getSlotName());
-                            unassigned.setReason("无可用医生（严格模式下所有医生均达到连续工作上限）");
-                            unassigned.setSuggestions(Arrays.asList("增加医生数量", "调整请假安排", "放宽连续工作限制", "关闭严格模式"));
-                            unassignedSlots.add(unassigned);
-                            continue;
-                        } else {
-                            // 非严格模式：尝试放宽连续工作天数限制
-                            log.warn("{}的时段{}无可用医生，尝试放宽连续工作限制", currentDate, slot.getSlotName());
-                            availableDoctors = filterAvailableDoctorsRelaxed(
-                                doctors, currentDate, slot, workloadMap, 
-                                leaveMap, generatedSchedules, existingSchedules, request.getRules()
-                            );
-                            
-                            // 🔥 排除当天已排班的医生
-                            availableDoctors = availableDoctors.stream()
-                                .filter(d -> !doctorsAssignedToday.contains(d.getDoctorId()))
-                                .collect(Collectors.toList());
-                            
-                            if (availableDoctors.isEmpty()) {
-                                // 记录未分配的时间段
-                                UnassignedSlot unassigned = new UnassignedSlot();
-                                unassigned.setDate(currentDate);
-                                unassigned.setSlotId(slot.getSlotId());
-                                unassigned.setSlotName(slot.getSlotName());
-                                unassigned.setReason("无可用医生（已放宽限制仍无法满足）");
-                                unassigned.setSuggestions(Arrays.asList("增加医生数量", "调整请假安排", "进一步放宽连续工作限制"));
-                                unassignedSlots.add(unassigned);
-                                continue;
+                    // 🔥 为该时段分配多个医生（minDoctors ~ maxDoctors）
+                    int assignedCount = 0;
+                    int attemptCount = 0;
+                    int maxAttempts = doctors.size(); // 防止无限循环
+                    
+                    while (assignedCount < minDoctors && attemptCount < maxAttempts) {
+                        attemptCount++;
+                        
+                        // 4.1 筛选可用医生（只排除该时段已排班的医生）
+                        List<Doctor> availableDoctors = filterAvailableDoctors(
+                            doctors, currentDate, slot, workloadMap, 
+                            leaveMap, generatedSchedules, existingSchedules, request.getRules()
+                        );
+                        
+                        // 🔥 排除该时段已排班的医生（允许医生在同一天的不同时段工作）
+                        availableDoctors = availableDoctors.stream()
+                            .filter(d -> !slotDoctorsAssigned.contains(d.getDoctorId()))
+                            .collect(Collectors.toList());
+                        
+                        if (availableDoctors.isEmpty()) {
+                            // 检查是否启用严格模式
+                            if (request.getRules().getStrictMode() != null && request.getRules().getStrictMode()) {
+                                // 严格模式：不放宽限制
+                                log.warn("⚠️ 严格模式：{}的时段{}已分配{}个医生，需要{}个但无更多可用医生", 
+                                    currentDate, slot.getSlotName(), assignedCount, minDoctors);
+                                break;
                             } else {
-                                relaxedCount++;
-                                log.warn("⚠️ 已为{}的时段{}放宽连续工作限制", currentDate, slot.getSlotName());
+                                // 非严格模式：尝试放宽连续工作天数限制
+                                log.warn("{}的时段{}已分配{}个医生，需要{}个，尝试放宽连续工作限制", 
+                                    currentDate, slot.getSlotName(), assignedCount, minDoctors);
+                                availableDoctors = filterAvailableDoctorsRelaxed(
+                                    doctors, currentDate, slot, workloadMap, 
+                                    leaveMap, generatedSchedules, existingSchedules, request.getRules()
+                                );
+                                
+                                // 🔥 排除该时段已排班的医生（允许医生在同一天的不同时段工作）
+                                availableDoctors = availableDoctors.stream()
+                                    .filter(d -> !slotDoctorsAssigned.contains(d.getDoctorId()))
+                                    .collect(Collectors.toList());
+                                
+                                if (availableDoctors.isEmpty()) {
+                                    log.warn("{}的时段{}已分配{}个医生，需要{}个但无更多可用医生（已放宽限制）", 
+                                        currentDate, slot.getSlotName(), assignedCount, minDoctors);
+                                    break;
+                                } else {
+                                    relaxedCount++;
+                                    log.warn("⚠️ 已为{}的时段{}放宽连续工作限制（第{}个医生）", 
+                                        currentDate, slot.getSlotName(), assignedCount + 1);
+                                }
                             }
+                        }
+                        
+                        // 4.2 智能选择医生（综合考虑工作量和连续工作天数）
+                        Doctor selectedDoctor = selectBestDoctor(
+                            availableDoctors, workloadMap, generatedSchedules, 
+                            currentDate, request.getRules()
+                        );
+                        
+                        // 4.4 获取医生的固定诊室
+                        Location assignedLocation = doctorLocationMap.get(selectedDoctor.getDoctorId());
+                        
+                        if (assignedLocation == null) {
+                            log.warn("医生{}未分配诊室，跳过", selectedDoctor.getFullName());
+                            continue;
+                        }
+                        
+                        // 🔥 检查诊室是否已被该时段其他医生使用
+                        if (slotLocationsUsed.contains(assignedLocation.getLocationId())) {
+                            log.warn("诊室{}在{}的时段{}已被占用，跳过医生{}", 
+                                assignedLocation.getLocationName(), currentDate, slot.getSlotName(), 
+                                selectedDoctor.getFullName());
+                            continue;
+                        }
+                        
+                        // 4.5 创建排班记录
+                        Schedule schedule = buildSchedule(
+                            selectedDoctor, currentDate, slot, 
+                            assignedLocation, request.getRules()
+                        );
+                        
+                        generatedSchedules.add(schedule);
+                        
+                        // 4.6 更新工作量
+                        workloadMap.merge(selectedDoctor.getDoctorId(), 1, Integer::sum);
+                        
+                        // 🔥 记录该医生已在该时段排班（允许同一天不同时段工作）
+                        slotDoctorsAssigned.add(selectedDoctor.getDoctorId());
+                        slotLocationsUsed.add(assignedLocation.getLocationId());
+                        assignedCount++;
+                        
+                        // 如果达到最大医生数，停止为该时段分配
+                        if (assignedCount >= maxDoctors) {
+                            break;
                         }
                     }
                     
-                    // 4.2 智能选择医生（综合考虑工作量和连续工作天数）
-                    Doctor selectedDoctor = selectBestDoctor(
-                        availableDoctors, workloadMap, generatedSchedules, 
-                        currentDate, request.getRules()
-                    );
-                    
-                    // 4.4 获取医生的固定诊室
-                    Location assignedLocation = doctorLocationMap.get(selectedDoctor.getDoctorId());
-                    
-                    if (assignedLocation == null) {
+                    // 如果未达到最小医生数，记录为未完全分配
+                    if (assignedCount < minDoctors) {
                         UnassignedSlot unassigned = new UnassignedSlot();
                         unassigned.setDate(currentDate);
                         unassigned.setSlotId(slot.getSlotId());
                         unassigned.setSlotName(slot.getSlotName());
-                        unassigned.setReason("医生未分配诊室");
-                        unassigned.setSuggestions(Arrays.asList("增加诊室资源", "检查医生-诊室映射"));
+                        unassigned.setReason(String.format("仅分配了%d个医生，未达到最小要求%d个", 
+                            assignedCount, minDoctors));
+                        unassigned.setSuggestions(Arrays.asList(
+                            "增加医生数量", 
+                            "减少每时段最小医生数", 
+                            "调整请假安排", 
+                            "关闭严格模式"));
                         unassignedSlots.add(unassigned);
-                        continue;
                     }
-                    
-                    // 4.5 创建排班记录
-                    Schedule schedule = buildSchedule(
-                        selectedDoctor, currentDate, slot, 
-                        assignedLocation, request.getRules()
-                    );
-                    
-                    generatedSchedules.add(schedule);
-                    
-                    // 4.6 更新工作量
-                    workloadMap.merge(selectedDoctor.getDoctorId(), 1, Integer::sum);
-                    
-                    // 🔥 记录该医生已在今天排班
-                    doctorsAssignedToday.add(selectedDoctor.getDoctorId());
                 }
                 currentDate = currentDate.plusDays(1);
             }

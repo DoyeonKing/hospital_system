@@ -14,6 +14,7 @@ public class ScheduleResponse {
     
     private Integer scheduleId;
     private Integer doctorId;
+    private String doctorIdentifier;
     private LocalDate scheduleDate;
     private Integer slotId;
     private Integer locationId;
@@ -53,6 +54,7 @@ public class ScheduleResponse {
         // 安全地访问关联对象
         if (schedule.getDoctor() != null) {
             response.setDoctorId(schedule.getDoctor().getDoctorId());
+            response.setDoctorIdentifier(schedule.getDoctor().getIdentifier());
             response.setDoctorName(schedule.getDoctor().getFullName());
             response.setDoctorTitle(schedule.getDoctor().getTitle());
             
