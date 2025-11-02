@@ -189,10 +189,8 @@
 		
 		// 导航到科室列表
 		navigateToDepartments() {
-			uni.showToast({
-				title: '跳转到科室列表',
-				icon: 'none',
-				duration: 2000
+			uni.navigateTo({
+				url: '/pages/departments/departments'
 			})
 		}
 	}

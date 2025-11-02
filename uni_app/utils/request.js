@@ -4,8 +4,12 @@
  */
 import config from '../config/index.js'
 
-// API基础URL配置
-const BASE_URL = config.baseURL
+/**
+ * 获取API基础URL
+ */
+function getBaseURL() {
+	return config.baseURL
+}
 
 /**
  * 封装的request方法
@@ -15,7 +19,7 @@ const BASE_URL = config.baseURL
 function request(options) {
 	return new Promise((resolve, reject) => {
 		uni.request({
-			url: BASE_URL + options.url,
+			url: getBaseURL() + options.url,
 			method: options.method || 'GET',
 			data: options.data || {},
 			header: {

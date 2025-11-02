@@ -5,6 +5,16 @@
 		</view>
 		
 		<view class="content">
+			<!-- 候补入口 -->
+			<view class="waitlist-entry" @click="navigateToWaitlist">
+				<view class="entry-icon">⏳</view>
+				<view class="entry-info">
+					<text class="entry-title">我的候补</text>
+					<text class="entry-desc">查看候补排队情况</text>
+				</view>
+				<text class="entry-arrow">></text>
+			</view>
+			
 			<!-- 预约列表 -->
 			<view class="appointment-list" v-if="appointmentList.length > 0">
 				<view 
@@ -12,6 +22,7 @@
 					v-for="appointment in appointmentList" 
 					:key="appointment.id"
 					:class="{ 'completed': appointment.status === 'completed', 'cancelled': appointment.status === 'cancelled' }"
+					@click="navigateToDetail(appointment.id)"
 				>
 					<view class="appointment-header">
 						<view class="department-info">
@@ -41,11 +52,11 @@
 							<text class="info-value queue-number">第{{ appointment.queueNumber }}号</text>
 						</view>
 					</view>
-					<view class="appointment-actions" v-if="appointment.status === 'confirmed'">
-						<view class="action-btn cancel-btn" @click="handleCancel(appointment.id)">
-							<text class="btn-text">取消预约</text>
-						</view>
+				<view class="appointment-actions" v-if="appointment.status === 'confirmed'">
+					<view class="action-btn cancel-btn" @click.stop="handleCancel(appointment.id)">
+						<text class="btn-text">取消预约</text>
 					</view>
+				</view>
 				</view>
 			</view>
 			
@@ -120,17 +131,29 @@
 				return month + '月' + day + '日 ' + hours + ':' + minutes
 			},
 			
-			// 导航到科室列表
-			navigateToDepartments() {
-				uni.showToast({
-					title: '跳转到科室列表',
-					icon: 'none',
-					duration: 2000
-				})
-			},
-			
-			// 取消预约
-			handleCancel(appointmentId) {
+		// 导航到科室列表
+		navigateToDepartments() {
+			uni.navigateTo({
+				url: '/pages/departments/departments'
+			})
+		},
+		
+		// 导航到候补列表
+		navigateToWaitlist() {
+			uni.navigateTo({
+				url: '/pages/waitlist/waitlist'
+			})
+		},
+		
+		// 导航到预约详情
+		navigateToDetail(appointmentId) {
+			uni.navigateTo({
+				url: `/pages/appointment/detail?appointmentId=${appointmentId}`
+			})
+		},
+		
+		// 取消预约
+		handleCancel(appointmentId) {
 				uni.showModal({
 					title: '确认取消',
 					content: '确定要取消这个预约吗？',
@@ -171,7 +194,7 @@
 	}
 
 	.page-header {
-		background: linear-gradient(135deg, lighten($color-primary, 10%) 0%, $color-primary 100%);
+		background: linear-gradient(135deg, #7be6d8 0%, #4FD9C3 100%);
 		padding: 40rpx 30rpx 30rpx;
 	}
 
@@ -183,6 +206,50 @@
 
 	.content {
 		padding: 40rpx 30rpx;
+	}
+
+	.waitlist-entry {
+		background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, rgba(255, 165, 0, 0.05) 100%);
+		border: 2rpx solid rgba(255, 165, 0, 0.3);
+		border-radius: 16rpx;
+		padding: 24rpx;
+		margin-bottom: 30rpx;
+		display: flex;
+		align-items: center;
+		transition: all 0.3s ease;
+	}
+
+	.waitlist-entry:active {
+		transform: scale(0.98);
+	}
+
+	.entry-icon {
+		font-size: 48rpx;
+		margin-right: 20rpx;
+	}
+
+	.entry-info {
+		flex: 1;
+	}
+
+	.entry-title {
+		display: block;
+		font-size: 28rpx;
+		font-weight: 700;
+		color: #1A202C;
+		margin-bottom: 8rpx;
+	}
+
+	.entry-desc {
+		display: block;
+		font-size: 24rpx;
+		color: #718096;
+	}
+
+	.entry-arrow {
+		font-size: 32rpx;
+		color: #A0AEC0;
+		font-weight: bold;
 	}
 
 	.empty-state {
@@ -214,7 +281,7 @@
 	.empty-btn {
 		margin-top: 24rpx;
 		padding: 16rpx 48rpx;
-		background: linear-gradient(135deg, lighten($color-primary, 10%) 0%, $color-primary 100%);
+		background: linear-gradient(135deg, #7be6d8 0%, #4FD9C3 100%);
 		border-radius: 24rpx;
 		display: inline-block;
 	}
@@ -340,7 +407,7 @@
 	}
 
 	.queue-number {
-		color: $color-primary;
+		color: #4FD9C3;
 		font-weight: 600;
 	}
 

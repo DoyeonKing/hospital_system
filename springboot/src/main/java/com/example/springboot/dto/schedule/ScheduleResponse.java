@@ -29,6 +29,8 @@ public class ScheduleResponse {
     // 关联查询字段
     private String doctorName;
     private String doctorTitle;
+    private String doctorSpecialty; // 医生擅长领域
+    private String doctorPhotoUrl;  // 医生头像
     private Integer departmentId;
     private String departmentName;
     private String slotName;
@@ -55,6 +57,8 @@ public class ScheduleResponse {
             response.setDoctorId(schedule.getDoctor().getDoctorId());
             response.setDoctorName(schedule.getDoctor().getFullName());
             response.setDoctorTitle(schedule.getDoctor().getTitle());
+            response.setDoctorSpecialty(schedule.getDoctor().getSpecialty());
+            response.setDoctorPhotoUrl(schedule.getDoctor().getPhotoUrl());
             
             if (schedule.getDoctor().getDepartment() != null) {
                 response.setDepartmentId(schedule.getDoctor().getDepartment().getDepartmentId());
