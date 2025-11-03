@@ -17,4 +17,5 @@ public interface WaitlistRepository extends JpaRepository<Waitlist, Integer> {
     Optional<Waitlist> findByPatientAndScheduleAndStatus(Patient patient, Schedule schedule, WaitlistStatus status);
     boolean existsByPatientAndScheduleAndStatus(Patient patient, Schedule schedule, WaitlistStatus status);
     List<Waitlist> findByCreatedAtBeforeAndStatus(LocalDateTime time, WaitlistStatus status);
+    List<Waitlist> findByPatient(Patient patient);
 }
