@@ -152,6 +152,19 @@ const routes = [
         name: 'DoctorWorkHours',
         meta: { title: '医生工时统计', requiresAuth: true },
         component: DoctorWorkHours
+    
+    },
+    {
+        path: '/scheduling/doctor-hours',
+        name: 'DoctorWorkHours',
+        meta: { title: '医生工时统计', requiresAuth: true },
+        component: DoctorWorkHours
+     },
+    {   
+     path: '/scheduling/auto-schedule',
+        name: 'AutoSchedule',
+        meta: { title: '自动排班', requiresAuth: true },
+        component: AutoSchedule
     },
     // =======================================================
 

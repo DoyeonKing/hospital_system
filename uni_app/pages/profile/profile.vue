@@ -21,44 +21,66 @@
 				</view>
 			</view>
 			
-			<!-- 待就诊卡片 -->
-			<view class="upcoming-card" v-if="upcomingAppointment" @click="navigateToAppointments">
-				<view class="upcoming-icon">🩺</view>
-				<view class="upcoming-content">
-					<text class="upcoming-title">待就诊</text>
-					<text class="upcoming-info">{{ formatAppointmentTime(upcomingAppointment.scheduleTime) }} · {{ upcomingAppointment.departmentName }}</text>
-				</view>
-				<text class="upcoming-arrow">></text>
+		<!-- 待就诊卡片 -->
+		<view class="upcoming-card" v-if="upcomingAppointment" @click="navigateToAppointments">
+			<view class="upcoming-icon">🩺</view>
+			<view class="upcoming-content">
+				<text class="upcoming-title">待就诊</text>
+				<text class="upcoming-info">{{ formatAppointmentTime(upcomingAppointment.scheduleTime) }} · {{ upcomingAppointment.departmentName }}</text>
 			</view>
+			<text class="upcoming-arrow">></text>
+		</view>
 
-			<!-- 功能列表 -->
-			<view class="menu-list">
-				<view class="menu-item" @click="navigateToEditProfile">
-					<text class="menu-icon">📝</text>
-					<text class="menu-text">编辑资料</text>
-					<text class="menu-arrow">></text>
-				</view>
-				<view class="menu-item" @click="navigateToSettings">
-					<text class="menu-icon">⚙️</text>
-					<text class="menu-text">设置</text>
-					<text class="menu-arrow">></text>
-				</view>
-				<view class="menu-item" @click="showAbout">
-					<text class="menu-icon">ℹ️</text>
-					<text class="menu-text">关于我们</text>
-					<text class="menu-arrow">></text>
-				</view>
+		<!-- 候补提醒卡片 -->
+		<view class="waitlist-card" v-if="waitlistCount > 0" @click="navigateToWaitlist">
+			<view class="waitlist-icon">⏳</view>
+			<view class="waitlist-content">
+				<text class="waitlist-title">我的候补</text>
+				<text class="waitlist-info">您有 {{ waitlistCount }} 个候补记录</text>
 			</view>
+			<text class="waitlist-arrow">></text>
+		</view>
 
-			<!-- 退出登录 -->
-			<view class="logout-btn" @click="handleLogout">
-				<text class="logout-text">退出登录</text>
+		<!-- 功能列表 -->
+		<view class="menu-list">
+			<view class="menu-item" @click="navigateToMyAppointments">
+				<text class="menu-icon">📅</text>
+				<text class="menu-text">我的预约</text>
+				<text class="menu-arrow">></text>
+			</view>
+			<view class="menu-item" @click="navigateToWaitlistList">
+				<text class="menu-icon">⏳</text>
+				<text class="menu-text">我的候补</text>
+				<text class="menu-arrow">></text>
+			</view>
+			<view class="menu-item" @click="navigateToEditProfile">
+				<text class="menu-icon">📝</text>
+				<text class="menu-text">编辑资料</text>
+				<text class="menu-arrow">></text>
+			</view>
+			<view class="menu-item" @click="navigateToSettings">
+				<text class="menu-icon">⚙️</text>
+				<text class="menu-text">设置</text>
+				<text class="menu-arrow">></text>
+			</view>
+			<view class="menu-item" @click="showAbout">
+				<text class="menu-icon">ℹ️</text>
+				<text class="menu-text">关于我们</text>
+				<text class="menu-arrow">></text>
 			</view>
 		</view>
+
+		<!-- 退出登录 -->
+		<view class="logout-btn" @click="handleLogout">
+			<text class="logout-text">退出登录</text>
+		</view>
 	</view>
+</view>
 </template>
 
 <script>
+	import { mockWaitlist } from '../../api/mockData.js'
+	
 	export default {
 		data() {
 			return {
@@ -67,6 +89,7 @@
 					identifier: '2021001001'
 				},
 				upcomingAppointment: null,
+				waitlistCount: 0,
 				identifierMasked: true
 			}
 		},
@@ -83,11 +106,13 @@
 		onLoad() {
 			this.loadPatientInfo()
 			this.loadUpcomingCount()
+			this.loadWaitlistCount()
 		},
 		onShow() {
 			// 页面显示时刷新数据
 			this.loadPatientInfo()
 			this.loadUpcomingCount()
+			this.loadWaitlistCount()
 		},
 		methods: {
 			loadPatientInfo() {
@@ -142,6 +167,25 @@
 				return month + '月' + day + '日 ' + hours + ':' + minutes
 			},
 			navigateToAppointments() {
+				uni.switchTab({
+					url: '/pages/appointments/appointments'
+				})
+			},
+			loadWaitlistCount() {
+				const allWaitlist = JSON.parse(JSON.stringify(mockWaitlist))
+				this.waitlistCount = allWaitlist.filter(w => w.status === 'waiting' || w.status === 'notified').length
+			},
+			navigateToWaitlist() {
+				uni.navigateTo({
+					url: '/pages/waitlist/waitlist'
+				})
+			},
+			navigateToWaitlistList() {
+				uni.navigateTo({
+					url: '/pages/waitlist/waitlist'
+				})
+			},
+			navigateToMyAppointments() {
 				uni.switchTab({
 					url: '/pages/appointments/appointments'
 				})
@@ -268,25 +312,73 @@
 	
 	.upcoming-content {
 		flex: 1;
-		display: flex;
-		flex-direction: column;
 	}
 	
 	.upcoming-title {
+		display: block;
 		font-size: 28rpx;
-		font-weight: 600;
+		font-weight: 700;
 		color: #1A202C;
 		margin-bottom: 8rpx;
 	}
 	
 	.upcoming-info {
+		display: block;
 		font-size: 24rpx;
 		color: #718096;
 	}
 	
 	.upcoming-arrow {
-		font-size: 32rpx;
-		color: #CBD5E0;
+		font-size: 36rpx;
+		color: #A0AEC0;
+		font-weight: bold;
+	}
+
+	/* 候补提醒卡片样式 */
+	.waitlist-card {
+		background: linear-gradient(135deg, rgba(255, 165, 0, 0.15) 0%, rgba(255, 165, 0, 0.05) 100%);
+		border: 2rpx solid rgba(255, 165, 0, 0.3);
+		border-radius: 20rpx;
+		padding: 24rpx 30rpx;
+		margin-bottom: 30rpx;
+		display: flex;
+		align-items: center;
+		box-shadow: 0 4rpx 20rpx rgba(255, 165, 0, 0.2);
+		transition: all 0.3s ease;
+	}
+
+	.waitlist-card:active {
+		transform: translateY(-2rpx);
+		box-shadow: 0 6rpx 24rpx rgba(255, 165, 0, 0.3);
+	}
+
+	.waitlist-icon {
+		font-size: 40rpx;
+		margin-right: 20rpx;
+	}
+
+	.waitlist-content {
+		flex: 1;
+	}
+
+	.waitlist-title {
+		display: block;
+		font-size: 28rpx;
+		font-weight: 700;
+		color: #1A202C;
+		margin-bottom: 8rpx;
+	}
+
+	.waitlist-info {
+		display: block;
+		font-size: 24rpx;
+		color: #718096;
+	}
+
+	.waitlist-arrow {
+		font-size: 36rpx;
+		color: #A0AEC0;
+		font-weight: bold;
 	}
 
 	.menu-list {

@@ -100,7 +100,7 @@
 						class="department-tag" 
 						v-for="dept in popularDepartments" 
 						:key="dept.id"
-						@click="navigateToDepartmentSchedule(dept.id)"
+						@click="navigateToDepartments"
 					>
 						<text class="tag-text">{{ dept.name }}</text>
 					</view>
@@ -129,6 +129,16 @@
 			<text class="appointment-number">#{{ upcomingAppointment.queueNumber }}</text>
 		</view>
 
+		<!-- 候补提醒卡片 -->
+		<view class="waitlist-card" v-if="waitlistCount > 0" @click="navigateToWaitlist">
+			<view class="waitlist-icon">⏳</view>
+			<view class="waitlist-content">
+				<text class="waitlist-title">我的候补</text>
+				<text class="waitlist-info">您有 {{ waitlistCount }} 个候补记录</text>
+			</view>
+			<text class="waitlist-arrow">></text>
+		</view>
+
 		<!-- 加载状态 -->
 		<view class="loading" v-if="loading">
 			<text class="loading-text">加载中...</text>
@@ -137,7 +147,7 @@
 </template>
 
 <script>
-	import { mockTodaySchedules, mockUpcomingAppointment, mockPopularDepartments, mockPatientInfo, mockMessages } from '../../api/mockData.js'
+	import { mockTodaySchedules, mockUpcomingAppointment, mockPopularDepartments, mockPatientInfo, mockMessages, mockWaitlist } from '../../api/mockData.js'
 	
 	export default {
 		data() {
@@ -152,6 +162,7 @@
 				todaySchedules: [],
 				upcomingAppointment: null,
 				popularDepartments: [],
+				waitlistCount: 0,
 				unreadCount: 0,
 				showAllDepartments: false,
 				identifierMasked: true
@@ -196,82 +207,89 @@
 			uni.stopPullDownRefresh()
 		},
 		methods: {
-			// 检查登录状态
-			checkLoginStatus() {
-				const token = uni.getStorageSync('patientToken')
-				const patientInfo = uni.getStorageSync('patientInfo')
-				
-				// 如果没有登录信息，使用模拟数据（仅用于演示）
-				if (!token || !patientInfo) {
-					console.log('使用模拟数据演示页面功能')
-					this.patientInfo = mockPatientInfo
-					return true
-				}
-				
-				this.patientInfo = patientInfo
+		// 检查登录状态
+		checkLoginStatus() {
+			const patientInfo = uni.getStorageSync('patientInfo')
+			
+			console.log('从Storage读取的patientInfo:', patientInfo)
+			
+			// 如果没有登录信息，使用模拟数据（仅用于演示）
+			if (!patientInfo) {
+				console.log('使用模拟数据演示页面功能')
+				this.patientInfo = mockPatientInfo
 				return true
-			},
+			}
 			
-			// 加载页面数据 - 直接使用模拟数据，避免API调用失败
-			loadPageData() {
-				// 先检查登录状态
-				this.checkLoginStatus()
-				
-				this.loading = true
-				this.hasNetworkError = false
-				
-				// 直接使用测试数据，确保页面有内容显示
-				this.todaySchedules = JSON.parse(JSON.stringify(mockTodaySchedules))
-				this.upcomingAppointment = JSON.parse(JSON.stringify(mockUpcomingAppointment))
-				this.popularDepartments = JSON.parse(JSON.stringify(mockPopularDepartments))
-				this.unreadCount = mockMessages.filter(msg => !msg.isRead).length
-				
-				this.loading = false
-			},
+			console.log('使用登录数据，患者信息:', patientInfo)
+			this.patientInfo = patientInfo
+			return true
+		},
 			
+		// 加载页面数据 - 直接使用模拟数据，避免API调用失败
+		loadPageData() {
+			// 先检查登录状态
+			this.checkLoginStatus()
 			
-			// 导航到消息中心
-			navigateToMessages() {
-				uni.switchTab({
-					url: '/pages/messages/messages'
-				})
-			},
+			this.loading = true
+			this.hasNetworkError = false
 			
-			// 格式化时间
-			formatTime(timeString) {
-				if (!timeString) return ''
-				const date = new Date(timeString)
-				const month = date.getMonth() + 1
-				const day = date.getDate()
-				const hours = date.getHours().toString().padStart(2, '0')
-				const minutes = date.getMinutes().toString().padStart(2, '0')
-				return month + '月' + day + '日 ' + hours + ':' + minutes
-			},
+			// 直接使用测试数据，确保页面有内容显示
+			this.todaySchedules = JSON.parse(JSON.stringify(mockTodaySchedules))
+			this.upcomingAppointment = JSON.parse(JSON.stringify(mockUpcomingAppointment))
+			this.popularDepartments = JSON.parse(JSON.stringify(mockPopularDepartments))
+			this.unreadCount = mockMessages.filter(msg => !msg.isRead).length
 			
-			// 导航到科室列表
-			navigateToDepartments() {
-				uni.showToast({
-					title: '跳转到科室列表',
-					icon: 'none',
-					duration: 2000
-				})
-				// TODO: 实现科室列表页面跳转
-				// uni.navigateTo({
-				//     url: '/pages/departments/departments'
-				// })
-			},
+			// 加载候补数量
+			const allWaitlist = JSON.parse(JSON.stringify(mockWaitlist))
+			this.waitlistCount = allWaitlist.filter(w => w.status === 'waiting' || w.status === 'notified').length
 			
-			// 导航到我的预约
-			navigateToMyAppointments() {
-				uni.switchTab({
-					url: '/pages/appointments/appointments'
-				})
-			},
+			this.loading = false
+		},
+		
+		
+		// 导航到消息中心
+		navigateToMessages() {
+			uni.switchTab({
+				url: '/pages/messages/messages'
+			})
+		},
+		
+		// 格式化时间
+		formatTime(timeString) {
+			if (!timeString) return ''
+			const date = new Date(timeString)
+			const month = date.getMonth() + 1
+			const day = date.getDate()
+			const hours = date.getHours().toString().padStart(2, '0')
+			const minutes = date.getMinutes().toString().padStart(2, '0')
+			return month + '月' + day + '日 ' + hours + ':' + minutes
+		},
+		
+		// 导航到科室列表
+		navigateToDepartments() {
+			uni.navigateTo({
+				url: '/pages/departments/departments'
+			})
+		},
+		
+		// 导航到我的预约
+		navigateToMyAppointments() {
+			uni.switchTab({
+				url: '/pages/appointments/appointments'
+			})
+		},
 			
 			// 导航到个人中心
 			navigateToProfile() {
 				uni.switchTab({
 					url: '/pages/profile/profile'
+				})
+			},
+			
+			// 导航到候补列表
+			navigateToWaitlist() {
+				uni.navigateTo({
+					url: '/pages/waitlist/waitlist'
 				})
 			},
 			
@@ -341,18 +359,16 @@
 				})
 			},
 			
-			// 导航到科室排班
-			navigateToDepartmentSchedule(departmentId) {
-				uni.showToast({
-					title: '跳转到科室' + departmentId + '排班',
-					icon: 'none',
-					duration: 2000
-				})
-				// TODO: 实现科室排班页面跳转
-				// uni.navigateTo({
-				//     url: `/pages/schedule/schedule?departmentId=${departmentId}`
-				// })
-			},
+		// 导航到科室排班
+		navigateToDepartmentSchedule(departmentId) {
+			// 查找对应的子科室
+			const schedule = this.todaySchedules.find(s => s.departmentId === departmentId)
+			const departmentName = schedule ? schedule.departmentName : '科室'
+			
+			uni.navigateTo({
+				url: `/pages/schedules/schedules?departmentId=${departmentId}&departmentName=${encodeURIComponent(departmentName)}`
+			})
+		},
 			
 			// 切换热门科室展开/收起
 			toggleDepartments() {
@@ -789,6 +805,52 @@
 		font-weight: 800;
 		position: relative;
 		z-index: 1;
+	}
+
+	/* 候补提醒卡片样式 */
+	.waitlist-card {
+		background: linear-gradient(135deg, rgba(255, 165, 0, 0.15) 0%, rgba(255, 165, 0, 0.05) 100%);
+		border: 2rpx solid rgba(255, 165, 0, 0.3);
+		margin: 20rpx 30rpx;
+		padding: 24rpx;
+		border-radius: 20rpx;
+		display: flex;
+		align-items: center;
+		box-shadow: 0 4rpx 20rpx rgba(255, 165, 0, 0.2);
+		transition: all 0.3s ease;
+	}
+
+	.waitlist-card:active {
+		transform: scale(0.98);
+	}
+
+	.waitlist-icon {
+		font-size: 56rpx;
+		margin-right: 20rpx;
+	}
+
+	.waitlist-content {
+		flex: 1;
+	}
+
+	.waitlist-title {
+		display: block;
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #1A202C;
+		margin-bottom: 8rpx;
+	}
+
+	.waitlist-info {
+		display: block;
+		font-size: 24rpx;
+		color: #718096;
+	}
+
+	.waitlist-arrow {
+		font-size: 36rpx;
+		color: #A0AEC0;
+		font-weight: bold;
 	}
 
 	/* 加载状态 */
