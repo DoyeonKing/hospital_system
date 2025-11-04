@@ -7,9 +7,14 @@
       <template #header>
         <div class="card-header-title">
           <span>科室信息总览与管理</span>
-          <el-button type="success" :icon="Plus" @click="handleCreateDepartment">
-            创建新科室
-          </el-button>
+          <div>
+            <el-button type="info" @click="handleSymptomMapping">
+              症状映射管理
+            </el-button>
+            <el-button type="success" :icon="Plus" @click="handleCreateDepartment">
+              创建新科室
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -60,7 +65,6 @@
             <div class="tree-node-content">
               <div class="node-info">
                 <span class="node-name" v-html="highlightText(data.name, searchForm.name)"></span>
-                <span class="node-id">(ID: {{ data.departmentId || data.parentDepartmentId }})</span>
                 <span class="node-description" v-if="data.description" v-html="highlightText(data.description, searchForm.description)"></span>
               </div>
               <div class="node-actions">
@@ -71,6 +75,14 @@
                     @click.stop="handleViewDetails(data)"
                 >
                   查看成员
+                </el-button>
+                <el-button
+                    v-if="data.type === 'department'"
+                    size="small"
+                    type="success"
+                    @click.stop="handleViewLocations(data)"
+                >
+                  地点管理
                 </el-button>
                 <el-button
                     v-if="data.type === 'department'"
@@ -383,11 +395,24 @@ const handleCreateDepartment = () => {
     router.push('/departments/create');
 };
 
+// 症状映射管理
+const handleSymptomMapping = () => {
+    router.push('/departments/symptom-mapping');
+};
+
 // 查看成员
 const handleViewDetails = (row) => {
     // 只有子科室才能查看成员
     if (row.type === 'department') {
         router.push(`/departments/members/${row.id}`);
+    }
+};
+
+// 地点管理
+const handleViewLocations = (row) => {
+    // 只有子科室才能管理地点
+    if (row.type === 'department') {
+        router.push(`/departments/locations/${row.id}`);
     }
 };
 
@@ -418,7 +443,10 @@ const handleDelete = async (row) => {
     
     // 如果是子科室，添加额外提示
     if (row.type === 'department') {
-      confirmMessage += '\n\n注意：如果该科室下有医生，删除操作将把该科室下的所有医生自动移入"未分配科室"。';
+      confirmMessage += '\n\n注意：';
+      confirmMessage += '\n• 如果该科室下有医生，将自动移入"未分配科室"';
+      confirmMessage += '\n• 如果该科室下有地点，将设置为未分配状态';
+      confirmMessage += '\n• 该科室有未来排班时，无法删除';
     }
     
     confirmMessage += '\n\n此操作不可恢复。';
@@ -437,11 +465,21 @@ const handleDelete = async (row) => {
     const result = await deleteDepartment(row.id);
     
     // 显示删除结果
+    let successMsg = '科室删除成功！';
+    const details = [];
+    
     if (result.doctorCount > 0) {
-      ElMessage.success(`科室删除成功！已将 ${result.doctorCount} 位医生移动到未分配科室`);
-    } else {
-      ElMessage.success('科室删除成功');
+      details.push(`已将 ${result.doctorCount} 位医生移动到未分配科室`);
     }
+    if (result.locationCount > 0) {
+      details.push(`已将 ${result.locationCount} 个地点设置为未分配状态`);
+    }
+    
+    if (details.length > 0) {
+      successMsg += ' ' + details.join('，');
+    }
+    
+    ElMessage.success(successMsg);
     
     await fetchDepartments(); // 刷新列表
   } catch (error) {
