@@ -21,6 +21,11 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
     List<Schedule> findByScheduleDateAndStatus(LocalDate scheduleDate, ScheduleStatus status);
     Optional<Schedule> findByDoctorAndScheduleDateAndSlot(Doctor doctor, LocalDate scheduleDate, TimeSlot slot);
     List<Schedule> findByDoctorAndScheduleDateGreaterThanEqualAndStatus(Doctor doctor, LocalDate date, ScheduleStatus status);
+
+    /**
+     * 按日期范围与医生集合查询排班
+     */
+    List<Schedule> findByScheduleDateBetweenAndDoctorIn(LocalDate startDate, LocalDate endDate, List<Doctor> doctors);
     
     // 根据日期范围查找排班
     List<Schedule> findByScheduleDateBetween(LocalDate startDate, LocalDate endDate);

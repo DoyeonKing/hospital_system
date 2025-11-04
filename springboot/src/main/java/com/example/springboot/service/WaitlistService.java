@@ -1,5 +1,8 @@
 package com.example.springboot.service;
 
+import com.example.springboot.dto.appointment.AppointmentResponse;
+import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
+import com.example.springboot.dto.payment.PaymentRequest;
 import com.example.springboot.dto.waitlist.WaitlistCreateRequest;
 import com.example.springboot.dto.waitlist.WaitlistResponse;
 import com.example.springboot.dto.waitlist.WaitlistUpdateRequest;
@@ -36,7 +39,8 @@ public class WaitlistService {
     private final ScheduleRepository scheduleRepository;
     private final AppointmentRepository appointmentRepository; // For checking existing appointments
     private final PatientService patientService; // For converting patient entity to DTO
-    private final ScheduleService scheduleService; // For converting schedule entity to DTO
+    private final ScheduleService scheduleService;
+    private final AppointmentService appointmentService; // For converting schedule entity to DTO
 
     @Autowired
     public WaitlistService(WaitlistRepository waitlistRepository,
@@ -44,13 +48,15 @@ public class WaitlistService {
                            ScheduleRepository scheduleRepository,
                            AppointmentRepository appointmentRepository,
                            PatientService patientService,
-                           ScheduleService scheduleService) {
+                           ScheduleService scheduleService,
+                           AppointmentService appointmentService) {
         this.waitlistRepository = waitlistRepository;
         this.patientRepository = patientRepository;
         this.scheduleRepository = scheduleRepository;
         this.appointmentRepository = appointmentRepository;
         this.patientService = patientService;
         this.scheduleService = scheduleService;
+        this.appointmentService = appointmentService;
     }
 
     @Transactional(readOnly = true)
@@ -172,7 +178,7 @@ public class WaitlistService {
             newAppointment.setSchedule(schedule);
             newAppointment.setAppointmentNumber(schedule.getBookedSlots() + 1);
             newAppointment.setStatus(AppointmentStatus.PENDING_PAYMENT); // 初始状态待支付
-            newAppointment.setPaymentStatus(PaymentStatus.UNPAID);
+            newAppointment.setPaymentStatus(PaymentStatus.unpaid);
             newAppointment.setCreatedAt(LocalDateTime.now());
 
             schedule.setBookedSlots(schedule.getBookedSlots() + 1); // 增加已预约数
@@ -194,5 +200,54 @@ public class WaitlistService {
         response.setPatient(patientService.convertToResponseDto(waitlist.getPatient()));
         response.setSchedule(ScheduleResponse.fromEntity(waitlist.getSchedule()));
         return response;
+    }
+
+    // 在WaitlistService中添加以下方法
+    @Transactional(readOnly = true)
+    public List<WaitlistResponse> findByPatientId(Long patientId) {
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id " + patientId));
+        return waitlistRepository.findByPatient(patient).stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public WaitlistResponse cancelWaitlist(Integer waitlistId) {
+        Waitlist waitlist = waitlistRepository.findById(waitlistId)
+                .orElseThrow(() -> new ResourceNotFoundException("Waitlist not found with id " + waitlistId));
+
+        if (waitlist.getStatus() != WaitlistStatus.PENDING) {
+            throw new BadRequestException("Only pending waitlist entries can be canceled");
+        }
+
+        WaitlistUpdateRequest request = new WaitlistUpdateRequest();
+        request.setStatus(WaitlistStatus.expired);
+        return updateWaitlist(waitlistId, request);
+    }
+
+    @Transactional
+    public AppointmentResponse processWaitlistPayment(Integer waitlistId, PaymentRequest paymentData) {
+        Waitlist waitlist = waitlistRepository.findById(waitlistId)
+                .orElseThrow(() -> new ResourceNotFoundException("Waitlist not found with id " + waitlistId));
+
+        if (waitlist.getStatus() != WaitlistStatus.notified) {
+            throw new BadRequestException("Only notified waitlist entries can be paid");
+        }
+
+        // 创建正式预约
+        Appointment appointment = createAppointmentFromWaitlist(waitlist.getSchedule().getScheduleId());
+        if (appointment == null) {
+            throw new BadRequestException("No available slot to convert waitlist to appointment");
+        }
+
+        // 更新支付信息
+        AppointmentUpdateRequest updateRequest = new AppointmentUpdateRequest();
+        updateRequest.setPaymentStatus(PaymentStatus.paid);
+        updateRequest.setPaymentMethod(paymentData.getPaymentMethod());
+        updateRequest.setTransactionId(paymentData.getTransactionId());
+        updateRequest.setStatus(AppointmentStatus.completed);
+
+        return appointmentService.updateAppointment(appointment.getAppointmentId(), updateRequest);
     }
 }

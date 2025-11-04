@@ -132,7 +132,7 @@ public class LeaveRequestService {
             existingRequest.setStatus(request.getStatus());
             if (request.getStatus() == LeaveRequestStatus.APPROVED) {
                 // 如果申请被批准，需要更新相关排班的状态
-                updateAffectedSchedules(existingRequest.getDoctor(), existingRequest.getStartTime(), existingRequest.getEndTime(), ScheduleStatus.CANCELED);
+                updateAffectedSchedules(existingRequest.getDoctor(), existingRequest.getStartTime(), existingRequest.getEndTime(), ScheduleStatus.cancelled);
             } else if (request.getStatus() == LeaveRequestStatus.REJECTED) {
                 // 如果被拒绝，不做排班更改
             }

@@ -8,10 +8,7 @@ import com.example.springboot.dto.schedule.ScheduleResponse;
 import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.Schedule;
-import com.example.springboot.entity.enums.AppointmentStatus;
-import com.example.springboot.entity.enums.BlacklistStatus;
-import com.example.springboot.entity.enums.PaymentStatus;
-import com.example.springboot.entity.enums.PatientStatus;
+import com.example.springboot.entity.enums.*;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.AppointmentRepository;
@@ -22,7 +19,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -90,7 +89,7 @@ public class AppointmentService {
         Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + request.getScheduleId()));
 
-        if (schedule.getStatus() != com.example.springboot.entity.enums.ScheduleStatus.ACTIVE) {
+        if (schedule.getStatus() != ScheduleStatus.available) {
             throw new BadRequestException("Schedule is not active for booking.");
         }
         if (schedule.getBookedSlots() >= schedule.getTotalSlots()) {
@@ -110,8 +109,8 @@ public class AppointmentService {
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
         appointment.setAppointmentNumber(schedule.getBookedSlots() + 1); // 自动分配就诊序号
-        appointment.setStatus(AppointmentStatus.PENDING_PAYMENT); // 初始状态为待支付
-        appointment.setPaymentStatus(PaymentStatus.UNPAID);
+        appointment.setStatus(AppointmentStatus.scheduled); // 初始状态为待支付
+        appointment.setPaymentStatus(PaymentStatus.unpaid);
         appointment.setCreatedAt(LocalDateTime.now());
 
         // 增加排班的已预约数
@@ -130,7 +129,7 @@ public class AppointmentService {
         if (request.getAppointmentNumber() != null) existingAppointment.setAppointmentNumber(request.getAppointmentNumber());
         if (request.getStatus() != null) {
             // Handle specific status transitions and logic
-            if (request.getStatus() == AppointmentStatus.CANCELED && existingAppointment.getStatus() != AppointmentStatus.CANCELED) {
+            if (request.getStatus() == AppointmentStatus.cancelled && existingAppointment.getStatus() != AppointmentStatus.cancelled) {
                 // 如果是取消预约，需要减少排班的已预约数
                 Schedule schedule = existingAppointment.getSchedule();
                 if (schedule.getBookedSlots() > 0) {
@@ -188,5 +187,57 @@ public class AppointmentService {
         response.setSchedule(ScheduleResponse.fromEntity(appointment.getSchedule()));
 
         return response;
+    }
+
+    // 在AppointmentService中添加以下方法
+    @Transactional(readOnly = true)
+    public List<AppointmentResponse> findByPatientId(Long patientId) {
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id " + patientId));
+        return appointmentRepository.findByPatient(patient).stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<AppointmentResponse> findUpcomingByPatientId(Long patientId) {
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id " + patientId));
+        return appointmentRepository.findByPatientAndScheduleScheduleDateAfterOrScheduleScheduleDateEqualAndScheduleSlotStartTimeAfter(
+                        patient,
+                        LocalDate.now(),
+                        LocalDate.now(),
+                        LocalTime.now()
+                ).stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public AppointmentResponse cancelAppointment(Integer appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id " + appointmentId));
+
+        if (appointment.getStatus() == AppointmentStatus.cancelled) {
+            throw new BadRequestException("Appointment is already canceled");
+        }
+
+        AppointmentUpdateRequest request = new AppointmentUpdateRequest();
+        request.setStatus(AppointmentStatus.cancelled);
+        return updateAppointment(appointmentId, request);
+    }
+
+    @Transactional
+    public AppointmentResponse processPayment(Integer appointmentId, AppointmentUpdateRequest paymentData) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id " + appointmentId));
+
+        if (appointment.getPaymentStatus() == PaymentStatus.paid) {
+            throw new BadRequestException("Appointment is already paid");
+        }
+
+        paymentData.setPaymentStatus(PaymentStatus.paid);
+        paymentData.setStatus(AppointmentStatus.completed);
+        return updateAppointment(appointmentId, paymentData);
     }
 }
