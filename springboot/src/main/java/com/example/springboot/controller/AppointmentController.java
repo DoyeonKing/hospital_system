@@ -3,6 +3,7 @@ package com.example.springboot.controller;
 import com.example.springboot.dto.appointment.AppointmentCreateRequest;
 import com.example.springboot.dto.appointment.AppointmentResponse;
 import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
+import com.example.springboot.dto.payment.AppointmentPaymentRequest;
 import com.example.springboot.service.AppointmentService;
 import com.example.springboot.service.WaitlistService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,7 +81,7 @@ public class AppointmentController {
     @PostMapping("/{appointmentId}/pay")
     public ResponseEntity<AppointmentResponse> payForAppointment(
             @PathVariable Integer appointmentId,
-            @RequestBody AppointmentUpdateRequest paymentData) {
+            @RequestBody AppointmentPaymentRequest paymentData) {  // 使用新的支付请求DTO
         return ResponseEntity.ok(appointmentService.processPayment(appointmentId, paymentData));
     }
 }

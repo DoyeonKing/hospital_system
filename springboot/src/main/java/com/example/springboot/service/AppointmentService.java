@@ -4,6 +4,7 @@ import com.example.springboot.common.Constants;
 import com.example.springboot.dto.appointment.AppointmentCreateRequest;
 import com.example.springboot.dto.appointment.AppointmentResponse;
 import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
+import com.example.springboot.dto.payment.AppointmentPaymentRequest;
 import com.example.springboot.dto.schedule.ScheduleResponse;
 import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Patient;
@@ -228,16 +229,26 @@ public class AppointmentService {
     }
 
     @Transactional
-    public AppointmentResponse processPayment(Integer appointmentId, AppointmentUpdateRequest paymentData) {
+    public AppointmentResponse processPayment(Integer appointmentId, AppointmentPaymentRequest paymentData) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id " + appointmentId));
 
-        if (appointment.getPaymentStatus() == PaymentStatus.paid) {
-            throw new BadRequestException("Appointment is already paid");
+        // 仅处理支付相关字段更新
+        if (paymentData.getPaymentStatus() != null) {
+            appointment.setPaymentStatus(paymentData.getPaymentStatus());
+        }
+        if (paymentData.getPaymentMethod() != null) {
+            appointment.setPaymentMethod(paymentData.getPaymentMethod());
+        }
+        if (paymentData.getTransactionId() != null) {
+            appointment.setTransactionId(paymentData.getTransactionId());
         }
 
-        paymentData.setPaymentStatus(PaymentStatus.paid);
-        paymentData.setStatus(AppointmentStatus.completed);
-        return updateAppointment(appointmentId, paymentData);
+        // 可以添加支付状态变更的业务逻辑，例如：
+        if (paymentData.getPaymentStatus() == PaymentStatus.paid) {
+            appointment.setStatus(AppointmentStatus.scheduled);
+        }
+
+        return convertToResponseDto(appointmentRepository.save(appointment));
     }
 }
