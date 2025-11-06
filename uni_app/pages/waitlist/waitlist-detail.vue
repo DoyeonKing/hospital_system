@@ -145,22 +145,22 @@
 					
 					if (response && response.code === '200' && response.data) {
 						this.waitlist = response.data
-						
-						// 计算倒计时
+					
+					// 计算倒计时
 						if (this.waitlist.status === 'NOTIFIED' && this.waitlist.notificationSentAt) {
-							const now = new Date()
-							const notificationTime = new Date(this.waitlist.notificationSentAt)
-							const elapsedSeconds = Math.floor((now - notificationTime) / 1000)
-							this.remainingSeconds = Math.max(0, 15 * 60 - elapsedSeconds)
-							
-							// 如果倒计时结束，更新状态
-							if (this.remainingSeconds === 0) {
-								this.waitlist.status = 'EXPIRED'
-							}
-						}
+						const now = new Date()
+						const notificationTime = new Date(this.waitlist.notificationSentAt)
+						const elapsedSeconds = Math.floor((now - notificationTime) / 1000)
+						this.remainingSeconds = Math.max(0, 15 * 60 - elapsedSeconds)
 						
-						// 启动倒计时
-						this.startCountdown()
+						// 如果倒计时结束，更新状态
+						if (this.remainingSeconds === 0) {
+								this.waitlist.status = 'EXPIRED'
+						}
+					}
+					
+					// 启动倒计时
+					this.startCountdown()
 					} else {
 						uni.showToast({
 							title: response?.msg || '加载失败',
@@ -265,13 +265,13 @@
 							try {
 								const response = await cancelWaitlist(this.waitlistId)
 								if (response && response.code === '200' && response.data) {
-									uni.showToast({
-										title: '取消成功',
-										icon: 'success'
-									})
-									setTimeout(() => {
-										uni.navigateBack()
-									}, 1500)
+							uni.showToast({
+								title: '取消成功',
+								icon: 'success'
+							})
+							setTimeout(() => {
+								uni.navigateBack()
+							}, 1500)
 								} else {
 									uni.showToast({
 										title: response?.msg || '取消失败',

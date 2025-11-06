@@ -153,17 +153,35 @@ export async function getDoctorsByDepartment(departmentId) {
  */
 export async function getDoctorById(doctorId) {
 	const response = await get(`/api/doctors/${doctorId}`)
-	// 后端直接返回 DoctorResponse 对象
+	console.log('getDoctorById 原始响应:', response)
+	
+	// 如果返回的是错误字符串
+	if (typeof response === 'string') {
+		throw new Error(response)
+	}
+	
+	// 格式1: 后端直接返回 DoctorResponse 对象（通过 ResponseEntity）
+	if (response && (response.doctorId || response.fullName)) {
+		return {
+			code: '200',
+			data: response
+		}
+	}
+	
+	// 格式2: 已经包装成 { code: '200', data: DoctorResponse }
+	if (response && response.code === '200' && response.data) {
+		return response
+	}
+	
+	// 格式3: 直接返回 DoctorResponse（没有包装）
 	if (response && response.doctorId) {
 		return {
 			code: '200',
 			data: response
 		}
 	}
-	// 兼容可能的 Result 格式
-	if (response.code === '200' && response.data) {
-		return response
-	}
+	
+	// 如果都不匹配，返回原响应（可能是错误）
 	return response
 }
 

@@ -37,17 +37,17 @@
 					</view>
 					
 					<!-- 排队位置 -->
-					<view class="info-row" v-if="waitlist.status === 'waiting'">
+					<view class="info-row" v-if="waitlist.status === 'waiting' || waitlist.status === 'WAITING'">
 						<text class="info-label">👥 排队位置：</text>
 						<text class="info-value queue-position">第{{ waitlist.queuePosition }}位</text>
 					</view>
 					
 					<!-- 通知时间和倒计时 -->
-					<view class="info-row" v-if="waitlist.status === 'notified'">
+					<view class="info-row" v-if="waitlist.status === 'notified' || waitlist.status === 'NOTIFIED'">
 						<text class="info-label">🔔 通知时间：</text>
 						<text class="info-value">{{ formatDateTime(waitlist.notificationSentAt) }}</text>
 					</view>
-					<view class="countdown-wrapper" v-if="waitlist.status === 'notified'">
+					<view class="countdown-wrapper" v-if="waitlist.status === 'notified' || waitlist.status === 'NOTIFIED'">
 						<text class="countdown-label">剩余支付时间：</text>
 						<text class="countdown-value" :class="{ 'urgent': waitlist.remainingSeconds < 300 }">
 							{{ formatCountdown(waitlist.remainingSeconds) }}
@@ -62,19 +62,19 @@
 				</view>
 				
 				<!-- 操作按钮 -->
-				<view class="waitlist-actions" v-if="waitlist.status === 'notified'">
+				<view class="waitlist-actions" v-if="waitlist.status === 'notified' || waitlist.status === 'NOTIFIED'">
 					<view class="action-btn payment-btn" @click.stop="navigateToPayment(waitlist)">
 						<text class="btn-text">立即支付</text>
 					</view>
 				</view>
-				<view class="waitlist-actions" v-if="waitlist.status === 'waiting'">
+				<view class="waitlist-actions" v-if="waitlist.status === 'waiting' || waitlist.status === 'WAITING'">
 					<view class="action-btn cancel-btn" @click.stop="handleCancel(waitlist.id)">
 						<text class="btn-text">取消候补</text>
 					</view>
 				</view>
 				
 				<!-- 15分钟倒计时提示 -->
-				<view class="urgent-notice" v-if="waitlist.status === 'notified'">
+				<view class="urgent-notice" v-if="waitlist.status === 'notified' || waitlist.status === 'NOTIFIED'">
 					<text class="notice-text">⏰ 请在15分钟内完成支付，超时自动取消</text>
 				</view>
 			</view>
@@ -136,17 +136,31 @@
 					console.log('候补列表响应:', response)
 					
 					if (response && response.code === '200' && response.data) {
+						console.log('候补列表数据:', response.data)
+						console.log('候补列表数据长度:', response.data.length)
+						
 						// 计算倒计时
 						const now = new Date()
 						this.waitlistList = response.data.map(item => {
-							if (item.status === 'NOTIFIED' && item.notificationSentAt) {
+							console.log('处理候补项:', {
+								id: item.id,
+								status: item.status,
+								departmentName: item.departmentName,
+								doctorName: item.doctorName
+							})
+							
+							// 兼容大小写状态值
+							const status = item.status || ''
+							const isNotified = status === 'NOTIFIED' || status === 'notified'
+							
+							if (isNotified && item.notificationSentAt) {
 								const notificationTime = new Date(item.notificationSentAt)
 								const elapsedSeconds = Math.floor((now - notificationTime) / 1000)
 								const remainingSeconds = Math.max(0, 15 * 60 - elapsedSeconds) // 15分钟 = 900秒
 								
 								// 如果倒计时结束，更新状态
 								if (remainingSeconds === 0) {
-									item.status = 'EXPIRED'
+									item.status = 'expired'
 								}
 								
 								return {
@@ -156,6 +170,9 @@
 							}
 							return item
 						})
+						
+						console.log('处理后的候补列表:', this.waitlistList)
+						console.log('候补列表长度:', this.waitlistList.length)
 						
 						// 启动倒计时
 						this.startCountdown()
@@ -186,7 +203,11 @@
 				
 				this.countdownTimer = setInterval(() => {
 					this.waitlistList = this.waitlistList.map(item => {
-						if (item.status === 'NOTIFIED' && item.remainingSeconds > 0) {
+						// 兼容大小写状态值
+						const status = item.status || ''
+						const isNotified = status === 'NOTIFIED' || status === 'notified'
+						
+						if (isNotified && item.remainingSeconds > 0) {
 							return {
 								...item,
 								remainingSeconds: item.remainingSeconds - 1
@@ -196,9 +217,11 @@
 					})
 					
 					// 检查是否有倒计时结束的候补
-					const hasExpired = this.waitlistList.some(item => 
-						item.status === 'NOTIFIED' && item.remainingSeconds === 0
-					)
+					const hasExpired = this.waitlistList.some(item => {
+						const status = item.status || ''
+						const isNotified = status === 'NOTIFIED' || status === 'notified'
+						return isNotified && item.remainingSeconds === 0
+					})
 					if (hasExpired) {
 						this.loadWaitlist() // 重新加载数据
 					}
@@ -300,11 +323,11 @@
 								console.log('取消候补响应:', response)
 								
 								if (response && response.code === '200') {
-									uni.showToast({
-										title: '取消成功',
-										icon: 'success'
-									})
-									this.loadWaitlist()
+							uni.showToast({
+								title: '取消成功',
+								icon: 'success'
+							})
+							this.loadWaitlist()
 								} else {
 									uni.showToast({
 										title: response?.msg || '取消失败',

@@ -33,7 +33,7 @@
 						:class="{ active: selectedDoctorId === doctor.doctorId }"
 						@click="selectDoctor(doctor.doctorId)"
 					>
-						<image class="doctor-avatar-small" :src="doctor.photoUrl" mode="aspectFill" @error="handleImageError"></image>
+						<image class="doctor-avatar-small" :src="doctor.photoUrl || defaultAvatar" mode="aspectFill" @error="handleImageError"></image>
 						<view class="doctor-name-small">{{ doctor.doctorName }}</view>
 						<view class="doctor-title-small">{{ doctor.doctorTitle }}</view>
 					</view>
@@ -45,7 +45,7 @@
 						<!-- 医生简介卡片 -->
 						<view class="doctor-intro-card" v-if="currentDoctorInfo" @click="navigateToDoctorDetail(currentDoctorInfo.doctorId)">
 							<view class="intro-avatar-section">
-								<image class="intro-avatar" :src="currentDoctorInfo.photoUrl" mode="aspectFill" @error="handleImageError"></image>
+								<image class="intro-avatar" :src="currentDoctorInfo.photoUrl || defaultAvatar" mode="aspectFill" @error="handleImageError"></image>
 							</view>
 							<view class="intro-info-section">
 								<view class="intro-name-row">
@@ -153,7 +153,8 @@
 				doctorDetailsMap: {}, // 存储医生详细信息
 				selectedDoctorId: null,
 				selectedDate: 'all',
-				dateOptions: []
+				dateOptions: [],
+				defaultAvatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'
 			}
 		},
 		computed: {
@@ -178,6 +179,34 @@
 				if (this.selectedDate !== 'all') {
 					filtered = filtered.filter(s => s.scheduleDate === this.selectedDate)
 				}
+				
+				// 过滤掉已过期的排班（与后端验证逻辑一致）
+				const now = new Date()
+				const today = this.formatDate(now)
+				const currentTime = now.getHours() * 100 + now.getMinutes() // 格式：HHMM
+				
+				filtered = filtered.filter(schedule => {
+					const scheduleDate = schedule.scheduleDate
+					
+					// 如果排班日期在今天之前，过滤掉
+					if (scheduleDate < today) {
+						return false
+					}
+					
+					// 如果排班日期是今天，检查时间段是否已结束
+					if (scheduleDate === today && schedule.endTime) {
+						// 解析 endTime (格式可能是 "HH:MM:SS" 或 "HH:MM")
+						const endTimeStr = schedule.endTime.split(':')
+						const endTime = parseInt(endTimeStr[0]) * 100 + parseInt(endTimeStr[1])
+						
+						// 如果结束时间已过，过滤掉
+						if (endTime < currentTime) {
+							return false
+						}
+					}
+					
+					return true
+				})
 				
 				return filtered
 			},
@@ -415,8 +444,24 @@
 		
 		// 图片加载失败处理
 		handleImageError(e) {
-			console.log('图片加载失败:', e)
-			e.target.src = 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'
+			console.log('图片加载失败，使用默认头像:', e)
+			const defaultAvatar = 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'
+			if (e && e.target) {
+				e.target.src = defaultAvatar
+			}
+			// 如果是医生列表中的图片，更新对应的数据
+			if (e && e.target && e.target.dataset) {
+				const doctorId = e.target.dataset.doctorId
+				if (doctorId) {
+					const doctor = this.doctorList.find(d => d.doctorId === parseInt(doctorId))
+					if (doctor) {
+						doctor.photoUrl = defaultAvatar
+					}
+					if (this.doctorDetailsMap[doctorId]) {
+						this.doctorDetailsMap[doctorId].photoUrl = defaultAvatar
+					}
+				}
+			}
 		},
 		
 		// 跳转到医生详情页

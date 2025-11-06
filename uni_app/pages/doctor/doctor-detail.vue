@@ -7,7 +7,7 @@
 		<view class="content">
 			<!-- 医生基本信息卡片 -->
 			<view class="doctor-header-card">
-				<image class="doctor-avatar" :src="doctorInfo.photoUrl" mode="aspectFill"></image>
+				<image class="doctor-avatar" :src="doctorInfo.photoUrl || defaultAvatar" mode="aspectFill" @error="handleImageError"></image>
 				<view class="doctor-basic">
 					<view class="doctor-name-row">
 						<text class="doctor-name">{{ doctorInfo.doctorName }}</text>
@@ -78,7 +78,8 @@
 		data() {
 			return {
 				doctorId: null,
-				doctorInfo: {}
+				doctorInfo: {},
+				defaultAvatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'
 			}
 		},
 		onLoad(options) {
@@ -92,18 +93,34 @@
 					const response = await getDoctorById(this.doctorId)
 					console.log('医生详情API响应:', response)
 					
-					// 后端返回 DoctorResponse，需要适配格式
-					if (response && response.fullName) {
+					// 处理不同的返回格式
+					let doctorData = null
+					
+					// 格式1: { code: '200', data: DoctorResponse }
+					if (response && response.code === '200' && response.data) {
+						doctorData = response.data
+					}
+					// 格式2: 直接返回 DoctorResponse 对象
+					else if (response && (response.fullName || response.doctorId)) {
+						doctorData = response
+					}
+					// 格式3: 后端直接返回 DoctorResponse（通过 ResponseEntity）
+					else if (response && response.doctorId) {
+						doctorData = response
+					}
+					
+					if (doctorData && (doctorData.fullName || doctorData.doctorId)) {
 						this.doctorInfo = {
-							doctorName: response.fullName,
-							doctorTitle: response.title || '医师',
-							departmentName: response.department ? response.department.name : '未知科室',
-							specialty: response.specialty || '暂无专长信息',
-							photoUrl: response.photoUrl || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
-							bio: response.bio || '医生详情功能开发中...'
+							doctorName: doctorData.fullName || '未知医生',
+							doctorTitle: doctorData.title || '医师',
+							departmentName: doctorData.department ? (doctorData.department.name || doctorData.department.departmentName) : '未知科室',
+							specialty: doctorData.specialty || '暂无专长信息',
+							photoUrl: doctorData.photoUrl || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
+							bio: doctorData.bio || '医生详情功能开发中...'
 						}
+						console.log('医生详情处理成功:', this.doctorInfo)
 					} else {
-						throw new Error('返回数据格式异常')
+						throw new Error('返回数据格式异常: ' + JSON.stringify(response))
 					}
 				} catch (error) {
 					console.error('获取医生详情失败:', error)
@@ -122,6 +139,17 @@
 							bio: '医生详情功能开发中...'
 						}
 					}
+				}
+			},
+			
+			// 图片加载失败处理
+			handleImageError(e) {
+				console.log('医生头像加载失败，使用默认头像')
+				// 设置为默认头像
+				this.doctorInfo.photoUrl = this.defaultAvatar
+				// 如果 e.target 存在，直接设置 src
+				if (e && e.target) {
+					e.target.src = this.defaultAvatar
 				}
 			}
 		}
