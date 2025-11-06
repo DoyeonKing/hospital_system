@@ -79,16 +79,16 @@
 				<text class="tips-content">候补成功后，系统将通过短信通知您，请保持手机畅通。收到通知后请在15分钟内完成支付，否则将自动取消。</text>
 			</view>
 			
-			<view class="tips-card" v-if="waitlist.status === 'notified'">
+			<view class="tips-card" v-if="waitlist.status === 'NOTIFIED' || waitlist.status === 'notified'">
 				<text class="tips-title">🔔 重要提醒</text>
 				<text class="tips-content">您已收到候补通知，请立即完成支付。支付成功后，候补将转为正式预约。</text>
 			</view>
 			
 			<!-- 操作按钮 -->
 			<view class="action-section">
-				<button class="action-btn payment-btn" v-if="waitlist.status === 'notified'" @click="navigateToPayment">立即支付</button>
-				<button class="action-btn cancel-btn" v-if="waitlist.status === 'waiting'" @click="handleCancel">取消候补</button>
-				<button class="action-btn disabled-btn" v-else-if="waitlist.status !== 'notified' && waitlist.status !== 'waiting'" disabled>
+				<button class="action-btn payment-btn" v-if="waitlist.status === 'NOTIFIED' || waitlist.status === 'notified'" @click="navigateToPayment">立即支付</button>
+				<button class="action-btn cancel-btn" v-if="waitlist.status === 'WAITING' || waitlist.status === 'waiting'" @click="handleCancel">取消候补</button>
+				<button class="action-btn disabled-btn" v-else-if="waitlist.status !== 'NOTIFIED' && waitlist.status !== 'notified' && waitlist.status !== 'WAITING' && waitlist.status !== 'waiting'" disabled>
 					{{ getStatusText(waitlist.status) }}
 				</button>
 			</view>
@@ -97,7 +97,7 @@
 </template>
 
 <script>
-	import { mockWaitlist } from '../../api/mockData.js'
+	import { getWaitlistDetail, cancelWaitlist } from '../../api/appointment.js'
 	
 	export default {
 		data() {
@@ -118,7 +118,8 @@
 				createdAt: ''
 			},
 				countdownTimer: null,
-				remainingSeconds: 0
+				remainingSeconds: 0,
+				loading: false
 			}
 		},
 		onLoad(options) {
@@ -136,60 +137,44 @@
 			}
 		},
 		methods: {
-			loadWaitlistDetail() {
+			async loadWaitlistDetail() {
+				this.loading = true
 				try {
-					// TODO: 调用后端API
-					const allWaitlist = JSON.parse(JSON.stringify(mockWaitlist))
-					const found = allWaitlist.find(w => w.id === this.waitlistId)
+					const response = await getWaitlistDetail(this.waitlistId)
+					console.log('候补详情响应:', response)
 					
-					if (!found) {
-						console.error('未找到候补记录:', this.waitlistId)
+					if (response && response.code === '200' && response.data) {
+						this.waitlist = response.data
+						
+						// 计算倒计时
+						if (this.waitlist.status === 'NOTIFIED' && this.waitlist.notificationSentAt) {
+							const now = new Date()
+							const notificationTime = new Date(this.waitlist.notificationSentAt)
+							const elapsedSeconds = Math.floor((now - notificationTime) / 1000)
+							this.remainingSeconds = Math.max(0, 15 * 60 - elapsedSeconds)
+							
+							// 如果倒计时结束，更新状态
+							if (this.remainingSeconds === 0) {
+								this.waitlist.status = 'EXPIRED'
+							}
+						}
+						
+						// 启动倒计时
+						this.startCountdown()
+					} else {
 						uni.showToast({
-							title: '候补记录不存在',
+							title: response?.msg || '加载失败',
 							icon: 'none'
 						})
-						return
 					}
-					
-					// 确保waitlist有必要的属性
-					this.waitlist = {
-						id: found.id || 0,
-					status: found.status || 'waiting',
-					departmentName: found.departmentName || '',
-					doctorName: found.doctorName || '',
-					doctorTitle: found.doctorTitle || '',
-					scheduleTime: found.scheduleTime || '',
-					slotName: found.slotName || '',
-					location: found.location || '',
-					fee: found.fee || 0,
-					queuePosition: found.queuePosition || 0,
-					notificationSentAt: found.notificationSentAt || '',
-					createdAt: found.createdAt || new Date().toISOString()
-				}
-					
-					console.log('加载的候补数据:', this.waitlist)
-					
-					// 计算倒计时
-					if (this.waitlist.status === 'notified' && this.waitlist.notificationSentAt) {
-						const now = new Date()
-						const notificationTime = new Date(this.waitlist.notificationSentAt)
-						const elapsedSeconds = Math.floor((now - notificationTime) / 1000)
-						this.remainingSeconds = Math.max(0, 15 * 60 - elapsedSeconds)
-						
-						// 如果倒计时结束，更新状态
-						if (this.remainingSeconds === 0) {
-							this.waitlist.status = 'expired'
-						}
-					}
-					
-					// 启动倒计时
-					this.startCountdown()
 				} catch (error) {
 					console.error('加载候补详情失败:', error)
 					uni.showToast({
-						title: '加载失败',
+						title: '加载失败，请重试',
 						icon: 'none'
 					})
+				} finally {
+					this.loading = false
 				}
 			},
 			
@@ -198,7 +183,7 @@
 					clearInterval(this.countdownTimer)
 				}
 				
-				if (this.waitlist.status === 'notified') {
+				if (this.waitlist.status === 'NOTIFIED' || this.waitlist.status === 'notified') {
 					this.countdownTimer = setInterval(() => {
 						if (this.remainingSeconds > 0) {
 							this.remainingSeconds--
@@ -212,12 +197,17 @@
 			
 			getStatusText(status) {
 				const statusMap = {
+					'WAITING': '候补中',
+					'NOTIFIED': '待支付',
+					'FULFILLED': '已转预约',
+					'EXPIRED': '已过期',
+					'REJECTED': '已拒绝',
+					'CANCELLED': '已取消',
+					// 兼容旧格式
 					'waiting': '候补中',
 					'notified': '待支付',
 					'booked': '已转预约',
 					'expired': '已过期',
-					'FULFILLED': '已完成',
-					'REJECTED': '已拒绝',
 					'cancelled': '已取消'
 				}
 				return statusMap[status] || '未知'
@@ -225,6 +215,12 @@
 			
 			getStatusIcon(status) {
 				const iconMap = {
+					'WAITING': '⏳',
+					'NOTIFIED': '🔔',
+					'FULFILLED': '✅',
+					'EXPIRED': '❌',
+					'CANCELLED': '🚫',
+					// 兼容旧格式
 					'waiting': '⏳',
 					'notified': '🔔',
 					'booked': '✅',
@@ -260,20 +256,35 @@
 				})
 			},
 			
-			handleCancel() {
+			async handleCancel() {
 				uni.showModal({
 					title: '取消候补',
 					content: '确定要取消候补吗？',
-					success: (res) => {
+					success: async (res) => {
 						if (res.confirm) {
-							// TODO: 调用后端API
-							uni.showToast({
-								title: '取消成功',
-								icon: 'success'
-							})
-							setTimeout(() => {
-								uni.navigateBack()
-							}, 1500)
+							try {
+								const response = await cancelWaitlist(this.waitlistId)
+								if (response && response.code === '200' && response.data) {
+									uni.showToast({
+										title: '取消成功',
+										icon: 'success'
+									})
+									setTimeout(() => {
+										uni.navigateBack()
+									}, 1500)
+								} else {
+									uni.showToast({
+										title: response?.msg || '取消失败',
+										icon: 'none'
+									})
+								}
+							} catch (error) {
+								console.error('取消候补失败:', error)
+								uni.showToast({
+									title: '取消失败，请重试',
+									icon: 'none'
+								})
+							}
 						}
 					}
 				})

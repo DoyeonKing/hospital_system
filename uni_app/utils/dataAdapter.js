@@ -10,10 +10,17 @@
  */
 export function adaptAppointmentList(backendData) {
 	if (!Array.isArray(backendData)) {
+		console.warn('adaptAppointmentList: 输入不是数组:', backendData)
 		return []
 	}
 	
-	return backendData.map(adaptAppointment)
+	console.log('adaptAppointmentList: 开始适配，输入数组长度:', backendData.length)
+	
+	const adapted = backendData.map(adaptAppointment).filter(item => item !== null)
+	
+	console.log('adaptAppointmentList: 适配完成，有效数据数量:', adapted.length)
+	
+	return adapted
 }
 
 /**
@@ -22,10 +29,16 @@ export function adaptAppointmentList(backendData) {
  * @returns {Object} 前端格式的预约对象
  */
 export function adaptAppointment(appointment) {
-	if (!appointment) return null
+	if (!appointment) {
+		console.warn('adaptAppointment: appointment 为空')
+		return null
+	}
+	
+	console.log('adaptAppointment 原始数据:', JSON.stringify(appointment, null, 2))
 	
 	// 如果数据已经是扁平格式（Mock数据），直接返回
 	if (appointment.departmentName && !appointment.schedule) {
+		console.log('adaptAppointment: 已经是扁平格式，直接返回')
 		return appointment
 	}
 	
@@ -33,16 +46,38 @@ export function adaptAppointment(appointment) {
 	const schedule = appointment.schedule || {}
 	const patient = appointment.patient || {}
 	
-	// 状态映射
+	console.log('adaptAppointment 嵌套数据:', {
+		schedule: schedule,
+		patient: patient,
+		status: appointment.status
+	})
+	
+	// 状态映射（兼容大小写）
 	const statusMap = {
+		// 后端状态 -> 前端状态
 		'scheduled': 'confirmed',
+		'SCHEDULED': 'confirmed',
+		'confirmed': 'confirmed',
+		'CONFIRMED': 'confirmed',
 		'completed': 'completed',
+		'COMPLETED': 'completed',
 		'cancelled': 'cancelled',
+		'CANCELLED': 'cancelled',
 		'no_show': 'cancelled',
+		'NO_SHOW': 'cancelled',
+		'pending_payment': 'pending',
 		'PENDING_PAYMENT': 'pending'
 	}
 	
-	return {
+	// 处理状态：后端可能返回枚举值（字符串）或枚举对象
+	let statusValue = appointment.status
+	if (typeof statusValue === 'object' && statusValue !== null) {
+		// 如果是枚举对象，获取其字符串值
+		statusValue = statusValue.name || statusValue.toString()
+	}
+	const finalStatus = statusMap[statusValue] || statusMap[statusValue?.toLowerCase()] || statusValue?.toLowerCase() || 'pending'
+	
+	const adapted = {
 		id: appointment.appointmentId,
 		appointmentId: appointment.appointmentId,
 		scheduleId: schedule.scheduleId,
@@ -54,12 +89,26 @@ export function adaptAppointment(appointment) {
 		scheduleTime: schedule.scheduleDate ? 
 			(schedule.scheduleDate + 'T' + formatTime(schedule.startTime)) : '',
 		appointmentTime: appointment.createdAt || '',
-		status: statusMap[appointment.status] || appointment.status,
+		status: finalStatus,
 		queueNumber: appointment.appointmentNumber,
 		appointmentNumber: appointment.appointmentNumber,
-		patientName: patient.fullName || '',
-		patientId: patient.patientId
+		patientName: patient.fullName || patient.name || '',
+		patientId: patient.patientId || patient.id
 	}
+	
+	console.log('adaptAppointment 适配后数据:', JSON.stringify(adapted, null, 2))
+	console.log('adaptAppointment 适配后字段检查:', {
+		id: adapted.id,
+		appointmentId: adapted.appointmentId,
+		departmentName: adapted.departmentName,
+		doctorName: adapted.doctorName,
+		status: adapted.status,
+		scheduleTime: adapted.scheduleTime,
+		hasDepartmentName: !!adapted.departmentName,
+		hasDoctorName: !!adapted.doctorName
+	})
+	
+	return adapted
 }
 
 /**

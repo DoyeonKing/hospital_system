@@ -237,7 +237,12 @@ public class AppointmentService {
         }
 
         paymentData.setPaymentStatus(PaymentStatus.paid);
-        paymentData.setStatus(AppointmentStatus.completed);
+        // 支付成功后，状态应该保持为 scheduled（已预约），而不是 completed（已完成）
+        // completed 状态应该在就诊完成后由医生或系统标记
+        if (appointment.getStatus() == AppointmentStatus.PENDING_PAYMENT) {
+            paymentData.setStatus(AppointmentStatus.scheduled); // 从待支付改为已预约
+        }
+        // 如果已经是 scheduled 状态，则保持 scheduled 状态不变
         return updateAppointment(appointmentId, paymentData);
     }
 }

@@ -41,7 +41,7 @@
 					<text class="label">就诊时间：</text>
 					<text class="value">{{ formatDateTime(appointment.scheduleTime) }}</text>
 				</view>
-				<view class="info-row" v-if="appointment.status === 'confirmed'">
+				<view class="info-row" v-if="isConfirmedStatus(appointment.status)">
 					<text class="label">排队号：</text>
 					<text class="value queue-number">第{{ appointment.queueNumber }}号</text>
 				</view>
@@ -52,7 +52,7 @@
 			</view>
 			
 			<!-- 签到二维码（仅已确认状态显示） -->
-			<view class="qr-code-card" v-if="appointment.status === 'confirmed'">
+			<view class="qr-code-card" v-if="isConfirmedStatus(appointment.status)">
 				<view class="qr-title">
 					<text class="qr-icon">📱</text>
 					<text class="qr-text">签到二维码</text>
@@ -64,16 +64,19 @@
 			</view>
 			
 			<!-- 操作按钮 -->
-			<view class="action-section" v-if="appointment.status === 'confirmed'">
+			<view class="action-section" v-if="!isCancelledStatus(appointment.status)">
 				<button class="home-btn" @click="handleBackToHome">返回主页</button>
-				<button class="cancel-btn" @click="handleCancel">取消预约</button>
+				<!-- 所有非取消状态都可以取消预约 -->
+				<button class="cancel-btn" v-if="canCancelAppointment(appointment.status)" @click="handleCancel">取消预约</button>
+				<button class="view-btn" v-if="isCompletedStatus(appointment.status) && !isConfirmedStatus(appointment.status)" @click="handleBackToHome">查看其他预约</button>
 			</view>
 		</view>
 	</view>
 </template>
 
 <script>
-	import { mockAppointments, mockPatientInfo } from '../../api/mockData.js'
+	import { getAppointmentDetail, cancelAppointment } from '../../api/appointment.js'
+	import { mockPatientInfo } from '../../api/mockData.js'
 	
 	export default {
 	data() {
@@ -82,7 +85,8 @@
 			appointment: {},
 			patientInfo: {},
 			qrCodeUrl: '',
-			urlParams: {} // 存储URL传递的参数
+			urlParams: {}, // 存储URL传递的参数
+			loading: false
 		}
 	},
 onLoad(options) {
@@ -101,7 +105,7 @@ onLoad(options) {
 	this.generateQRCode()
 },
 		methods: {
-	loadAppointmentDetail() {
+	async loadAppointmentDetail() {
 		// 如果有URL参数，说明是新建的预约，使用URL参数
 		if (this.urlParams.departmentName && this.urlParams.doctorName) {
 			const now = new Date()
@@ -126,9 +130,35 @@ onLoad(options) {
 			patientId: this.patientInfo.id || 1
 		}
 		} else {
-			// TODO: 调用后端API获取预约详情
-			const allAppointments = JSON.parse(JSON.stringify(mockAppointments))
-			this.appointment = allAppointments.find(a => a.id === this.appointmentId) || {}
+			// 调用后端API获取预约详情
+			this.loading = true
+			try {
+				const response = await getAppointmentDetail(this.appointmentId)
+				console.log('预约详情响应:', response)
+				
+				if (response && response.code === '200' && response.data) {
+					this.appointment = response.data
+					console.log('[detail] 预约详情数据:', JSON.stringify(this.appointment, null, 2))
+					console.log('[detail] 预约状态:', this.appointment.status)
+					console.log('[detail] isConfirmedStatus:', this.isConfirmedStatus(this.appointment.status))
+					console.log('[detail] isCompletedStatus:', this.isCompletedStatus(this.appointment.status))
+					console.log('[detail] isCancelledStatus:', this.isCancelledStatus(this.appointment.status))
+					console.log('[detail] 应该显示取消按钮:', this.isConfirmedStatus(this.appointment.status) || this.isCompletedStatus(this.appointment.status))
+				} else {
+					uni.showToast({
+						title: response?.msg || '加载失败',
+						icon: 'none'
+					})
+				}
+			} catch (error) {
+				console.error('加载预约详情失败:', error)
+				uni.showToast({
+					title: '加载失败，请重试',
+					icon: 'none'
+				})
+			} finally {
+				this.loading = false
+			}
 		}
 	},
 			
@@ -146,21 +176,74 @@ onLoad(options) {
 			},
 			
 			getStatusText(status) {
+				if (!status) return '未知'
+				const statusLower = status.toLowerCase()
 				const statusMap = {
 					'confirmed': '已确认',
+					'scheduled': '已确认',
 					'completed': '已完成',
-					'cancelled': '已取消'
+					'cancelled': '已取消',
+					'pending': '待支付'
 				}
-				return statusMap[status] || '未知'
+				return statusMap[statusLower] || statusMap[status] || '未知'
 			},
 			
 			getStatusIcon(status) {
+				if (!status) return '❓'
+				const statusLower = status.toLowerCase()
 				const iconMap = {
 					'confirmed': '✅',
+					'scheduled': '✅',
 					'completed': '✔️',
-					'cancelled': '❌'
+					'cancelled': '❌',
+					'pending': '⏳'
 				}
-				return iconMap[status] || '❓'
+				return iconMap[statusLower] || iconMap[status] || '❓'
+			},
+			
+			// 判断是否为已确认状态（兼容大小写）
+			// 包括：confirmed, scheduled, pending_payment（待支付状态也可以取消）
+			isConfirmedStatus(status) {
+				if (!status) {
+					console.log('[detail isConfirmedStatus] status 为空')
+					return false
+				}
+				const statusLower = status.toLowerCase()
+				const result = statusLower === 'confirmed' || 
+					   statusLower === 'scheduled' || 
+					   statusLower === 'pending_payment' ||
+					   statusLower === 'pending'
+				console.log('[detail isConfirmedStatus] 状态:', status, '转换为:', statusLower, '结果:', result)
+				return result
+			},
+			
+			// 判断是否为已完成状态
+			isCompletedStatus(status) {
+				if (!status) return false
+				return status.toLowerCase() === 'completed'
+			},
+			
+			// 判断是否为已取消状态
+			isCancelledStatus(status) {
+				if (!status) return false
+				return status.toLowerCase() === 'cancelled'
+			},
+			
+			// 判断是否为待支付状态
+			isPendingStatus(status) {
+				if (!status) return false
+				const statusLower = status.toLowerCase()
+				return statusLower === 'pending' || statusLower === 'pending_payment'
+			},
+			
+			// 判断是否可以取消预约（所有非取消状态都可以取消）
+			canCancelAppointment(status) {
+				if (!status) return false
+				const statusLower = status.toLowerCase()
+				// 已取消状态不能再次取消，其他状态都可以取消
+				const canCancel = statusLower !== 'cancelled'
+				console.log('[detail canCancelAppointment] 状态:', status, '可以取消:', canCancel)
+				return canCancel
 			},
 			
 			formatDateTime(dateString) {
@@ -173,17 +256,18 @@ onLoad(options) {
 				return `${month}月${day}日 ${hours}:${minutes}`
 			},
 			
-			handleCancel() {
+			async handleCancel() {
 				uni.showModal({
 					title: '确认取消',
 					content: '确定要取消这个预约吗？',
-					success: (res) => {
+					success: async (res) => {
 						if (res.confirm) {
+							try {
 							uni.showLoading({ title: '取消中...' })
+								const response = await cancelAppointment(this.appointmentId)
+								console.log('取消预约响应:', response)
 							
-							// TODO: 调用后端API取消预约
-							setTimeout(() => {
-								uni.hideLoading()
+								if (response && response.code === '200') {
 								uni.showToast({
 									title: '预约已取消',
 									icon: 'success'
@@ -192,7 +276,21 @@ onLoad(options) {
 								setTimeout(() => {
 									uni.navigateBack()
 								}, 1500)
-							}, 1000)
+								} else {
+									uni.showToast({
+										title: response?.msg || '取消失败',
+										icon: 'none'
+									})
+								}
+							} catch (error) {
+								console.error('取消预约失败:', error)
+								uni.showToast({
+									title: '取消失败，请重试',
+									icon: 'none'
+								})
+							} finally {
+								uni.hideLoading()
+							}
 						}
 					}
 				})
@@ -369,6 +467,17 @@ onLoad(options) {
 		border: 2rpx solid #FED7D7;
 		border-radius: 50rpx;
 		color: #DC2626;
+		font-size: 32rpx;
+		font-weight: 600;
+	}
+
+	.view-btn {
+		flex: 1;
+		height: 96rpx;
+		background: #E6FFFA;
+		border: 2rpx solid #7be6d8;
+		border-radius: 50rpx;
+		color: #38A2AC;
 		font-size: 32rpx;
 		font-weight: 600;
 	}

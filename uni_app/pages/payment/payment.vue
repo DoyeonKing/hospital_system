@@ -60,7 +60,6 @@
 
 <script>
 	import { mockSchedules, mockPatientInfo } from '../../api/mockData.js'
-	// import { createAppointment } from '../../api/appointment.js'
 	
 	export default {
 		data() {
@@ -76,6 +75,7 @@
 				patientInfo: {},
 				appointmentId: null, // 预约ID
 				isWaitlist: false, // 是否为候补支付
+				appointmentCreated: false, // 标记是否已创建预约，防止重复创建
 				selectedMethod: 'wechat',
 				paymentMethods: [
 					{ value: 'wechat', name: '微信支付', icon: '💚' },
@@ -101,40 +101,120 @@
 			loadPatientInfo() {
 				const stored = uni.getStorageSync('patientInfo')
 				this.patientInfo = stored || mockPatientInfo
+				console.log('加载患者信息:', this.patientInfo)
+				
+				// 如果没有患者ID，提示用户
+				if (!this.patientInfo || !this.patientInfo.id) {
+					console.warn('警告：患者ID不存在，可能导致创建预约失败')
+					uni.showToast({
+						title: '请先登录',
+						icon: 'none',
+						duration: 2000
+					})
+				}
 			},
 			
 			selectMethod(method) {
 				this.selectedMethod = method
 			},
 			
-		async createAppointment() {
-			try {
-				if (this.isWaitlist) {
-					// 候补支付：使用候补ID
-					this.appointmentId = this.waitlistId
-				} else {
-					// 创建预约（状态为待支付）
-					// const response = await createAppointment({
-					// 	scheduleId: this.scheduleId,
-					// 	patientId: this.patientInfo.id
-					// })
-					// this.appointmentId = response.appointmentId
-					
-					// 模拟创建预约
-					this.appointmentId = Math.floor(Math.random() * 10000) + 1000
+			async createAppointment() {
+				// 防止重复创建
+				if (this.appointmentCreated) {
+					console.log('预约已创建，跳过重复创建')
+					return
 				}
-			} catch (error) {
-				console.error('创建预约失败:', error)
-				uni.showModal({
-					title: '预约失败',
-					content: '创建预约失败，请重试',
-					showCancel: false,
-					success: () => {
-						uni.navigateBack()
+				
+				try {
+					if (this.isWaitlist) {
+						// 候补支付：使用候补ID
+						this.appointmentId = this.waitlistId
+						this.appointmentCreated = true
+						console.log('候补支付，使用waitlistId:', this.appointmentId)
+					} else {
+						// 检查必要参数
+						if (!this.scheduleId) {
+							throw new Error('排班ID不能为空')
+						}
+						if (!this.patientInfo || !this.patientInfo.id) {
+							throw new Error('患者信息不完整，请先登录')
+						}
+						
+						console.log('准备创建预约，参数:', {
+							scheduleId: this.scheduleId,
+							patientId: this.patientInfo.id
+						})
+						
+						// 动态导入 appointment API
+						const { createAppointment } = await import('../../api/appointment.js')
+						
+						// 创建预约（状态为待支付）
+						const response = await createAppointment({
+							scheduleId: this.scheduleId,
+							patientId: this.patientInfo.id
+						})
+						
+						console.log('创建预约完整响应:', JSON.stringify(response, null, 2))
+						
+						// 处理不同的响应格式
+						let appointmentData = null
+						if (response && response.code === '200' && response.data) {
+							appointmentData = response.data
+						} else if (response && response.appointmentId) {
+							// 直接返回 AppointmentResponse
+							appointmentData = response
+						} else if (response && response.data && response.data.appointmentId) {
+							appointmentData = response.data
+						}
+						
+						if (appointmentData) {
+							this.appointmentId = appointmentData.appointmentId || appointmentData.id
+							this.appointmentCreated = true
+							console.log('预约创建成功，appointmentId:', this.appointmentId)
+						} else {
+							console.error('创建预约响应格式异常:', response)
+							// 检查是否是重复预约错误
+							const errorMsg = response?.msg || response?.message || ''
+							if (errorMsg.includes('already has an appointment')) {
+								// 如果是重复预约，尝试获取已存在的预约
+								console.log('检测到重复预约，尝试获取已存在的预约')
+								// 这里可以调用获取预约列表接口，找到对应的预约
+								// 暂时提示用户
+								throw new Error('您已预约过该排班，请前往预约列表查看')
+							} else {
+								throw new Error(errorMsg || '创建预约失败：响应格式异常')
+							}
+						}
 					}
-				})
-			}
-		},
+				} catch (error) {
+					console.error('创建预约失败，详细信息:', error)
+					console.error('错误堆栈:', error.stack)
+					
+					// 如果是重复预约错误，提示更友好
+					const errorMessage = error.message || ''
+					if (errorMessage.includes('already has an appointment') || errorMessage.includes('已预约')) {
+						uni.showModal({
+							title: '预约提示',
+							content: '您已预约过该排班，请前往预约列表查看',
+							showCancel: false,
+							success: () => {
+								uni.switchTab({
+									url: '/pages/appointments/appointments'
+								})
+							}
+						})
+					} else {
+						uni.showModal({
+							title: '预约失败',
+							content: error.message || '创建预约失败，请重试',
+							showCancel: false,
+							success: () => {
+								uni.navigateBack()
+							}
+						})
+					}
+				}
+			},
 			
 			async handlePayment() {
 				if (!this.appointmentId) {
@@ -148,15 +228,47 @@
 				uni.showLoading({ title: '支付中...' })
 				
 				try {
-					// 模拟支付处理（等待2秒）
-					await new Promise(resolve => setTimeout(resolve, 2000))
+					console.log('开始支付，appointmentId:', this.appointmentId, 'isWaitlist:', this.isWaitlist)
 					
-					// 更新支付状态
-					// await updateAppointmentPayment(this.appointmentId, {
-					// 	paymentStatus: 'paid',
-					// 	paymentMethod: this.selectedMethod,
-					// 	transactionId: 'TXN' + Date.now()
-					// })
+					// 动态导入 appointment API
+					const appointmentApi = await import('../../api/appointment.js')
+					
+					if (this.isWaitlist) {
+						// 候补支付：调用 payForWaitlist
+						console.log('调用 payForWaitlist，waitlistId:', this.waitlistId)
+						const response = await appointmentApi.payForWaitlist(this.waitlistId, {
+							paymentMethod: this.selectedMethod,
+							transactionId: 'TXN' + Date.now()
+						})
+						
+						console.log('候补支付完整响应:', JSON.stringify(response, null, 2))
+						
+						if (response && response.code === '200' && response.data) {
+							this.appointmentId = response.data.appointmentId || response.data.id
+							console.log('候补支付成功，新的appointmentId:', this.appointmentId)
+						} else {
+							throw new Error(response?.msg || response?.message || '支付失败')
+						}
+					} else {
+						// 普通预约支付：调用 payForAppointment
+						console.log('调用 payForAppointment，appointmentId:', this.appointmentId)
+						const response = await appointmentApi.payForAppointment(this.appointmentId, {
+							paymentMethod: this.selectedMethod,
+							transactionId: 'TXN' + Date.now()
+						})
+						
+						console.log('预约支付完整响应:', JSON.stringify(response, null, 2))
+						
+						// 检查响应
+						if (response && response.code === '200') {
+							console.log('支付成功')
+						} else if (response && response.appointmentId) {
+							// 直接返回 AppointmentResponse，也认为是成功
+							console.log('支付成功（直接返回）')
+						} else {
+							throw new Error(response?.msg || response?.message || '支付失败')
+						}
+					}
 					
 					uni.hideLoading()
 					
@@ -167,17 +279,21 @@
 						duration: 2000
 					})
 					
-			// 跳转到预约详情页面，显示二维码
-			setTimeout(() => {
-				uni.redirectTo({
-					url: `/pages/appointment/detail?appointmentId=${this.appointmentId}&departmentName=${encodeURIComponent(this.departmentName)}&doctorName=${encodeURIComponent(this.doctorName)}&doctorTitle=${encodeURIComponent(this.doctorTitle)}&scheduleDate=${encodeURIComponent(this.scheduleDate)}&slotName=${encodeURIComponent(this.slotName)}`
-				})
-			}, 2000)
+					// 跳转到预约详情页面，显示二维码
+					setTimeout(() => {
+						console.log('跳转到预约详情，appointmentId:', this.appointmentId)
+						uni.redirectTo({
+							url: `/pages/appointment/detail?appointmentId=${this.appointmentId}&departmentName=${encodeURIComponent(this.departmentName)}&doctorName=${encodeURIComponent(this.doctorName)}&doctorTitle=${encodeURIComponent(this.doctorTitle)}&scheduleDate=${encodeURIComponent(this.scheduleDate)}&slotName=${encodeURIComponent(this.slotName)}`
+						})
+					}, 2000)
 				} catch (error) {
 					uni.hideLoading()
+					console.error('支付失败，详细信息:', error)
+					console.error('错误堆栈:', error.stack)
 					uni.showToast({
-						title: '支付失败，请重试',
-						icon: 'none'
+						title: error.message || '支付失败，请重试',
+						icon: 'none',
+						duration: 3000
 					})
 				}
 			}

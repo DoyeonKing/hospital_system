@@ -106,19 +106,33 @@
 					const response = await getScheduleById(this.scheduleId)
 					console.log('排班详情API响应:', response)
 					
-					if (response && response.scheduleId) {
-						// 适配后端数据格式
-						const adapted = adaptSchedule(response)
-						console.log('适配后的排班数据:', adapted)
-						
+					// getScheduleById 返回格式：{code: '200', data: {...}} 或直接返回 ScheduleResponse
+					let scheduleData = null
+					
+					if (response && response.code === '200' && response.data) {
+						// 标准 Result 格式
+						scheduleData = response.data
+					} else if (response && response.scheduleId) {
+						// 直接返回 ScheduleResponse 对象
+						scheduleData = adaptSchedule(response)
+					} else if (response && response.data) {
+						// 可能已经在 data 中
+						scheduleData = adaptSchedule(response.data)
+					} else {
+						throw new Error('返回数据格式异常')
+					}
+					
+					console.log('处理后的排班数据:', scheduleData)
+					
+					if (scheduleData) {
 						this.scheduleInfo = {
-							departmentName: adapted.departmentName || '',
-							doctorName: adapted.doctorName || '',
-							doctorTitle: adapted.doctorTitle || '',
-							scheduleDate: adapted.scheduleDate || '',
-							slotName: adapted.slotName || '',
-							location: adapted.location || '',
-							fee: adapted.fee || 0
+							departmentName: scheduleData.departmentName || '',
+							doctorName: scheduleData.doctorName || '',
+							doctorTitle: scheduleData.doctorTitle || '',
+							scheduleDate: scheduleData.scheduleDate || '',
+							slotName: scheduleData.slotName || '',
+							location: scheduleData.location || '',
+							fee: scheduleData.fee || 0
 						}
 						console.log('设置后的scheduleInfo:', this.scheduleInfo)
 					} else {

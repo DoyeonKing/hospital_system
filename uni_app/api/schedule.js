@@ -14,10 +14,27 @@ export async function getTodaySchedules(startDate, endDate) {
 		startDate,
 		endDate
 	})
+	// 后端返回 Page<ScheduleResponse> 格式，提取 content
+	if (response.content && Array.isArray(response.content)) {
+		return {
+			code: '200',
+			data: adaptSchedule(response.content),
+			totalElements: response.totalElements,
+			totalPages: response.totalPages
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
 			data: adaptSchedule(response.data)
+		}
+	}
+	// 兼容直接返回数组的情况
+	if (Array.isArray(response)) {
+		return {
+			code: '200',
+			data: adaptSchedule(response)
 		}
 	}
 	return response
@@ -63,14 +80,27 @@ export async function getSchedulesByDepartment(departmentId, startDate, endDate)
 	// 处理返回的 Page 格式：Spring Boot 的 Page 格式
 	if (response.content && Array.isArray(response.content)) {
 		return {
-			...response,
-			data: adaptSchedule(response.content)
+			code: '200',
+			data: adaptSchedule(response.content),
+			totalElements: response.totalElements,
+			totalPages: response.totalPages
 		}
 	}
 	
-	// 兼容可能的其他格式
+	// 兼容可能的 Result 格式
+	if (response.code === '200' && response.data) {
+		return {
+			...response,
+			data: adaptSchedule(response.data)
+		}
+	}
+	
+	// 兼容直接返回数组的情况
 	if (Array.isArray(response)) {
-		return adaptSchedule(response)
+		return {
+			code: '200',
+			data: adaptSchedule(response)
+		}
 	}
 	
 	// 都不匹配，返回原数据
@@ -81,31 +111,82 @@ export async function getSchedulesByDepartment(departmentId, startDate, endDate)
  * 获取时间段列表
  * @param {Number} scheduleId - 排班ID
  */
-export function getTimeSlots(scheduleId) {
-	return get(`/api/timeslots/schedule/${scheduleId}`)
+export async function getTimeSlots(scheduleId) {
+	const response = await get(`/api/timeslots/schedule/${scheduleId}`)
+	// 后端可能返回数组或 Result 格式
+	if (Array.isArray(response)) {
+		return {
+			code: '200',
+			data: response
+		}
+	}
+	// 兼容可能的 Result 格式
+	if (response.code === '200' && response.data) {
+		return response
+	}
+	return response
 }
 
 /**
  * 根据科室ID获取医生列表
  * @param {Number} departmentId - 科室ID
  */
-export function getDoctorsByDepartment(departmentId) {
-	return get(`/api/departments/${departmentId}/doctors`)
+export async function getDoctorsByDepartment(departmentId) {
+	const response = await get(`/api/departments/${departmentId}/doctors`)
+	// 后端可能返回数组或对象
+	if (Array.isArray(response)) {
+		return {
+			code: '200',
+			data: response
+		}
+	}
+	// 兼容可能的 Result 格式
+	if (response.code === '200' && response.data) {
+		return response
+	}
+	return response
 }
 
 /**
  * 获取单个医生详细信息
  * @param {Number} doctorId - 医生ID
  */
-export function getDoctorById(doctorId) {
-	return get(`/api/doctors/${doctorId}`)
+export async function getDoctorById(doctorId) {
+	const response = await get(`/api/doctors/${doctorId}`)
+	// 后端直接返回 DoctorResponse 对象
+	if (response && response.doctorId) {
+		return {
+			code: '200',
+			data: response
+		}
+	}
+	// 兼容可能的 Result 格式
+	if (response.code === '200' && response.data) {
+		return response
+	}
+	return response
 }
 
 /**
  * 获取单个排班详情
  * @param {Number} scheduleId - 排班ID
  */
-export function getScheduleById(scheduleId) {
-	return get(`/api/schedules/${scheduleId}`)
+export async function getScheduleById(scheduleId) {
+	const response = await get(`/api/schedules/${scheduleId}`)
+	// 后端直接返回 ScheduleResponse 对象
+	if (response && response.scheduleId) {
+		return {
+			code: '200',
+			data: adaptSchedule(response)
+		}
+	}
+	// 兼容可能的 Result 格式
+	if (response.code === '200' && response.data) {
+		return {
+			...response,
+			data: adaptSchedule(response.data)
+		}
+	}
+	return response
 }
 

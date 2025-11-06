@@ -147,7 +147,9 @@
 </template>
 
 <script>
-	import { mockTodaySchedules, mockUpcomingAppointment, mockPopularDepartments, mockPatientInfo, mockMessages, mockWaitlist } from '../../api/mockData.js'
+	import { mockTodaySchedules, mockPopularDepartments, mockPatientInfo, mockMessages } from '../../api/mockData.js'
+	import { getTodaySchedules, getPopularDepartments, getDepartmentTree } from '../../api/schedule.js'
+	import { getUpcomingAppointments, getPatientWaitlist } from '../../api/appointment.js'
 	
 	export default {
 		data() {
@@ -207,77 +209,222 @@
 			uni.stopPullDownRefresh()
 		},
 		methods: {
-		// 检查登录状态
-		checkLoginStatus() {
-			const patientInfo = uni.getStorageSync('patientInfo')
-			
-			console.log('从Storage读取的patientInfo:', patientInfo)
-			
-			// 如果没有登录信息，使用模拟数据（仅用于演示）
-			if (!patientInfo) {
-				console.log('使用模拟数据演示页面功能')
-				this.patientInfo = mockPatientInfo
+			// 检查登录状态
+			checkLoginStatus() {
+				const patientInfo = uni.getStorageSync('patientInfo')
+				
+				console.log('从Storage读取的patientInfo:', patientInfo)
+				
+				// 如果没有登录信息，使用模拟数据（仅用于演示）
+				if (!patientInfo) {
+					console.log('使用模拟数据演示页面功能')
+					this.patientInfo = mockPatientInfo
+					return true
+				}
+				
+				console.log('使用登录数据，患者信息:', patientInfo)
+				this.patientInfo = patientInfo
 				return true
-			}
+			},
 			
-			console.log('使用登录数据，患者信息:', patientInfo)
-			this.patientInfo = patientInfo
-			return true
-		},
+			// 加载页面数据
+			async loadPageData() {
+				// 先检查登录状态
+				this.checkLoginStatus()
+				
+				this.loading = true
+				this.hasNetworkError = false
+				
+				// 加载今日排班（调用真实API）
+				try {
+					const today = new Date()
+					const startDate = this.formatDate(today)
+					const endDate = startDate // 只查询今日
+					
+					console.log('首页 - 加载今日排班:', { startDate, endDate })
+					const scheduleResponse = await getTodaySchedules(startDate, endDate)
+					console.log('首页 - 今日排班响应:', scheduleResponse)
+					
+					if (scheduleResponse && scheduleResponse.code === '200' && scheduleResponse.data) {
+						// 按科室分组，统计每个科室的可用号源总数
+						const departmentMap = new Map()
+						
+						scheduleResponse.data.forEach(schedule => {
+							if (!schedule.departmentId || !schedule.departmentName) return
+							
+							const deptId = schedule.departmentId
+							const remainingSlots = schedule.remainingSlots || 0
+							
+							if (departmentMap.has(deptId)) {
+								const existing = departmentMap.get(deptId)
+								existing.availableSlots += remainingSlots
+							} else {
+								departmentMap.set(deptId, {
+									id: deptId,
+									departmentId: deptId,
+									departmentName: schedule.departmentName,
+									availableSlots: remainingSlots
+								})
+							}
+						})
+						
+						// 转换为数组，按可用号源数量降序排列，取前4个
+						this.todaySchedules = Array.from(departmentMap.values())
+							.filter(dept => dept.availableSlots > 0) // 只显示有号源的科室
+							.sort((a, b) => b.availableSlots - a.availableSlots)
+							.slice(0, 4)
+						
+						console.log('首页 - 处理后的今日可预约:', this.todaySchedules)
+					} else {
+						// API失败时使用mock数据
+						console.warn('首页 - 今日排班API失败，使用mock数据')
+						this.todaySchedules = JSON.parse(JSON.stringify(mockTodaySchedules))
+					}
+				} catch (error) {
+					console.error('首页 - 加载今日排班失败:', error)
+					// 出错时使用mock数据
+					this.todaySchedules = JSON.parse(JSON.stringify(mockTodaySchedules))
+				}
+				
+				// 加载热门科室（调用真实API）
+				try {
+					console.log('首页 - 加载热门科室')
+					const popularResponse = await getPopularDepartments()
+					console.log('首页 - 热门科室响应:', popularResponse)
+					
+					if (popularResponse && popularResponse.code === '200' && popularResponse.data) {
+						// 如果返回的是数组
+						this.popularDepartments = Array.isArray(popularResponse.data) 
+							? popularResponse.data.map(dept => ({
+								id: dept.departmentId || dept.id,
+								name: dept.name || dept.departmentName
+							}))
+							: [{
+								id: popularResponse.data.departmentId || popularResponse.data.id,
+								name: popularResponse.data.name || popularResponse.data.departmentName
+							}]
+					} else if (Array.isArray(popularResponse)) {
+						// 直接返回数组
+						this.popularDepartments = popularResponse.map(dept => ({
+							id: dept.departmentId || dept.id,
+							name: dept.name || dept.departmentName
+						}))
+					} else {
+						// 如果后端没有popular接口，使用科室树获取父科室作为热门科室
+						console.log('首页 - 热门科室接口不可用，使用科室树获取父科室')
+						try {
+							const treeResponse = await getDepartmentTree()
+							if (Array.isArray(treeResponse)) {
+								// 取前6个父科室作为热门科室（DepartmentTreeDTO 结构：id, name, type, children）
+								this.popularDepartments = treeResponse
+									.filter(item => item.type === 'parent' || !item.type) // 只取父科室
+									.slice(0, 6)
+									.map(parent => ({
+										id: parent.id,
+										name: parent.name
+									}))
+							} else if (treeResponse && Array.isArray(treeResponse.data)) {
+								this.popularDepartments = treeResponse.data
+									.filter(item => item.type === 'parent' || !item.type)
+									.slice(0, 6)
+									.map(parent => ({
+										id: parent.id,
+										name: parent.name
+									}))
+							} else {
+								// 都失败时使用mock数据
+								this.popularDepartments = JSON.parse(JSON.stringify(mockPopularDepartments))
+							}
+						} catch (treeError) {
+							console.error('首页 - 加载科室树失败:', treeError)
+							this.popularDepartments = JSON.parse(JSON.stringify(mockPopularDepartments))
+						}
+					}
+				} catch (error) {
+					console.error('首页 - 加载热门科室失败:', error)
+					// 出错时使用mock数据
+					this.popularDepartments = JSON.parse(JSON.stringify(mockPopularDepartments))
+				}
+				
+				// 加载未读消息数量（暂时使用mock）
+				this.unreadCount = mockMessages.filter(msg => !msg.isRead).length
+				
+				// 加载即将就诊的预约（调用真实API）
+				try {
+					const patientInfo = uni.getStorageSync('patientInfo')
+					if (patientInfo && patientInfo.id) {
+						// 获取即将就诊的预约
+						const appointmentResponse = await getUpcomingAppointments(patientInfo.id)
+						console.log('即将就诊预约响应:', appointmentResponse)
+						if (appointmentResponse && appointmentResponse.code === '200' && appointmentResponse.data) {
+							// 取第一个即将就诊的预约
+							this.upcomingAppointment = appointmentResponse.data.length > 0 ? appointmentResponse.data[0] : null
+						} else {
+							this.upcomingAppointment = null
+						}
+						
+						// 获取候补数量
+						const waitlistResponse = await getPatientWaitlist(patientInfo.id)
+						console.log('候补列表响应:', waitlistResponse)
+						if (waitlistResponse && waitlistResponse.code === '200' && waitlistResponse.data) {
+							this.waitlistCount = waitlistResponse.data.filter(w => 
+								w.status === 'WAITING' || w.status === 'NOTIFIED'
+							).length
+						} else {
+							this.waitlistCount = 0
+						}
+					} else {
+						this.upcomingAppointment = null
+						this.waitlistCount = 0
+					}
+				} catch (error) {
+					console.error('加载预约/候补数据失败:', error)
+					this.upcomingAppointment = null
+					this.waitlistCount = 0
+				}
+				
+				this.loading = false
+			},
 			
-		// 加载页面数据 - 直接使用模拟数据，避免API调用失败
-		loadPageData() {
-			// 先检查登录状态
-			this.checkLoginStatus()
+			// 格式化日期为 YYYY-MM-DD
+			formatDate(date) {
+				const year = date.getFullYear()
+				const month = String(date.getMonth() + 1).padStart(2, '0')
+				const day = String(date.getDate()).padStart(2, '0')
+				return `${year}-${month}-${day}`
+			},
 			
-			this.loading = true
-			this.hasNetworkError = false
+			// 导航到消息中心
+			navigateToMessages() {
+				uni.switchTab({
+					url: '/pages/messages/messages'
+				})
+			},
 			
-			// 直接使用测试数据，确保页面有内容显示
-			this.todaySchedules = JSON.parse(JSON.stringify(mockTodaySchedules))
-			this.upcomingAppointment = JSON.parse(JSON.stringify(mockUpcomingAppointment))
-			this.popularDepartments = JSON.parse(JSON.stringify(mockPopularDepartments))
-			this.unreadCount = mockMessages.filter(msg => !msg.isRead).length
+			// 格式化时间
+			formatTime(timeString) {
+				if (!timeString) return ''
+				const date = new Date(timeString)
+				const month = date.getMonth() + 1
+				const day = date.getDate()
+				const hours = date.getHours().toString().padStart(2, '0')
+				const minutes = date.getMinutes().toString().padStart(2, '0')
+				return month + '月' + day + '日 ' + hours + ':' + minutes
+			},
 			
-			// 加载候补数量
-			const allWaitlist = JSON.parse(JSON.stringify(mockWaitlist))
-			this.waitlistCount = allWaitlist.filter(w => w.status === 'waiting' || w.status === 'notified').length
+			// 导航到科室列表
+			navigateToDepartments() {
+				uni.navigateTo({
+					url: '/pages/departments/departments'
+				})
+			},
 			
-			this.loading = false
-		},
-		
-		
-		// 导航到消息中心
-		navigateToMessages() {
-			uni.switchTab({
-				url: '/pages/messages/messages'
-			})
-		},
-		
-		// 格式化时间
-		formatTime(timeString) {
-			if (!timeString) return ''
-			const date = new Date(timeString)
-			const month = date.getMonth() + 1
-			const day = date.getDate()
-			const hours = date.getHours().toString().padStart(2, '0')
-			const minutes = date.getMinutes().toString().padStart(2, '0')
-			return month + '月' + day + '日 ' + hours + ':' + minutes
-		},
-		
-		// 导航到科室列表
-		navigateToDepartments() {
-			uni.navigateTo({
-				url: '/pages/departments/departments'
-			})
-		},
-		
-		// 导航到我的预约
-		navigateToMyAppointments() {
-			uni.switchTab({
-				url: '/pages/appointments/appointments'
-			})
-		},
+			// 导航到我的预约
+			navigateToMyAppointments() {
+				uni.switchTab({
+					url: '/pages/appointments/appointments'
+				})
+			},
 			
 			// 导航到个人中心
 			navigateToProfile() {
@@ -359,16 +506,16 @@
 				})
 			},
 			
-		// 导航到科室排班
-		navigateToDepartmentSchedule(departmentId) {
-			// 查找对应的子科室
-			const schedule = this.todaySchedules.find(s => s.departmentId === departmentId)
-			const departmentName = schedule ? schedule.departmentName : '科室'
-			
-			uni.navigateTo({
-				url: `/pages/schedules/schedules?departmentId=${departmentId}&departmentName=${encodeURIComponent(departmentName)}`
-			})
-		},
+			// 导航到科室排班
+			navigateToDepartmentSchedule(departmentId) {
+				// 查找对应的子科室
+				const schedule = this.todaySchedules.find(s => s.departmentId === departmentId)
+				const departmentName = schedule ? schedule.departmentName : '科室'
+				
+				uni.navigateTo({
+					url: `/pages/schedules/schedules?departmentId=${departmentId}&departmentName=${encodeURIComponent(departmentName)}`
+				})
+			},
 			
 			// 切换热门科室展开/收起
 			toggleDepartments() {

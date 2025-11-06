@@ -10,13 +10,31 @@ import { adaptAppointmentList, adaptAppointment, adaptAppointmentDetail, adaptWa
  */
 export async function getPatientAppointments(patientId) {
 	const response = await get(`/api/appointments/patient/${patientId}`)
-	if (response.code === '200' && response.data) {
-		// 转换数据格式
+	console.log('getPatientAppointments 原始响应:', response)
+	console.log('响应类型:', typeof response, '是否为数组:', Array.isArray(response))
+	
+	// 后端直接返回数组（ResponseEntity<List<AppointmentResponse>>）
+	if (Array.isArray(response)) {
+		console.log('检测到数组格式，开始适配，数组长度:', response.length)
+		const adapted = adaptAppointmentList(response)
+		console.log('适配后的预约列表，长度:', adapted.length)
 		return {
-			...response,
-			data: adaptAppointmentList(response.data)
+			code: '200',
+			data: adapted
 		}
 	}
+	
+	// 兼容可能的 Result 格式
+	if (response && response.code === '200' && response.data) {
+		console.log('检测到 Result 格式，data 类型:', typeof response.data, '是否为数组:', Array.isArray(response.data))
+		const adapted = Array.isArray(response.data) ? adaptAppointmentList(response.data) : []
+		return {
+			...response,
+			data: adapted
+		}
+	}
+	
+	console.warn('getPatientAppointments: 响应格式不匹配，返回原始响应')
 	return response
 }
 
@@ -26,6 +44,14 @@ export async function getPatientAppointments(patientId) {
  */
 export async function getUpcomingAppointments(patientId) {
 	const response = await get(`/api/appointments/patient/${patientId}/upcoming`)
+	// 后端直接返回数组，直接使用
+	if (Array.isArray(response)) {
+		return {
+			code: '200',
+			data: adaptAppointmentList(response)
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
@@ -41,6 +67,14 @@ export async function getUpcomingAppointments(patientId) {
  */
 export async function createAppointment(data) {
 	const response = await post('/api/appointments', data)
+	// 后端直接返回 AppointmentResponse 对象
+	if (response && response.appointmentId) {
+		return {
+			code: '200',
+			data: adaptAppointment(response)
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
@@ -56,6 +90,14 @@ export async function createAppointment(data) {
  */
 export async function cancelAppointment(appointmentId) {
 	const response = await put(`/api/appointments/${appointmentId}/cancel`)
+	// 后端直接返回 AppointmentResponse 对象
+	if (response && response.appointmentId) {
+		return {
+			code: '200',
+			data: adaptAppointment(response)
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
@@ -71,6 +113,14 @@ export async function cancelAppointment(appointmentId) {
  */
 export async function getAppointmentDetail(appointmentId) {
 	const response = await get(`/api/appointments/${appointmentId}`)
+	// 后端直接返回 AppointmentResponse 对象
+	if (response && response.appointmentId) {
+		return {
+			code: '200',
+			data: adaptAppointmentDetail(response)
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
@@ -87,6 +137,14 @@ export async function getAppointmentDetail(appointmentId) {
  */
 export async function updateAppointmentPayment(appointmentId, data) {
 	const response = await put(`/api/appointments/${appointmentId}`, data)
+	// 后端直接返回 AppointmentResponse 对象
+	if (response && response.appointmentId) {
+		return {
+			code: '200',
+			data: adaptAppointment(response)
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
@@ -103,6 +161,14 @@ export async function updateAppointmentPayment(appointmentId, data) {
  */
 export async function payForAppointment(appointmentId, paymentData) {
 	const response = await post(`/api/appointments/${appointmentId}/pay`, paymentData)
+	// 后端直接返回 AppointmentResponse 对象
+	if (response && response.appointmentId) {
+		return {
+			code: '200',
+			data: adaptAppointment(response)
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
@@ -122,6 +188,14 @@ export async function payForAppointment(appointmentId, paymentData) {
  */
 export async function getPatientWaitlist(patientId) {
 	const response = await get(`/api/waitlist/patient/${patientId}`)
+	// 后端直接返回数组，直接使用
+	if (Array.isArray(response)) {
+		return {
+			code: '200',
+			data: adaptWaitlistList(response)
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
@@ -137,6 +211,14 @@ export async function getPatientWaitlist(patientId) {
  */
 export async function getWaitlistDetail(waitlistId) {
 	const response = await get(`/api/waitlist/${waitlistId}`)
+	// 后端直接返回 WaitlistResponse 对象
+	if (response && response.waitlistId) {
+		return {
+			code: '200',
+			data: adaptWaitlist(response)
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
@@ -152,6 +234,14 @@ export async function getWaitlistDetail(waitlistId) {
  */
 export async function createWaitlist(data) {
 	const response = await post('/api/waitlist', data)
+	// 后端直接返回 WaitlistResponse 对象
+	if (response && response.waitlistId) {
+		return {
+			code: '200',
+			data: adaptWaitlist(response)
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
@@ -167,6 +257,14 @@ export async function createWaitlist(data) {
  */
 export async function cancelWaitlist(waitlistId) {
 	const response = await put(`/api/waitlist/${waitlistId}/cancel`)
+	// 后端直接返回 WaitlistResponse 对象
+	if (response && response.waitlistId) {
+		return {
+			code: '200',
+			data: adaptWaitlist(response)
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
@@ -183,6 +281,14 @@ export async function cancelWaitlist(waitlistId) {
  */
 export async function payForWaitlist(waitlistId, paymentData) {
 	const response = await post(`/api/waitlist/${waitlistId}/pay`, paymentData)
+	// 后端直接返回 AppointmentResponse 对象（候补转预约后）
+	if (response && response.appointmentId) {
+		return {
+			code: '200',
+			data: adaptAppointment(response)
+		}
+	}
+	// 兼容可能的 Result 格式
 	if (response.code === '200' && response.data) {
 		return {
 			...response,
