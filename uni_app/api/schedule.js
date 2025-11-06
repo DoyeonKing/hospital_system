@@ -152,19 +152,27 @@ export async function getDoctorsByDepartment(departmentId) {
  * @param {Number} doctorId - 医生ID
  */
 export async function getDoctorById(doctorId) {
-	const response = await get(`/api/doctors/${doctorId}`)
-	// 后端直接返回 DoctorResponse 对象
-	if (response && response.doctorId) {
-		return {
-			code: '200',
-			data: response
+	try {
+		const response = await get(`/api/doctors/${doctorId}`)
+		console.log('getDoctorById 原始响应:', response)
+		
+		// 后端直接返回 DoctorResponse 对象
+		if (response && response.doctorId) {
+			return response
 		}
-	}
-	// 兼容可能的 Result 格式
-	if (response.code === '200' && response.data) {
+		// 兼容可能的 Result 格式
+		if (response && response.code === '200' && response.data) {
+			return response.data
+		}
+		// 如果返回的是错误字符串
+		if (typeof response === 'string') {
+			throw new Error(response)
+		}
 		return response
+	} catch (error) {
+		console.error('getDoctorById 错误:', error)
+		throw error
 	}
-	return response
 }
 
 /**

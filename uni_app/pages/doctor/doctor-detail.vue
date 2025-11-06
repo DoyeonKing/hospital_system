@@ -91,22 +91,48 @@
 					// 调用后端API获取医生详情
 					const response = await getDoctorById(this.doctorId)
 					console.log('医生详情API响应:', response)
+					console.log('响应数据类型:', typeof response)
 					
-					// 后端返回 DoctorResponse，需要适配格式
-					if (response && response.fullName) {
+					// 处理不同的响应格式
+					let doctorData = null
+					
+					// 情况1: 直接返回 DoctorResponse 对象
+					if (response && response.doctorId) {
+						doctorData = response
+					}
+					// 情况2: 包装在 data 字段中
+					else if (response && response.data && response.data.doctorId) {
+						doctorData = response.data
+					}
+					// 情况3: code/data 格式
+					else if (response && response.code === '200' && response.data) {
+						doctorData = response.data
+					}
+					
+					// 如果成功获取到医生数据，进行适配
+					if (doctorData && doctorData.fullName) {
 						this.doctorInfo = {
-							doctorName: response.fullName,
-							doctorTitle: response.title || '医师',
-							departmentName: response.department ? response.department.name : '未知科室',
-							specialty: response.specialty || '暂无专长信息',
-							photoUrl: response.photoUrl || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
-							bio: response.bio || '医生详情功能开发中...'
+							doctorName: doctorData.fullName,
+							doctorTitle: doctorData.title || '医师',
+							departmentName: doctorData.department ? doctorData.department.name : '未知科室',
+							specialty: doctorData.specialty || '暂无专长信息',
+							photoUrl: doctorData.photoUrl || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
+							bio: doctorData.bio || '暂无简介',
+							education: doctorData.education || '',
+							experience: doctorData.experience || '',
+							awards: doctorData.awards || ''
 						}
 					} else {
-						throw new Error('返回数据格式异常')
+						throw new Error('返回数据格式异常或医生不存在')
 					}
 				} catch (error) {
 					console.error('获取医生详情失败:', error)
+					uni.showToast({
+						title: '获取医生信息失败',
+						icon: 'none',
+						duration: 2000
+					})
+					
 					// 如果后端失败，使用Mock数据作为fallback
 					const doctor = mockDoctorDetails.find(d => d.doctorId === this.doctorId)
 					if (doctor) {
@@ -119,7 +145,7 @@
 							departmentName: '未知科室',
 							specialty: '暂无专长信息',
 							photoUrl: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
-							bio: '医生详情功能开发中...'
+							bio: '暂无简介'
 						}
 					}
 				}
