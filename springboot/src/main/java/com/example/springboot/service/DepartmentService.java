@@ -14,6 +14,9 @@ import com.example.springboot.entity.enums.DoctorStatus;
 import com.example.springboot.repository.DepartmentRepository;
 import com.example.springboot.repository.ParentDepartmentRepository;
 import com.example.springboot.repository.DoctorRepository;
+import com.example.springboot.repository.ScheduleRepository;
+import com.example.springboot.repository.LocationRepository;
+import com.example.springboot.entity.Location;
 import com.example.springboot.specifications.DepartmentSpecification;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -24,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.hibernate.Hibernate;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.ArrayList;
@@ -40,6 +44,12 @@ public class DepartmentService {
     
     @Autowired
     private DoctorRepository doctorRepository;
+    
+    @Autowired
+    private ScheduleRepository scheduleRepository;
+    
+    @Autowired
+    private LocationRepository locationRepository;
 
     /**
      * 创建新子科室
@@ -118,18 +128,31 @@ public class DepartmentService {
             if (departmentId.equals(999)) {
                 throw new RuntimeException("不能删除未分配科室");
             }
+            
+            // 3. 检查科室是否有未来的排班
+            long futureScheduleCount = scheduleRepository.countFutureSchedulesByDepartment(
+                departmentId, 
+                LocalDate.now()
+            );
+            if (futureScheduleCount > 0) {
+                throw new RuntimeException("该科室有 " + futureScheduleCount + " 个未来的排班，无法删除。请先删除或调整相关排班。");
+            }
 
-            // 3. 查询该科室下的医生
+            // 4. 查询该科室下的医生和地点
             List<Doctor> doctorsInDepartment = doctorRepository.findByDepartmentDepartmentId(departmentId);
+            List<Location> locationsInDepartment = locationRepository.findByDepartmentDepartmentId(departmentId);
             System.out.println("科室 " + departmentId + " 下有 " + doctorsInDepartment.size() + " 位医生");
+            System.out.println("科室 " + departmentId + " 下有 " + locationsInDepartment.size() + " 个地点");
             
             DepartmentDeleteResult result = new DepartmentDeleteResult();
             result.setDepartmentId(departmentId);
             result.setDepartmentName(department.getName());
             result.setDoctorCount(doctorsInDepartment.size());
             result.setMovedDoctors(new ArrayList<>());
+            result.setLocationCount(locationsInDepartment.size());
+            result.setMovedLocations(new ArrayList<>());
 
-            // 4. 如果有医生，先将他们移动到未分配科室
+            // 5. 如果有医生，先将他们移动到未分配科室
             if (!doctorsInDepartment.isEmpty()) {
                 Department unassignedDepartment = departmentRepository.findById(999)
                         .orElseThrow(() -> new RuntimeException("未分配科室不存在，请先执行数据库初始化脚本"));
@@ -146,34 +169,37 @@ public class DepartmentService {
                 System.out.println("医生移动完成");
             }
 
-            // 5. 处理其他外键约束
-            System.out.println("处理其他外键约束...");
+            // 6. 如果有地点，先将它们设置为未分配（department_id = NULL）
+            if (!locationsInDepartment.isEmpty()) {
+                System.out.println("开始处理地点...");
+                
+                for (Location location : locationsInDepartment) {
+                    System.out.println("解除地点绑定: " + location.getLocationName());
+                    location.setDepartment(null);  // 设置为未分配
+                    result.getMovedLocations().add(location.getLocationName());
+                }
+                
+                // 批量保存地点
+                locationRepository.saveAll(locationsInDepartment);
+                System.out.println("地点处理完成");
+            }
             
-            // 注释掉不存在的症状映射表处理
-            // 处理 symptom_department_mapping 表
-            // try {
-            //     int updatedMappings = departmentRepository.updateSymptomDepartmentMappings(departmentId, 999);
-            //     System.out.println("更新了 " + updatedMappings + " 条症状映射记录");
-            // } catch (Exception e) {
-            //     System.out.println("处理症状映射时发生错误: " + e.getMessage());
-            //     // 继续执行，不中断删除流程
-            // }
-
-            // 处理 locations 表（如果有外键约束）
+            // 6.5 处理症状科室映射表（symptom_department_mapping）
             try {
-                int updatedLocations = departmentRepository.updateLocationDepartments(departmentId, 999);
-                System.out.println("更新了 " + updatedLocations + " 条诊室记录");
+                int updatedMappings = departmentRepository.updateSymptomDepartmentMappings(departmentId, 999);
+                System.out.println("更新了 " + updatedMappings + " 条症状映射记录到未分配科室");
             } catch (Exception e) {
-                System.out.println("处理诊室记录时发生错误: " + e.getMessage());
-                // 继续执行，不中断删除流程
+                System.out.println("处理症状映射时发生错误: " + e.getMessage());
+                // 如果更新失败，不中断删除流程，继续执行
             }
 
-            // 6. 删除科室
+            // 7. 删除科室
             System.out.println("开始删除科室: " + department.getName());
             departmentRepository.delete(department);
             System.out.println("科室删除成功");
             
             result.setSuccess(true);
+            result.setMessage("成功删除科室，移动了 " + result.getDoctorCount() + " 位医生和 " + result.getLocationCount() + " 个地点");
             System.out.println("=== 科室删除完成 ===");
             return result;
             
@@ -201,7 +227,16 @@ public class DepartmentService {
             throw new RuntimeException("医生不属于该科室");
         }
 
-        // 3. 将医生移动到未分配科室（ID=999）
+        // 3. 检查医生是否有未来的排班
+        long futureScheduleCount = scheduleRepository.countFutureSchedulesByDoctor(
+            doctor,
+            LocalDate.now()
+        );
+        if (futureScheduleCount > 0) {
+            throw new RuntimeException("该医生有 " + futureScheduleCount + " 个未来的排班，无法移除。请先删除或调整相关排班。");
+        }
+
+        // 4. 将医生移动到未分配科室（ID=999）
         Department unassignedDepartment = departmentRepository.findById(999)
                 .orElseThrow(() -> new RuntimeException("未分配科室不存在，请先执行数据库初始化脚本"));
         

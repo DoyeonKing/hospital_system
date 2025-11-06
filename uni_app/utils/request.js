@@ -4,8 +4,12 @@
  */
 import config from '../config/index.js'
 
-// API基础URL配置
-const BASE_URL = config.baseURL
+/**
+ * 获取API基础URL
+ */
+function getBaseURL() {
+	return config.baseURL
+}
 
 /**
  * 封装的request方法
@@ -14,8 +18,12 @@ const BASE_URL = config.baseURL
  */
 function request(options) {
 	return new Promise((resolve, reject) => {
+		const fullUrl = getBaseURL() + options.url
+		console.log(`[REQUEST] ${options.method || 'GET'} ${fullUrl}`)
+		console.log('[REQUEST] 请求参数:', options.data || {})
+		
 		uni.request({
-			url: BASE_URL + options.url,
+			url: fullUrl,
 			method: options.method || 'GET',
 			data: options.data || {},
 			header: {
@@ -25,17 +33,24 @@ function request(options) {
 				...getAuthHeader()
 			},
 			success: (res) => {
+				console.log(`[RESPONSE] ${options.method || 'GET'} ${fullUrl}`)
+				console.log('[RESPONSE] 状态码:', res.statusCode)
+				console.log('[RESPONSE] 响应数据:', res.data)
+				console.log('[RESPONSE] 响应数据类型:', typeof res.data, '是否为数组:', Array.isArray(res.data))
+				
 				// 统一处理响应
 				if (res.statusCode === 200) {
 					// 后端返回的数据格式：
 					// 1. 标准格式：{ code, msg, data }
 					// 2. 简单格式：{ message } 或 { error }
+					// 3. Spring Boot ResponseEntity: 直接返回数据（可能是数组或对象）
 					resolve(res.data)
 				} else if (res.statusCode === 400) {
 					// 400 Bad Request - 业务逻辑错误
 					// 后端返回 {"error": "..."}
 					resolve(res.data)
 				} else {
+					console.error('[RESPONSE] 非200状态码:', res.statusCode, res.data)
 					uni.showToast({
 						title: '请求失败',
 						icon: 'none'
@@ -44,11 +59,9 @@ function request(options) {
 				}
 			},
 			fail: (err) => {
-				console.error('请求失败:', err)
-				uni.showToast({
-					title: '网络错误，请稍后重试',
-					icon: 'none'
-				})
+				console.error('[REQUEST] 请求失败:', err)
+				console.error('[REQUEST] 失败URL:', fullUrl)
+				// 不显示toast，让调用方处理错误
 				reject(err)
 			}
 		})

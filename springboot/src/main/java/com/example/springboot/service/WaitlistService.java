@@ -77,7 +77,7 @@ public class WaitlistService {
     public List<WaitlistResponse> findWaitlistsBySchedule(Integer scheduleId) {
         Schedule schedule = scheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + scheduleId));
-        return waitlistRepository.findByScheduleAndStatusOrderByCreatedAtAsc(schedule, WaitlistStatus.PENDING).stream()
+        return waitlistRepository.findByScheduleAndStatusOrderByCreatedAtAsc(schedule, WaitlistStatus.waiting).stream()
                 .map(this::convertToResponseDto)
                 .collect(Collectors.toList());
     }
@@ -103,14 +103,14 @@ public class WaitlistService {
             throw new BadRequestException("Patient already has an appointment for this schedule.");
         }
         // 检查患者是否已在该排班的候补队列中
-        if (waitlistRepository.existsByPatientAndScheduleAndStatus(patient, schedule, WaitlistStatus.PENDING)) {
+        if (waitlistRepository.existsByPatientAndScheduleAndStatus(patient, schedule, WaitlistStatus.waiting)) {
             throw new BadRequestException("Patient is already on the waitlist for this schedule.");
         }
 
         Waitlist waitlist = new Waitlist();
         waitlist.setPatient(patient);
         waitlist.setSchedule(schedule);
-        waitlist.setStatus(WaitlistStatus.PENDING);
+        waitlist.setStatus(WaitlistStatus.waiting);  // 新候补记录状态为 waiting
         waitlist.setCreatedAt(LocalDateTime.now());
 
         return convertToResponseDto(waitlistRepository.save(waitlist));
@@ -152,22 +152,22 @@ public class WaitlistService {
             return null; // 没有空余号源
         }
 
-        // 获取最早的待处理候补条目
-        List<Waitlist> pendingWaitlists = waitlistRepository.findByScheduleAndStatusOrderByCreatedAtAsc(schedule, WaitlistStatus.PENDING);
+        // 获取最早的等待中的候补条目
+        List<Waitlist> pendingWaitlists = waitlistRepository.findByScheduleAndStatusOrderByCreatedAtAsc(schedule, WaitlistStatus.waiting);
         if (pendingWaitlists.isEmpty()) {
-            return null; // 没有待处理的候补人员
+            return null; // 没有等待中的候补人员
         }
 
         for (Waitlist waitlist : pendingWaitlists) {
             Patient patient = waitlist.getPatient();
             // 再次检查患者状态和是否已预约
             if (patient.getPatientProfile() != null && patient.getPatientProfile().getBlacklistStatus() == BlacklistStatus.blacklisted) {
-                waitlist.setStatus(WaitlistStatus.REJECTED); // 标记为拒绝，跳过
+                waitlist.setStatus(WaitlistStatus.expired); // 标记为过期（拒绝）
                 waitlistRepository.save(waitlist);
                 continue;
             }
             if (appointmentRepository.existsByPatientAndSchedule(patient, schedule)) {
-                waitlist.setStatus(WaitlistStatus.REJECTED); // 标记为拒绝，因为已经有预约了
+                waitlist.setStatus(WaitlistStatus.expired); // 标记为过期（已有预约）
                 waitlistRepository.save(waitlist);
                 continue;
             }
@@ -184,7 +184,7 @@ public class WaitlistService {
             schedule.setBookedSlots(schedule.getBookedSlots() + 1); // 增加已预约数
             scheduleRepository.save(schedule); // 保存排班
 
-            waitlist.setStatus(WaitlistStatus.FULFILLED); // 标记候补已完成
+            waitlist.setStatus(WaitlistStatus.booked); // 标记候补已完成（已预约）
             waitlist.setNotificationSentAt(LocalDateTime.now()); // 假设此时通知已发送
             waitlistRepository.save(waitlist); // 保存候补
 
@@ -217,8 +217,8 @@ public class WaitlistService {
         Waitlist waitlist = waitlistRepository.findById(waitlistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Waitlist not found with id " + waitlistId));
 
-        if (waitlist.getStatus() != WaitlistStatus.PENDING) {
-            throw new BadRequestException("Only pending waitlist entries can be canceled");
+        if (waitlist.getStatus() != WaitlistStatus.waiting) {
+            throw new BadRequestException("Only waiting waitlist entries can be canceled");
         }
 
         WaitlistUpdateRequest request = new WaitlistUpdateRequest();
@@ -228,26 +228,49 @@ public class WaitlistService {
 
     @Transactional
     public AppointmentResponse processWaitlistPayment(Integer waitlistId, PaymentRequest paymentData) {
+        // 1. 查找候补记录
         Waitlist waitlist = waitlistRepository.findById(waitlistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Waitlist not found with id " + waitlistId));
 
+        // 2. 检查状态必须是 notified（已通知）
         if (waitlist.getStatus() != WaitlistStatus.notified) {
             throw new BadRequestException("Only notified waitlist entries can be paid");
         }
 
-        // 创建正式预约
-        Appointment appointment = createAppointmentFromWaitlist(waitlist.getSchedule().getScheduleId());
-        if (appointment == null) {
-            throw new BadRequestException("No available slot to convert waitlist to appointment");
+        Schedule schedule = waitlist.getSchedule();
+        Patient patient = waitlist.getPatient();
+
+        // 3. 检查是否还有空位（可能在通知后被其他人预约了）
+        if (schedule.getBookedSlots() >= schedule.getTotalSlots()) {
+            throw new BadRequestException("No available slot, the schedule is already fully booked");
         }
 
-        // 更新支付信息
-        AppointmentUpdateRequest updateRequest = new AppointmentUpdateRequest();
-        updateRequest.setPaymentStatus(PaymentStatus.paid);
-        updateRequest.setPaymentMethod(paymentData.getPaymentMethod());
-        updateRequest.setTransactionId(paymentData.getTransactionId());
-        updateRequest.setStatus(AppointmentStatus.completed);
+        // 4. 检查患者是否已经有这个排班的预约了
+        if (appointmentRepository.existsByPatientAndSchedule(patient, schedule)) {
+            throw new BadRequestException("Patient already has an appointment for this schedule");
+        }
 
-        return appointmentService.updateAppointment(appointment.getAppointmentId(), updateRequest);
+        // 5. 为当前患者创建正式预约
+        Appointment appointment = new Appointment();
+        appointment.setPatient(patient);
+        appointment.setSchedule(schedule);
+        appointment.setAppointmentNumber(schedule.getBookedSlots() + 1);
+        appointment.setStatus(AppointmentStatus.scheduled);  // 已预约状态
+        appointment.setPaymentStatus(PaymentStatus.paid);    // 已支付
+        appointment.setPaymentMethod(paymentData.getPaymentMethod());
+        appointment.setTransactionId(paymentData.getTransactionId());
+        appointment.setCreatedAt(LocalDateTime.now());
+
+        // 6. 更新排班的已预约数
+        schedule.setBookedSlots(schedule.getBookedSlots() + 1);
+        scheduleRepository.save(schedule);
+
+        // 7. 更新候补状态为已预约
+        waitlist.setStatus(WaitlistStatus.booked);
+        waitlistRepository.save(waitlist);
+
+        // 8. 保存预约并返回
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        return appointmentService.findAppointmentById(savedAppointment.getAppointmentId());
     }
 }

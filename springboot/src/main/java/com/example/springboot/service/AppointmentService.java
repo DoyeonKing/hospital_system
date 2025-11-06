@@ -244,11 +244,13 @@ public class AppointmentService {
             appointment.setTransactionId(paymentData.getTransactionId());
         }
 
-        // 可以添加支付状态变更的业务逻辑，例如：
-        if (paymentData.getPaymentStatus() == PaymentStatus.paid) {
-            appointment.setStatus(AppointmentStatus.scheduled);
+        paymentData.setPaymentStatus(PaymentStatus.paid);
+        // 支付成功后，状态应该保持为 scheduled（已预约），而不是 completed（已完成）
+        // completed 状态应该在就诊完成后由医生或系统标记
+        if (appointment.getStatus() == AppointmentStatus.PENDING_PAYMENT) {
+            paymentData.setStatus(AppointmentStatus.scheduled); // 从待支付改为已预约
         }
-
-        return convertToResponseDto(appointmentRepository.save(appointment));
+        // 如果已经是 scheduled 状态，则保持 scheduled 状态不变
+        return updateAppointment(appointmentId, paymentData);
     }
 }

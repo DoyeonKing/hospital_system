@@ -50,6 +50,15 @@ public interface DepartmentRepository extends JpaRepository<Department, Integer>
     List<Department> findByDescriptionContaining(@Param("description") String description);
     
     /**
+     * 更新症状科室映射表中的科室ID
+     * 将指定科室的症状映射转移到未分配科室
+     */
+    @Modifying
+    @Query(value = "UPDATE symptom_department_mapping SET department_id = :targetDepartmentId WHERE department_id = :sourceDepartmentId", nativeQuery = true)
+    int updateSymptomDepartmentMappings(@Param("sourceDepartmentId") Integer sourceDepartmentId, 
+                                       @Param("targetDepartmentId") Integer targetDepartmentId);
+    
+    /**
      * 检查科室名称是否存在
      */
     boolean existsByName(String name);

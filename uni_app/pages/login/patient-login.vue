@@ -83,7 +83,7 @@
 </template>
 
 <script>
-	import { loginPatient, verifyInitialLogin, activatePatient } from '../../api/patient.js'
+	import { post } from '../../utils/request.js'
 	
 	export default {
 		data() {
@@ -94,15 +94,15 @@
 					identifier: '',
 					password: ''
 				},
-			activationForm: {
-				identifier: '',
-				initialPassword: '',
-				idCard: '',          // 从后端获取的脱敏身份证号
-				idCardInput: '',     // 用户输入的身份证号后6位
-				phone: '',
-				newPassword: '',
-				confirmPassword: ''
-			}
+				activationForm: {
+					identifier: '',
+					initialPassword: '',
+					idCard: '',          // 从后端获取的脱敏身份证号
+					idCardInput: '',     // 用户输入的身份证号后6位
+					phone: '',
+					newPassword: '',
+					confirmPassword: ''
+				}
 			}
 		},
 		methods: {
@@ -128,40 +128,50 @@
 				};
 			},
 			
-			// 患者正常登录
-			async handleLogin() {
-				if (!this.loginForm.identifier || !this.loginForm.password) {
-					uni.showToast({ title: '请输入学号和密码', icon: 'none' });
-					return;
-				}
+		// 患者正常登录
+		async handleLogin() {
+			if (!this.loginForm.identifier || !this.loginForm.password) {
+				uni.showToast({ title: '请输入学号和密码', icon: 'none' });
+				return;
+			}
+			
+			uni.showLoading({ title: '登录中...' });
+			
+			try {
+				const response = await post('/api/auth/patient/login', {
+					identifier: this.loginForm.identifier,
+					password: this.loginForm.password
+				});
 				
-				uni.showLoading({ title: '登录中...' });
+				uni.hideLoading();
 				
-				try {
-					const response = await loginPatient({
-						identifier: this.loginForm.identifier,
-						password: this.loginForm.password
-					});
+				if (response.code === '200') {
+					// 保存token和用户信息
+					uni.setStorageSync('patientToken', response.data.token);
 					
-					uni.hideLoading();
+					// 适配后端返回的数据格式：data.userInfo 包含患者信息
+					const userInfo = response.data.userInfo || {};
+					const adaptedInfo = {
+						id: userInfo.patientId,
+						name: userInfo.fullName,
+						identifier: userInfo.identifier
+					};
+					uni.setStorageSync('patientInfo', adaptedInfo);
 					
-					if (response.code === '200') {
-						// 保存token和用户信息
-						uni.setStorageSync('patientToken', response.data.token);
-						uni.setStorageSync('patientInfo', response.data.patientInfo);
-						
-						uni.showToast({ title: '登录成功', icon: 'success' });
-						// 跳转到主页
-						setTimeout(() => {
-							uni.switchTab({ url: '/pages/index/index' });
-						}, 1500);
-					} else {
-						uni.showToast({ title: response.msg || '登录失败', icon: 'none' });
-					}
-				} catch (error) {
-					uni.hideLoading();
-					console.error('登录请求失败:', error);
+					console.log('登录成功，保存的用户信息:', adaptedInfo);
+					
+					uni.showToast({ title: '登录成功', icon: 'success' });
+					// 跳转到主页
+					setTimeout(() => {
+						uni.switchTab({ url: '/pages/index/index' });
+					}, 1500);
+				} else {
+					uni.showToast({ title: response.msg || '登录失败', icon: 'none' });
 				}
+			} catch (error) {
+				uni.hideLoading();
+				console.error('登录请求失败:', error);
+			}
 			},
 			
 			// 激活第一步：验证初始登录信息
@@ -171,33 +181,33 @@
 					return;
 				}
 				
-				uni.showLoading({ title: '验证中...' });
+			uni.showLoading({ title: '验证中...' });
+			
+			try {
+				const response = await post('/api/auth/verify-patient', {
+					identifier: this.activationForm.identifier,
+					initialPassword: this.activationForm.initialPassword
+				});
 				
-				try {
-					const response = await verifyInitialLogin({
-						identifier: this.activationForm.identifier,
-						initialPassword: this.activationForm.initialPassword
-					});
-					
-					uni.hideLoading();
-					
-					// 后端返回格式：{"message": "..."} 表示成功，{"error": "..."} 表示失败
-					if (response.message) {
-						// 验证成功，进入第二步
-						this.activationStep = 2;
-						uni.showToast({ title: response.message, icon: 'success' });
-					} else if (response.error) {
-						uni.showToast({ title: response.error, icon: 'none' });
-					} else {
-						uni.showToast({ title: '验证失败', icon: 'none' });
-					}
-				} catch (error) {
-					uni.hideLoading();
-					console.error('验证请求失败:', error);
+				uni.hideLoading();
+				
+				// 后端返回格式：{"message": "..."} 表示成功，{"error": "..."} 表示失败
+				if (response.message) {
+					// 验证成功，进入第二步
+					this.activationStep = 2;
+					uni.showToast({ title: response.message, icon: 'success' });
+				} else if (response.error) {
+					uni.showToast({ title: response.error, icon: 'none' });
+				} else {
+					uni.showToast({ title: '验证失败', icon: 'none' });
 				}
+			} catch (error) {
+				uni.hideLoading();
+				console.error('验证请求失败:', error);
+			}
 			},
 			
-			// 激活第二步：身份验证
+		// 激活第二步：身份验证
 		async handleVerification() {
 			// 验证身份证号
 			if (!this.activationForm.idCardInput) {
@@ -223,45 +233,45 @@
 				return;
 			}
 			
-			uni.showLoading({ title: '身份验证中...' });
+		uni.showLoading({ title: '身份验证中...' });
+		
+		try {
+			const response = await post('/api/auth/activate-patient', {
+				identifier: this.activationForm.identifier,
+				idCardEnding: this.activationForm.idCardInput,  // 后端使用 idCardEnding 参数名
+				newPassword: this.activationForm.newPassword,
+				confirmPassword: this.activationForm.confirmPassword
+			});
 			
-			try {
-				const response = await activatePatient({
-					identifier: this.activationForm.identifier,
-					idCardEnding: this.activationForm.idCardInput,  // 后端使用 idCardEnding 参数名
-					newPassword: this.activationForm.newPassword,
-					confirmPassword: this.activationForm.confirmPassword
-				});
-				
-				uni.hideLoading();
-				
-				// 后端返回格式：{"message": "..."} 表示成功，{"error": "..."} 表示失败
-				if (response.message) {
-					uni.showToast({ title: response.message, icon: 'success' });
-					// 返回登录界面
-					setTimeout(() => {
-						this.isActivation = false;
-						this.activationStep = 1;
-						// 清空表单
-						this.activationForm = {
-							identifier: '',
-							initialPassword: '',
-							idCard: '',
-							idCardInput: '',
-							phone: '',
-							newPassword: '',
-							confirmPassword: ''
-						};
-					}, 2000);
-				} else if (response.error) {
-					uni.showToast({ title: response.error, icon: 'none' });
-				} else {
-					uni.showToast({ title: '激活失败', icon: 'none' });
-				}
-			} catch (error) {
-				uni.hideLoading();
-				console.error('激活请求失败:', error);
+			uni.hideLoading();
+			
+			// 后端返回格式：{"message": "..."} 表示成功，{"error": "..."} 表示失败
+			if (response.message) {
+				uni.showToast({ title: response.message, icon: 'success' });
+				// 返回登录界面
+				setTimeout(() => {
+					this.isActivation = false;
+					this.activationStep = 1;
+					// 清空表单
+					this.activationForm = {
+						identifier: '',
+						initialPassword: '',
+						idCard: '',
+						idCardInput: '',
+						phone: '',
+						newPassword: '',
+						confirmPassword: ''
+					};
+				}, 2000);
+			} else if (response.error) {
+				uni.showToast({ title: response.error, icon: 'none' });
+			} else {
+				uni.showToast({ title: '激活失败', icon: 'none' });
 			}
+		} catch (error) {
+			uni.hideLoading();
+			console.error('激活请求失败:', error);
+		}
 		},
 			
 			completeActivation() {
@@ -293,7 +303,7 @@
 		width: 96rpx;
 		height: 96rpx;
 		margin-bottom: 16rpx;
-		border-radius: 16rpx;
+		border-radius: 24rpx;
 		box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
 		opacity: 0.95;
 	}
@@ -519,5 +529,3 @@
 		}
 	}
 </style>
-
-

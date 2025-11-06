@@ -44,6 +44,7 @@ public class UserServiceImpl implements UserService {
     // private final ClinicRepository clinicRepository;
     private final DepartmentRepository departmentRepository;
     private final PatientProfileRepository patientProfileRepository;
+    private final ScheduleRepository scheduleRepository;
     private final PatientService patientService;
     private final DoctorService doctorService;
     private final AdminService adminService;
@@ -593,8 +594,14 @@ public class UserServiceImpl implements UserService {
                 throw new BadRequestException("该医生已被删除");
             }
             
-            // 检查是否有未完成的排班（可选的前置检查）
-            // 这里可以添加更复杂的业务逻辑检查
+            // 检查是否有未来的排班
+            long futureScheduleCount = scheduleRepository.countFutureSchedulesByDoctor(
+                doctor,
+                java.time.LocalDate.now()
+            );
+            if (futureScheduleCount > 0) {
+                throw new BadRequestException("该医生有 " + futureScheduleCount + " 个未来的排班，无法删除。请先删除或调整相关排班。");
+            }
             
             // 软删除
             doctor.setStatus(DoctorStatus.deleted);

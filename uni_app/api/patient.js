@@ -47,4 +47,3 @@ export function checkActivationStatus(identifier) {
 export function logoutPatient() {
 	return post('/api/patient/logout')
 }
-

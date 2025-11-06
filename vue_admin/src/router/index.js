@@ -10,6 +10,8 @@ import DepartmentIndex from '@/views/departments/Index.vue';
 import CreateDepartment from '@/views/departments/CreateDepartment.vue';
 // 【已移除】ManageDepartments 和 DepartmentView 导入，因为文件已删除
 import DepartmentMembers from '@/views/departments/Members.vue'; // 保留：科室成员页面
+import DepartmentLocations from '@/views/departments/Locations.vue'; // 科室地点管理页面
+import SymptomMapping from '@/views/departments/SymptomMapping.vue'; // 症状映射管理页面
 
 // 导入用户管理页面组件
 import UserIndex from '@/views/users/Index.vue';
@@ -25,6 +27,7 @@ import ShiftManagement from '@/views/scheduling/ShiftManagement.vue';
 import ScheduleDashboard from '@/views/scheduling/ScheduleDashboard.vue';
 import ScheduleFeeManagement from '@/views/scheduling/ScheduleFeeManagement.vue';
 import AutoSchedule from '@/views/scheduling/AutoSchedule.vue';
+import DoctorWorkHours from '@/views/scheduling/DoctorWorkHours.vue';
 
 // ===== 新增：导入就医规范管理页面组件 =====
 import RegulationIndex from '@/views/regulations/Index.vue';
@@ -72,6 +75,18 @@ const routes = [
         name: 'DepartmentMembers',
         meta: { title: '科室成员管理', requiresAuth: true },
         component: DepartmentMembers
+    },
+    {
+        path: '/departments/locations/:id', // 必须使用 :id 接收科室 ID 参数
+        name: 'DepartmentLocations',
+        meta: { title: '科室地点管理', requiresAuth: true },
+        component: DepartmentLocations
+    },
+    {
+        path: '/departments/symptom-mapping',
+        name: 'SymptomMapping',
+        meta: { title: '症状映射管理', requiresAuth: true },
+        component: SymptomMapping
     },
 
     // =======================================================
@@ -142,6 +157,25 @@ const routes = [
     },
     {
         path: '/scheduling/auto-schedule',
+        name: 'AutoSchedule',
+        meta: { title: '自动排班', requiresAuth: true },
+        component: AutoSchedule
+    },
+        
+    {path: '/scheduling/doctor-hours',
+        name: 'DoctorWorkHours',
+        meta: { title: '医生工时统计', requiresAuth: true },
+        component: DoctorWorkHours
+    
+    },
+    {
+        path: '/scheduling/doctor-hours',
+        name: 'DoctorWorkHours',
+        meta: { title: '医生工时统计', requiresAuth: true },
+        component: DoctorWorkHours
+     },
+    {   
+     path: '/scheduling/auto-schedule',
         name: 'AutoSchedule',
         meta: { title: '自动排班', requiresAuth: true },
         component: AutoSchedule

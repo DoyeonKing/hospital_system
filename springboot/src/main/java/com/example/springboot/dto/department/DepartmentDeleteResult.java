@@ -12,6 +12,8 @@ public class DepartmentDeleteResult {
     private String departmentName;
     private Integer doctorCount;
     private List<String> movedDoctors;
+    private Integer locationCount;
+    private List<String> movedLocations;
     private Boolean success;
     private String message;
 }

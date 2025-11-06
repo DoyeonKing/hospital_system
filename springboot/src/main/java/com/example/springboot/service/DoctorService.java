@@ -8,11 +8,13 @@ import com.example.springboot.entity.Doctor;
 import com.example.springboot.entity.enums.DoctorStatus;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.DoctorRepository;
+import com.example.springboot.repository.ScheduleRepository;
 import com.example.springboot.util.PasswordEncoderUtil;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,12 +28,14 @@ public class DoctorService {
     private final DoctorRepository doctorRepository;
     private final PasswordEncoderUtil passwordEncoderUtil;
     private final DepartmentRepository departmentRepository;
+    private final ScheduleRepository scheduleRepository;
 
     public DoctorService(DoctorRepository doctorRepository, PasswordEncoderUtil passwordEncoderUtil,
-            DepartmentRepository departmentRepository) { // 【修改构造函数】
+            DepartmentRepository departmentRepository, ScheduleRepository scheduleRepository) { // 【修改构造函数】
         this.doctorRepository = doctorRepository;
         this.passwordEncoderUtil = passwordEncoderUtil;
         this.departmentRepository = departmentRepository;
+        this.scheduleRepository = scheduleRepository;
     }
 
     // =========================================================================
@@ -245,10 +249,20 @@ public class DoctorService {
         if (doctorOptional.isEmpty()) {
             throw new ResourceNotFoundException("工号为 " + identifier + " 的医生不存在");
         }
+        
+        Doctor doctor = doctorOptional.get();
+        
+        // 2. 检查医生是否有未来的排班
+        long futureScheduleCount = scheduleRepository.countFutureSchedulesByDoctor(
+            doctor,
+            LocalDate.now()
+        );
+        if (futureScheduleCount > 0) {
+            throw new RuntimeException("该医生有 " + futureScheduleCount + " 个未来的排班，无法删除。请先删除或调整相关排班。");
+        }
 
-        // 2. 执行删除
-        // 假设 DoctorRepository 中存在 delete(Doctor doctor) 方法
-        doctorRepository.delete(doctorOptional.get());
+        // 3. 执行删除
+        doctorRepository.delete(doctor);
     }
 
     // =========================================================================
@@ -305,10 +319,21 @@ public class DoctorService {
 
     @Transactional
     public void deleteDoctor(Integer id) {
-        if (!doctorRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Doctor not found with id " + id);
+        // 1. 查找医生
+        Doctor doctor = doctorRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id " + id));
+        
+        // 2. 检查医生是否有未来的排班
+        long futureScheduleCount = scheduleRepository.countFutureSchedulesByDoctor(
+            doctor,
+            LocalDate.now()
+        );
+        if (futureScheduleCount > 0) {
+            throw new RuntimeException("该医生有 " + futureScheduleCount + " 个未来的排班，无法删除。请先删除或调整相关排班。");
         }
-        doctorRepository.deleteById(id);
+        
+        // 3. 执行删除
+        doctorRepository.delete(doctor);
     }
 
     // =========================================================================

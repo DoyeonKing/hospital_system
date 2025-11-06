@@ -47,4 +47,22 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
                                            @Param("endDate") LocalDate endDate,
                                            @Param("status") String status,
                                            Pageable pageable);
+    
+    /**
+     * 检查医生是否有未来的排班
+     */
+    @Query("SELECT COUNT(s) FROM Schedule s WHERE s.doctor = :doctor AND s.scheduleDate >= :currentDate")
+    long countFutureSchedulesByDoctor(@Param("doctor") Doctor doctor, @Param("currentDate") LocalDate currentDate);
+    
+    /**
+     * 检查科室下的所有医生是否有未来的排班
+     */
+    @Query("SELECT COUNT(s) FROM Schedule s WHERE s.doctor.department.departmentId = :departmentId AND s.scheduleDate >= :currentDate")
+    long countFutureSchedulesByDepartment(@Param("departmentId") Integer departmentId, @Param("currentDate") LocalDate currentDate);
+    
+    /**
+     * 检查地点是否在未来的排班中被使用
+     */
+    @Query("SELECT COUNT(s) FROM Schedule s WHERE s.location.locationId = :locationId AND s.scheduleDate >= :currentDate")
+    long countFutureSchedulesByLocation(@Param("locationId") Integer locationId, @Param("currentDate") LocalDate currentDate);
 }

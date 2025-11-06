@@ -3,8 +3,14 @@
     <div class="back-area" style="margin-bottom: 12px;">
       <BackButton />
     </div>
+    
+    <!-- 折叠/展开按钮 -->
+    <div class="sidebar-toggle" :class="{ collapsed: sidebarCollapsed }" @click="toggleSidebar" :title="sidebarCollapsed ? '展开科室列表' : '收起科室列表'">
+      <el-icon><component :is="sidebarCollapsed ? 'DArrowRight' : 'DArrowLeft'" /></el-icon>
+    </div>
+    
     <!-- 左侧科室导航 -->
-    <div class="department-sidebar">
+    <div class="department-sidebar" :class="{ 'collapsed': sidebarCollapsed }">
       <div v-if="loadingDepartments" class="loading-container">
         <el-icon class="is-loading"><Loading /></el-icon>
         <span>加载科室数据中...</span>
@@ -13,14 +19,12 @@
         <el-menu :default-active="activeParent" class="department-menu" @select="handleParentSelect">
           <el-menu-item v-for="parent in departments" :key="parent.id" :index="parent.id">
             <span>{{ parent.name }}</span>
-            <span style="font-size: 11px; color: #999; margin-left: 8px;">ID:{{ parent.id }}</span>
           </el-menu-item>
         </el-menu>
 
         <div class="sub-department-panel" v-if="subDepartments.length > 0">
           <div v-for="sub in subDepartments" :key="sub.id" class="sub-department-item" :class="{ 'active': activeSub === sub.id }" @click="handleSubSelect(sub.id)">
             {{ sub.name }}
-            <span style="font-size: 11px; color: #999; margin-left: 8px;">ID:{{ sub.id }}</span>
           </div>
         </div>
         <div v-else-if="activeParent && departments.find(p => p.id === activeParent)?.children?.length === 0" class="no-sub-departments">
@@ -30,63 +34,59 @@
     </div>
 
     <!-- 右侧内容区 -->
-    <div class="schedule-content">
+    <div class="schedule-content" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <el-card shadow="always" class="schedule-card">
         <template #header>
           <div class="card-header">
-             <span>{{ selectedDepartmentName }} ({{ selectedDepartmentCode }}) - 排班管理</span>
-             
-             <!-- 🔍 调试信息 -->
-             <div style="font-size: 12px; color: #999; margin-top: 4px;">
-               调试: activeSub={{ activeSub }}, activeParent={{ activeParent }}
+             <!-- 科室标题行 -->
+             <div class="header-title-row">
+               <span class="department-title">{{ selectedDepartmentName }}<span v-if="selectedDepartmentCode && selectedDepartmentCode !== 'N/A'"> ({{ selectedDepartmentCode }})</span> - 排班管理</span>
+               
+               <!-- 排班状态指示器 -->
+               <div class="schedule-status-indicator">
+                 <div v-if="scheduleStatus.saving" class="status-saving">
+                   <el-icon class="is-loading"><Loading /></el-icon>
+                   <span>正在保存排班...</span>
+                 </div>
+                 <div v-else-if="scheduleStatus.lastSaved" class="status-success">
+                   <el-icon><CircleCheck /></el-icon>
+                   <span>最后保存：{{ scheduleStatus.lastSaved.doctor }} - {{ scheduleStatus.lastSaved.timestamp }}</span>
+                 </div>
+                 <div v-else-if="scheduleStatus.error" class="status-error">
+                   <el-icon><CircleClose /></el-icon>
+                   <span>保存失败：{{ scheduleStatus.error.doctor }} - {{ scheduleStatus.error.timestamp }}</span>
+                 </div>
+               </div>
              </div>
              
-             <!-- 排班状态指示器 -->
-             <div class="schedule-status-indicator">
-               <div v-if="scheduleStatus.saving" class="status-saving">
-                 <el-icon class="is-loading"><Loading /></el-icon>
-                 <span>正在保存排班...</span>
-               </div>
-               <div v-else-if="scheduleStatus.lastSaved" class="status-success">
-                 <el-icon><CircleCheck /></el-icon>
-                 <span>最后保存：{{ scheduleStatus.lastSaved.doctor }} - {{ scheduleStatus.lastSaved.timestamp }}</span>
-               </div>
-               <div v-else-if="scheduleStatus.error" class="status-error">
-                 <el-icon><CircleClose /></el-icon>
-                 <span>保存失败：{{ scheduleStatus.error.doctor }} - {{ scheduleStatus.error.timestamp }}</span>
-               </div>
-             </div>
-             
-             <div class="header-controls">
-               <!-- 自动排班按钮 -->
-               <el-button 
-                 type="primary" 
-                 :icon="MagicStick" 
-                 @click="goToAutoSchedule"
-                 class="auto-schedule-btn">
-                 自动排班
-               </el-button>
-               
-               <!-- 自动填充按钮 -->
-               <el-button 
-                 type="success" 
-                 :icon="Refresh" 
-                 @click="autoFillScheduleData"
-                 class="auto-fill-btn">
-                 自动填充排班数据
-               </el-button>
-               
-               <!-- 测试排班创建按钮 -->
-               <el-button 
-                 type="warning" 
-                 @click="testScheduleCreation"
-                 class="test-btn">
-                 测试排班创建
-               </el-button>
+             <!-- 按钮控制行 -->
+            <div class="header-controls">
+              <!-- 自动排班按钮 -->
+              <el-button 
+                class="action-btn btn-auto"
+                type="primary" 
+                :icon="MagicStick" 
+                @click="goToAutoSchedule">
+                自动排班
+              </el-button>
+              
+              <!-- 视图切换按钮组 -->
+              <el-button-group class="view-switcher">
+                <el-button :type="currentView === 'day' ? 'primary' : ''" @click="changeView('day')">日视图</el-button>
+                <el-button :type="currentView === 'week' ? 'primary' : ''" @click="changeView('week')">周视图</el-button>
+                <el-button :type="currentView === 'month' ? 'primary' : ''" @click="changeView('month')">月视图</el-button>
+              </el-button-group>
+              
+              <!-- 周视图导航按钮 -->
+              <el-button-group v-if="currentView === 'week'" class="week-nav">
+                <el-button :icon="ArrowLeft" @click="changeWeek(-1)">上一周</el-button>
+                <el-button @click="changeWeek(0)">本周</el-button>
+                <el-button :icon="ArrowRight" @click="changeWeek(1)">下一周</el-button>
+              </el-button-group>
                
                <!-- 冲突信息显示 -->
                <div class="conflict-controls">
-                 <div v-if="conflictData.hasConflicts" class="conflict-summary">
+                 <div v-if="conflictData.hasConflicts" class="conflict-summary" @click="showConflictDialog" title="点击查看详细冲突信息">
                    <el-icon class="conflict-summary-icon" :class="conflictData.summary.critical > 0 ? 'critical-icon' : 'warning-icon'">
                      <Warning />
                    </el-icon>
@@ -99,33 +99,9 @@
                        (警告: {{ conflictData.summary.warning }})
                      </span>
                    </span>
+                   <el-icon style="margin-left: 4px; font-size: 14px;"><ArrowRight /></el-icon>
                  </div>
                </div>
-               
-               <!-- 视图切换按钮 -->
-               <el-button-group class="view-switcher">
-                 <el-button 
-                   :type="currentView === 'day' ? 'primary' : ''" 
-                   @click="changeView('day')">
-                   日视图
-                 </el-button>
-                 <el-button 
-                   :type="currentView === 'week' ? 'primary' : ''" 
-                   @click="changeView('week')">
-                   周视图
-                 </el-button>
-                 <el-button 
-                   :type="currentView === 'month' ? 'primary' : ''" 
-                   @click="changeView('month')">
-                   月视图
-                 </el-button>
-               </el-button-group>
-               <!-- 周视图导航按钮 -->
-               <el-button-group v-if="currentView === 'week'">
-                <el-button :icon="ArrowLeft" @click="changeWeek(-1)">上一周</el-button>
-                <el-button @click="changeWeek(0)">本周</el-button>
-                <el-button :icon="ArrowRight" @click="changeWeek(1)">下一周</el-button>
-              </el-button-group>
             </div>
           </div>
         </template>
@@ -141,7 +117,7 @@
          </div>
 
          <!-- 周视图表格 -->
-         <div v-if="currentView === 'week'">
+         <div v-if="currentView === 'week'" class="table-container">
         <div v-if="activeSub">
           <table class="schedule-table">
             <thead>
@@ -164,7 +140,7 @@
                           draggable="true" 
                        @dragstart="onDragStart($event, { type: 'timeSlot', data: timeSlot })">
                     <div class="time-slot-card-content">
-                      <div class="time-slot-name">{{ timeSlot.slotName || timeSlot.slot_name }}</div>
+                      <div class="time-slot-name">{{ timeSlot.slotName || timeSlot.slot_name || `${timeSlot.startTime || timeSlot.start_time}-${timeSlot.endTime || timeSlot.end_time}` }}</div>
                       <div class="time-slot-time">{{ (timeSlot.startTime || timeSlot.start_time) }} - {{ (timeSlot.endTime || timeSlot.end_time) }}</div>
                          <!-- 班次不匹配警告 -->
                          <div v-if="!isTimeSlotMatchShift(timeSlot, shift)" class="shift-mismatch-warning">
@@ -256,7 +232,7 @@
                  class="time-slot-card" draggable="true" @dragstart="onDragStart($event, { type: 'timeSlot', data: timeSlot })">
               <el-icon :size="20" class="time-slot-icon"><Clock /></el-icon>
               <div class="time-slot-info">
-                <span class="time-slot-name">{{ timeSlot.slotName || timeSlot.slot_name }}</span>
+                <span class="time-slot-name">{{ timeSlot.slotName || timeSlot.slot_name || `${timeSlot.startTime || timeSlot.start_time}-${timeSlot.endTime || timeSlot.end_time}` }}</span>
                 <span class="time-slot-time">{{ (timeSlot.startTime || timeSlot.start_time) }} - {{ (timeSlot.endTime || timeSlot.end_time) }}</span>
               </div>
             </div>
@@ -286,6 +262,94 @@
       </div>
 
     </div>
+
+    <!-- 冲突详情对话框 -->
+    <el-dialog
+      v-model="conflictDialogVisible"
+      title="排班冲突详情"
+      width="800px"
+      :close-on-click-modal="false"
+      class="conflict-dialog"
+    >
+      <div class="conflict-summary-header">
+        <el-alert
+          :title="`共发现 ${conflictData.summary.total} 个冲突`"
+          :type="conflictData.summary.critical > 0 ? 'error' : 'warning'"
+          :closable="false"
+        >
+          <template #default>
+            <div class="conflict-stats">
+              <span v-if="conflictData.summary.critical > 0" class="stat-item critical">
+                <el-icon><Warning /></el-icon>
+                严重冲突: {{ conflictData.summary.critical }} 个
+              </span>
+              <span v-if="conflictData.summary.warning > 0" class="stat-item warning">
+                <el-icon><Warning /></el-icon>
+                警告冲突: {{ conflictData.summary.warning }} 个
+              </span>
+            </div>
+          </template>
+        </el-alert>
+      </div>
+
+      <div class="conflict-list">
+        <el-collapse v-model="activeConflictNames" accordion>
+          <el-collapse-item
+            v-for="(conflict, index) in conflictData.conflicts"
+            :key="index"
+            :name="index"
+            :class="`conflict-item conflict-${conflict.severity}`"
+          >
+            <template #title>
+              <div class="conflict-title">
+                <el-icon :class="`conflict-icon ${conflict.severity}-icon`">
+                  <Warning />
+                </el-icon>
+                <span class="conflict-type-badge" :class="`badge-${conflict.severity}`">
+                  {{ conflict.title }}
+                </span>
+                <span class="conflict-desc">{{ conflict.description }}</span>
+              </div>
+            </template>
+            <div class="conflict-details">
+              <el-descriptions :column="1" border size="small">
+                <el-descriptions-item
+                  v-for="(detail, detailIndex) in conflict.details"
+                  :key="detailIndex"
+                  :label="detail.split(':')[0]"
+                >
+                  {{ detail.split(':').slice(1).join(':').trim() }}
+                </el-descriptions-item>
+              </el-descriptions>
+              
+              <!-- 如果有相关医生，显示医生信息 -->
+              <div v-if="conflict.allDoctors && conflict.allDoctors.length > 0" class="conflict-doctors">
+                <div class="doctors-title">涉及医生：</div>
+                <div class="doctors-list">
+                  <el-tag
+                    v-for="doctor in conflict.allDoctors"
+                    :key="doctor.id"
+                    type="info"
+                    effect="plain"
+                    size="small"
+                  >
+                    {{ doctor.name }} ({{ doctor.identifier || doctor.id }})
+                  </el-tag>
+                </div>
+              </div>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
+      </div>
+
+      <template #footer>
+        <el-button @click="conflictDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="exportConflictReport">
+          <el-icon><Download /></el-icon>
+          导出冲突报告
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -293,7 +357,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 // [新增] 导入 CircleCloseFilled 图标
-import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFilled, Clock, Document, Download, UploadFilled, Upload, Refresh, CircleCheck, CircleClose, Warning, Loading, MagicStick } from '@element-plus/icons-vue';
+import { ArrowLeft, ArrowRight, Close, Location, OfficeBuilding, CircleCloseFilled, Clock, Document, Download, UploadFilled, Upload, Refresh, CircleCheck, CircleClose, Warning, Loading, MagicStick, DArrowLeft, DArrowRight } from '@element-plus/icons-vue';
 // [新增] 导入 FullCalendar 组件和插件
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -364,6 +428,9 @@ const currentMonday = ref(getCurrentWeekMonday());
 const activeParent = ref(null);
 const activeSub = ref(null);
 
+// 侧边栏折叠状态
+const sidebarCollapsed = ref(false);
+
 // [新增] 视图切换状态
 const currentView = ref('week'); // 'day', 'week', 'month'
 const fullCalendar = ref(null);
@@ -399,6 +466,10 @@ const conflictData = ref({
     warning: 0
   }
 });
+
+// [新增] 冲突详情对话框状态
+const conflictDialogVisible = ref(false);
+const activeConflictNames = ref([]);
 
 const subDepartments = computed(() => {
   if (!activeParent.value) return [];
@@ -446,41 +517,28 @@ const calendarOptions = computed(() => ({
   },
   droppable: true,
   dropAccept: '.time-slot-card, .location-card',
-  datesSet: handleCalendarDatesSet  // 🔥 新增：日期范围变化时自动加载数据
+  datesSet: handleCalendarDatesSet,  // 🔥 新增：日期范围变化时自动加载数据
+  eventContent: renderEventContent,  // 自定义事件内容渲染
+  eventDidMount: handleEventDidMount  // 事件挂载后的处理
 }));
 
 const selectedDepartmentName = computed(() => {
   if (!activeSub.value) return '请选择科室';
   
-  console.log('🔍 ===== 开始计算科室名称 =====');
-  console.log('🔍 activeSub.value:', activeSub.value, 'typeof:', typeof activeSub.value);
-  console.log('🔍 departments.value:', JSON.stringify(departments.value, null, 2));
-  
   // 先尝试作为父科室查找
-  const parentAsSub = departments.value.find(p => {
-    console.log('🔍 比较父科室:', p.id, '(type:', typeof p.id, ') === ', activeSub.value, '(type:', typeof activeSub.value, ') ?', p.id === activeSub.value);
-    return p.id === activeSub.value;
-  });
-  
+  const parentAsSub = departments.value.find(p => p.id === activeSub.value);
   if (parentAsSub) {
-    console.log('✅ 找到父科室:', parentAsSub.name);
     return parentAsSub.name;
   }
   
   // 作为子科室查找
   for (const parent of departments.value) {
-    console.log('🔍 在父科室', parent.name, '中查找子科室，子科室列表:', parent.children);
-    const sub = parent.children.find(c => {
-      console.log('🔍   比较子科室:', c.id, '(type:', typeof c.id, ') === ', activeSub.value, '(type:', typeof activeSub.value, ') ?', c.id === activeSub.value);
-      return c.id === activeSub.value;
-    });
+    const sub = parent.children.find(c => c.id === activeSub.value);
     if (sub) {
-      console.log('✅ 找到子科室:', sub.name, '(父科室:', parent.name, ')');
       return sub.name;
     }
   }
   
-  console.log('❌ 未找到科室，activeSub.value =', activeSub.value);
   return '未知科室';
 });
 
@@ -533,6 +591,11 @@ const changeWeek = async (offset) => {
   
   // 🔥 新增：重新加载新周次的排班数据
   await loadSchedulesFromBackend();
+};
+
+// 切换侧边栏折叠状态
+const toggleSidebar = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value;
 };
 
 const getDoctorsForShift = (date, shift) => {
@@ -907,42 +970,34 @@ const clearTimeSlotColumns = () => {
 
 // --- 侧边栏选择逻辑 ---
 const handleParentSelect = (index) => {
-  console.log('🟢 选择父科室 - 传入index:', index);
   activeParent.value = index;
-  console.log('🟢 所有departments:', departments.value);
   const parent = departments.value.find(p => p.id === index);
   if (parent) {
-    console.log('🟢 找到父科室:', parent.name, 'ID:', parent.id);
-    console.log('🟢 子科室:', parent.children);
     if (parent.children && parent.children.length > 0) {
       activeSub.value = parent.children[0].id;
-      console.log('🟢 自动选择第一个子科室:', parent.children[0].name, 'ID:', parent.children[0].id);
     } else {
       activeSub.value = parent.id;
-      console.log('🟢 父科室无子科室，选择父科室本身 ID:', parent.id);
     }
   } else {
     activeSub.value = null;
-    console.log('🟢 未找到父科室');
   }
-  console.log('🟢 最终设置的activeSub.value:', activeSub.value);
   // 切换科室时清空时间段列
   clearTimeSlotColumns();
 };
 
 const handleSubSelect = async (id) => {
-  console.log('🔵 选择子科室 - 传入ID:', id);
-  console.log('🔵 当前departments:', departments.value);
-  console.log('🔵 当前subDepartments:', subDepartments.value);
-  
   activeSub.value = id;
-  console.log('🔵 设置后的activeSub.value:', activeSub.value);
+  
+  // 🔥 切换科室时清空该科室的旧数据，强制重新加载
+  if (id && scheduleData.value[id]) {
+    scheduleData.value[id] = [];
+    console.log(`🗑️ 切换科室，清空旧数据: ${id}`);
+  }
   
   // 加载选中科室的医生和办公地点数据
   if (id) {
     // 从科室ID中提取数字ID（去掉前缀 's' 或 'p'）
     const departmentId = id.replace(/^[sp]/, '');
-    console.log('🔵 提取的科室数字ID:', departmentId);
     
     // 并行加载基础数据
     await Promise.all([
@@ -950,8 +1005,18 @@ const handleSubSelect = async (id) => {
       loadLocationsForDepartment(departmentId)
     ]);
     
-    // 加载排班数据并自动填充时间段
-    await loadSchedulesFromBackend();
+    // 根据当前视图类型加载相应数据
+    if (currentView.value === 'week') {
+      // 周视图：加载当前周数据
+      await loadSchedulesFromBackend();
+    } else {
+      // 日视图/月视图：触发日历重新加载
+      if (fullCalendar.value) {
+        const calendarApi = fullCalendar.value.getApi();
+        // 强制刷新事件，确保触发 handleCalendarDatesSet
+        calendarApi.refetchEvents();
+      }
+    }
     
     // 延迟自动填充，确保基础数据已加载
     setTimeout(() => {
@@ -961,16 +1026,30 @@ const handleSubSelect = async (id) => {
 };
 
 // [新增] 视图切换函数
-const changeView = (viewType) => {
+const changeView = async (viewType) => {
+  const previousView = currentView.value;
   currentView.value = viewType;
+  
   if (fullCalendar.value) {
     const calendarApi = fullCalendar.value.getApi();
+    
     if (viewType === 'day') {
       calendarApi.changeView('timeGridDay');
     } else if (viewType === 'week') {
       calendarApi.changeView('timeGridWeek');
+      // 切换到周视图时，重新加载当前周数据
+      if (previousView !== 'week' && activeSub.value) {
+        await loadSchedulesFromBackend();
+      }
     } else if (viewType === 'month') {
+      // 🔥 关键修复：切换到月视图时，清空数据并重新加载
+      if (previousView !== 'month' && activeSub.value) {
+        console.log('🔄 从周/日视图切换到月视图，清空并重新加载完整月度数据...');
+        // 清空当前科室数据，强制重新加载
+        scheduleData.value[activeSub.value] = [];
+      }
       calendarApi.changeView('dayGridMonth');
+      // handleCalendarDatesSet 会在 changeView 后自动被触发，加载整个月的数据
     }
   }
 };
@@ -995,20 +1074,21 @@ const handleEventClick = (info) => {
 };
 
 const handleDateClick = (info) => {
-  console.log('点击日期:', info.dateStr);
+  // 日期点击事件
 };
 
-// 🔥 新增：日历日期范围变化时加载数据
+// 日历日期范围变化时加载数据
 const handleCalendarDatesSet = async (dateInfo) => {
-  console.log('🔥 日历日期范围变化:', dateInfo.startStr, '到', dateInfo.endStr);
+  console.log(`📅 日历日期范围变化: ${currentView.value} 视图, 范围: ${formatDate(dateInfo.start)} 到 ${formatDate(dateInfo.end)}`);
   
   // 仅在日历视图下加载数据（周视图有自己的加载机制）
   if (currentView.value === 'week') {
+    console.log('⏭️ 周视图使用独立的加载机制，跳过 handleCalendarDatesSet');
     return;
   }
   
   if (!activeSub.value) {
-    console.log('未选择科室，跳过数据加载');
+    console.log('⚠️ 未选择科室，跳过数据加载');
     return;
   }
   
@@ -1024,10 +1104,13 @@ const handleCalendarDatesSet = async (dateInfo) => {
       startDate.setDate(startDate.getDate() - 3);
       endDate = new Date(centerDate);
       endDate.setDate(endDate.getDate() + 3);
+      console.log(`📆 日视图加载范围: ${formatDate(startDate)} 到 ${formatDate(endDate)}`);
     } else {
-      // 月视图：使用日历提供的范围
+      // 月视图：使用日历提供的范围（通常包含上月末和下月初）
       startDate = dateInfo.start;
       endDate = dateInfo.end;
+      console.log(`📆 月视图加载范围: ${formatDate(startDate)} 到 ${formatDate(endDate)}`);
+      console.log(`📊 当前已有数据: ${scheduleData.value[activeSub.value]?.length || 0} 个时间段`);
     }
     
     const params = {
@@ -1035,51 +1118,71 @@ const handleCalendarDatesSet = async (dateInfo) => {
       startDate: formatDate(startDate),
       endDate: formatDate(endDate),
       page: 0,
-      size: 500  // 增加size以容纳更多数据
+      size: 500
     };
-    
-    console.log('📅 日历视图加载排班数据:', params);
     
     const response = await getSchedules(params);
     
     if (response && response.content) {
       const schedules = response.content;
-      const newScheduleData = {};
       const key = activeSub.value;
       
-      if (!newScheduleData[key]) {
-        newScheduleData[key] = [];
+      // 🔥 关键修复：合并数据而不是替换
+      // 如果当前科室还没有数据，初始化为空数组
+      if (!scheduleData.value[key]) {
+        scheduleData.value[key] = [];
       }
       
+      // 使用 Map 来去重和合并医生数据
+      const scheduleMap = new Map();
+      
+      // 首先将现有数据放入 Map（保留之前加载的数据）
+      scheduleData.value[key].forEach(item => {
+        const mapKey = `${item.date}_${item.shift}`;
+        if (!scheduleMap.has(mapKey)) {
+          scheduleMap.set(mapKey, {
+            date: item.date,
+            shift: item.shift,
+            doctors: [...item.doctors] // 深拷贝医生数组
+          });
+        }
+      });
+      
+      // 然后合并新加载的数据
       schedules.forEach(schedule => {
-        const existingIndex = newScheduleData[key].findIndex(item => 
-          item.date === schedule.scheduleDate && item.shift === getShiftFromTimeSlot(schedule.slotName, schedule.startTime)
-        );
+        const shift = getShiftFromTimeSlot(schedule.slotName, schedule.startTime);
+        const mapKey = `${schedule.scheduleDate}_${shift}`;
         
         const doctorInfo = {
           id: schedule.doctorId,
           name: schedule.doctorName,
-          identifier: schedule.doctorId.toString(),
+          identifier: schedule.doctorIdentifier || (schedule.doctorId ? schedule.doctorId.toString() : ''),
           location: schedule.location
         };
         
-        if (existingIndex >= 0) {
-          newScheduleData[key][existingIndex].doctors.push(doctorInfo);
+        if (scheduleMap.has(mapKey)) {
+          // 检查医生是否已存在，避免重复
+          const existingDoctors = scheduleMap.get(mapKey).doctors;
+          const doctorExists = existingDoctors.some(d => d.id === doctorInfo.id);
+          if (!doctorExists) {
+            existingDoctors.push(doctorInfo);
+          }
         } else {
-          newScheduleData[key].push({
+          scheduleMap.set(mapKey, {
             date: schedule.scheduleDate,
-            shift: getShiftFromTimeSlot(schedule.slotName, schedule.startTime),
+            shift: shift,
             doctors: [doctorInfo]
           });
         }
       });
       
-      // 更新数据（会触发 convertScheduleToEvents）
-      scheduleData.value = newScheduleData;
-      console.log('✅ 日历视图数据加载完成');
+      // 将 Map 转换回数组并更新数据
+      scheduleData.value[key] = Array.from(scheduleMap.values());
+      
+      console.log(`✅ 月视图数据合并完成，共 ${schedules.length} 条新记录，合并后 ${scheduleData.value[key].length} 个时间段`);
     }
   } catch (error) {
-    console.error('❌ 日历视图加载数据失败:', error);
+    console.error('日历视图加载数据失败:', error);
   }
 };
 
@@ -1090,6 +1193,85 @@ const formatDate = (date) => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+// [新增] 自定义事件内容渲染函数
+const renderEventContent = (eventInfo) => {
+  const event = eventInfo.event;
+  const props = event.extendedProps;
+  const view = eventInfo.view.type;
+  
+  // 提取医生名称和identifier
+  const titleMatch = event.title.match(/^(.+?)\s*\(ID:(.+?)\)/);
+  const doctorName = titleMatch ? titleMatch[1] : event.title.split(' (ID:')[0];
+  const doctorIdentifier = titleMatch ? titleMatch[2] : props.doctorId;
+  const location = props.location || '待分配地点';
+  const departmentName = props.departmentName || '';
+  
+  // 根据不同视图返回不同的内容
+  if (view === 'dayGridMonth') {
+    // 月视图：只显示医生名称和identifier（简洁版）
+    return {
+      html: `
+        <div class="fc-event-custom-month">
+          <div class="fc-event-title-month">
+            <strong>${doctorName}</strong>
+            <span class="fc-event-identifier">(${doctorIdentifier})</span>
+          </div>
+        </div>
+      `
+    };
+  } else if (view === 'timeGridDay' || view === 'timeGridWeek') {
+    // 日视图和周视图：显示详细信息
+    return {
+      html: `
+        <div class="fc-event-custom-day">
+          <div class="fc-event-time">${eventInfo.timeText}</div>
+          <div class="fc-event-title-day">
+            <strong>${doctorName}</strong>
+            <span class="fc-event-identifier">(${doctorIdentifier})</span>
+          </div>
+          ${departmentName ? `<div class="fc-event-department">${departmentName}</div>` : ''}
+          <div class="fc-event-location">
+            <i class="el-icon-location"></i> ${location}
+          </div>
+        </div>
+      `
+    };
+  }
+  
+  return { html: event.title };
+};
+
+// [新增] 事件挂载后的处理函数
+const handleEventDidMount = (info) => {
+  const event = info.event;
+  const el = info.el;
+  
+  // 添加tooltip显示完整信息
+  const props = event.extendedProps;
+  const titleMatch = event.title.match(/^(.+?)\s*\(ID:(.+?)\)/);
+  const doctorName = titleMatch ? titleMatch[1] : event.title;
+  const doctorIdentifier = titleMatch ? titleMatch[2] : props.doctorId;
+  
+  let tooltipContent = `
+    医生：${doctorName}
+    工号：${doctorIdentifier}
+    科室：${props.departmentName || '未知'}
+    地点：${props.location || '待分配'}
+    班次：${props.shift || '未知'}
+  `;
+  
+  if (props.hasConflict) {
+    tooltipContent += '\n⚠️ 存在排班冲突';
+  }
+  
+  el.setAttribute('title', tooltipContent.trim());
+  
+  // 添加自定义样式类
+  if (props.hasConflict) {
+    el.classList.add('has-conflict');
+  }
 };
 
 // [新增] 日历拖拽事件处理
@@ -1598,39 +1780,38 @@ const convertScheduleToEvents = () => {
     const startTime = shift === '上午' ? '08:00:00' : '14:00:00';
     const endTime = shift === '上午' ? '12:00:00' : '18:00:00';
     
+    // 获取科室名称
+    const departmentName = selectedDepartmentName.value || '未知科室';
+    
     // 为每个医生创建事件
     doctors.forEach((doctor, index) => {
-      // 如果有多个医生，稍微错开时间显示
-      const offsetMinutes = index * 5;
+      // 修复：移除时间偏移，所有同班次医生使用相同时间段
       const start = new Date(`${date}T${startTime}`);
-      start.setMinutes(start.getMinutes() + offsetMinutes);
-      
       const end = new Date(`${date}T${endTime}`);
-      end.setMinutes(end.getMinutes() + offsetMinutes);
       
-      // 根据冲突状态设置颜色
-      let backgroundColor = shift === '上午' ? '#67C23A' : '#409EFF';
-      let borderColor = shift === '上午' ? '#529b2e' : '#337ecc';
-      let className = '';
+      // 根据冲突状态设置颜色（月视图用白底黑字+彩色边框，日/周视图用彩色背景）
+      let backgroundColor = '#ffffff';  // 白色背景
+      let borderColor = shift === '上午' ? '#67C23A' : '#409EFF';  // 绿色/蓝色边框
+      let className = shift === '上午' ? 'shift-morning' : 'shift-afternoon';
       
       // 检查该医生在这个日期和班次是否有冲突
       const hasConflict = hasDoctorConflicts(doctor, date, shift);
       if (hasConflict) {
         const conflictClass = getDoctorConflictClass(doctor, date, shift);
         if (conflictClass === 'conflict-error') {
-          backgroundColor = '#F56C6C';
+          backgroundColor = '#FEF0F0';  // 淡红色背景
           borderColor = '#F56C6C';
-          className = 'conflict-critical';
+          className += ' conflict-critical';
         } else if (conflictClass === 'conflict-warning') {
-          backgroundColor = '#E6A23C';
+          backgroundColor = '#FDF6EC';  // 淡黄色背景
           borderColor = '#E6A23C';
-          className = 'conflict-warning';
+          className += ' conflict-warning';
         }
       }
       
       events.push({
         id: `${date}-${shift}-${doctor.id}`,
-        title: `${doctor.name} (ID:${doctor.identifier || doctor.id})`,
+        title: `${doctor.name} (ID:${doctor.identifier || doctor.id}) - ${departmentName}`,
         start: start.toISOString(),
         end: end.toISOString(),
         backgroundColor,
@@ -1642,6 +1823,7 @@ const convertScheduleToEvents = () => {
           location: doctor.location,
           shift: shift,
           departmentId: activeSub.value,
+          departmentName: departmentName,
           hasConflict: hasConflict
         }
       });
@@ -2210,10 +2392,7 @@ const loadDepartments = async () => {
       departments.value = departmentsWithChildren;
       console.log('最终科室数据结构:', departments.value);
       
-      // 如果有科室数据，默认选择第一个父科室
-      if (departments.value.length > 0) {
-        handleParentSelect(departments.value[0].id);
-      }
+      // 初始进入页面不选中任何科室，等待用户手动选择
       
     } else {
       console.error('获取父科室数据失败:', parentResponse);
@@ -2351,22 +2530,19 @@ const loadSchedulesFromBackend = async () => {
     if (response && response.content) {
       // 转换后端数据格式为前端格式
       const schedules = response.content;
-      const newScheduleData = {};
       
       console.log('后端返回的排班数据:', schedules);
       console.log('当前选中的科室ID:', activeSub.value);
       
+      // 🔥 关键修复：合并数据而不是替换（与月视图保持一致）
       schedules.forEach(schedule => {
         const key = `s${schedule.departmentId}`;
         console.log('处理排班记录:', schedule, '键:', key);
-        if (!newScheduleData[key]) {
-          newScheduleData[key] = [];
-        }
         
-        // 查找是否已存在相同日期和时段的记录
-        const existingIndex = newScheduleData[key].findIndex(item => 
-          item.date === schedule.scheduleDate && item.shift === getShiftFromTimeSlot(schedule.slotName, schedule.startTime)
-        );
+        // 确保科室数据存在
+        if (!scheduleData.value[key]) {
+          scheduleData.value[key] = [];
+        }
         
         // 检查location是否在当前可用地点列表中
         let validLocation = null;
@@ -2379,7 +2555,6 @@ const loadSchedulesFromBackend = async () => {
           } else {
             console.warn(`⚠️ 排班中的地点 "${schedule.location}" 不在当前可用地点列表中`);
             console.log('当前可用地点:', availableLocations.value.map(loc => loc.name));
-            // 如果找不到匹配的地点，不设置默认值，保持为null
             validLocation = null;
             console.log(`❌ 排班地点无效，不加载该排班记录`);
           }
@@ -2394,27 +2569,38 @@ const loadSchedulesFromBackend = async () => {
         const doctorInfo = {
           id: schedule.doctorId,
           name: schedule.doctorName,
-          identifier: schedule.doctorId.toString(),
+          identifier: schedule.doctorIdentifier || (schedule.doctorId ? schedule.doctorId.toString() : ''),
           location: validLocation
         };
         
+        const shift = getShiftFromTimeSlot(schedule.slotName, schedule.startTime);
+        
+        // 查找是否已存在相同日期和时段的记录
+        const existingIndex = scheduleData.value[key].findIndex(item => 
+          item.date === schedule.scheduleDate && item.shift === shift
+        );
+        
         if (existingIndex >= 0) {
-          // 如果已存在，添加医生到现有记录
-          newScheduleData[key][existingIndex].doctors.push(doctorInfo);
-          console.log(`✅ 添加医生到现有记录: ${doctorInfo.name} - ${schedule.scheduleDate} ${getShiftFromTimeSlot(schedule.slotName, schedule.startTime)}`);
+          // 检查医生是否已存在，避免重复
+          const existingDoctors = scheduleData.value[key][existingIndex].doctors;
+          const doctorExists = existingDoctors.some(d => d.id === doctorInfo.id);
+          if (!doctorExists) {
+            existingDoctors.push(doctorInfo);
+            console.log(`✅ 添加医生到现有记录: ${doctorInfo.name} - ${schedule.scheduleDate} ${shift}`);
+          } else {
+            console.log(`⏭️ 医生已存在，跳过: ${doctorInfo.name} - ${schedule.scheduleDate} ${shift}`);
+          }
         } else {
           // 创建新记录
-          newScheduleData[key].push({
+          scheduleData.value[key].push({
             date: schedule.scheduleDate,
-            shift: getShiftFromTimeSlot(schedule.slotName, schedule.startTime),
+            shift: shift,
             doctors: [doctorInfo]
           });
-          console.log(`✅ 创建新排班记录: ${doctorInfo.name} - ${schedule.scheduleDate} ${getShiftFromTimeSlot(schedule.slotName, schedule.startTime)}`);
+          console.log(`✅ 创建新排班记录: ${doctorInfo.name} - ${schedule.scheduleDate} ${shift}`);
         }
       });
       
-      // 更新前端数据
-      scheduleData.value = newScheduleData;
       console.log('排班数据加载完成:', scheduleData.value);
       console.log('当前选中的科室数据:', scheduleData.value[activeSub.value]);
       
@@ -2695,6 +2881,81 @@ const goToAutoSchedule = () => {
   router.push('/scheduling/auto-schedule');
 };
 
+// [新增] 显示冲突详情对话框
+const showConflictDialog = () => {
+  if (conflictData.value.hasConflicts) {
+    conflictDialogVisible.value = true;
+    // 默认展开第一个冲突
+    if (conflictData.value.conflicts.length > 0) {
+      activeConflictNames.value = [0];
+    }
+  }
+};
+
+// [新增] 导出冲突报告
+const exportConflictReport = () => {
+  try {
+    const report = generateConflictReport();
+    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const timestamp = new Date().toISOString().split('T')[0];
+    link.download = `排班冲突报告_${selectedDepartmentName.value}_${timestamp}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    ElMessage.success('冲突报告已导出');
+  } catch (error) {
+    console.error('导出冲突报告失败:', error);
+    ElMessage.error('导出失败');
+  }
+};
+
+// [新增] 生成冲突报告文本
+const generateConflictReport = () => {
+  const lines = [];
+  lines.push('=' .repeat(60));
+  lines.push(`排班冲突报告`);
+  lines.push(`科室: ${selectedDepartmentName.value}`);
+  lines.push(`生成时间: ${new Date().toLocaleString('zh-CN')}`);
+  lines.push('=' .repeat(60));
+  lines.push('');
+  
+  lines.push(`冲突汇总:`);
+  lines.push(`  总计: ${conflictData.value.summary.total} 个冲突`);
+  lines.push(`  严重: ${conflictData.value.summary.critical} 个`);
+  lines.push(`  警告: ${conflictData.value.summary.warning} 个`);
+  lines.push('');
+  lines.push('-' .repeat(60));
+  lines.push('');
+  
+  conflictData.value.conflicts.forEach((conflict, index) => {
+    lines.push(`${index + 1}. ${conflict.title} [${conflict.severity === 'critical' ? '严重' : '警告'}]`);
+    lines.push(`   ${conflict.description}`);
+    lines.push('');
+    
+    conflict.details.forEach(detail => {
+      lines.push(`   ${detail}`);
+    });
+    
+    if (conflict.allDoctors && conflict.allDoctors.length > 0) {
+      lines.push(`   涉及医生: ${conflict.allDoctors.map(d => `${d.name}(${d.identifier || d.id})`).join(', ')}`);
+    }
+    
+    lines.push('');
+    lines.push('-' .repeat(60));
+    lines.push('');
+  });
+  
+  lines.push('');
+  lines.push('报告结束');
+  lines.push('=' .repeat(60));
+  
+  return lines.join('\n');
+};
+
 // [新增] 自动填充排班数据
 const autoFillScheduleData = async () => {
   try {
@@ -2808,7 +3069,7 @@ const autoFillDoctors = async (schedules) => {
         doctorMap.set(doctorKey, {
           id: schedule.doctorId,
           name: schedule.doctorName,
-          identifier: schedule.doctorId.toString(),
+          identifier: schedule.doctorIdentifier || (schedule.doctorId ? schedule.doctorId.toString() : ''),
           title: schedule.doctorTitle || '医生',
           gender: 'male', // 默认性别
           specialty: schedule.doctorSpecialty || '',
@@ -3010,22 +3271,50 @@ onMounted(async () => {
 }
 
 /* [新增] 头部控制按钮样式 */
+/* 标题行样式 */
+.header-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.department-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+/* 按钮控制行 - 所有按钮排成一行 */
 .header-controls {
   display: flex;
-  gap: 16px;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.auto-fill-btn {
-  margin-right: 16px;
+/* 动作按钮统一尺寸与配色区分 */
+.header-controls :deep(.action-btn) {
+  flex: 0 0 140px; /* 统一宽度，比例协调 */
+  justify-content: center;
+}
+.header-controls :deep(.btn-auto) {
+  background-color: #409EFF;
+  border-color: #409EFF;
+  color: #fff;
+}
+.header-controls :deep(.btn-fill) {
+  background-color: #67C23A;
+  border-color: #67C23A;
+  color: #fff;
+}
+.header-controls :deep(.action-btn:hover) {
+  filter: brightness(0.95);
 }
 
-.test-btn {
-  margin-right: 16px;
-}
-
-.view-switcher {
-  margin-right: 16px;
+.view-switcher :deep(.el-button),
+.week-nav :deep(.el-button) {
+  padding: 6px 12px;
 }
 
 /* [新增] 日历容器样式 */
@@ -3069,12 +3358,18 @@ onMounted(async () => {
   font-size: 12px;
 }
 
-.calendar-container :deep(.fc-event:hover) {
-  opacity: 0.8;
+.calendar-container :deep(.fc-timegrid-event:hover) {
+  opacity: 0.9;
 }
 
 .calendar-container :deep(.fc-daygrid-event) {
   white-space: normal;
+  min-height: 22px;
+  margin-bottom: 2px;
+}
+
+.calendar-container :deep(.fc-daygrid-event .fc-event-main) {
+  padding: 1px 2px;
 }
 
 .calendar-container :deep(.fc-timegrid-event) {
@@ -3104,6 +3399,49 @@ onMounted(async () => {
   overflow-y: auto; /* 垂直滚动 */
   max-height: calc(100vh - 50px); /* 限制最大高度 */
   scroll-behavior: smooth; /* 平滑滚动 */
+  transition: all 0.3s ease;
+}
+
+/* 折叠状态 */
+.department-sidebar.collapsed {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+/* 折叠/展开按钮 */
+.sidebar-toggle {
+  position: absolute;
+  left: 320px;                /* 贴在侧栏右边缘 */
+  top: 50%;                   /* 垂直居中 */
+  transform: translateY(-50%);
+  width: 28px;
+  height: 64px;
+  background-color: #409EFF;
+  border-radius: 0 8px 8px 0;  /* 半胶囊，贴边更自然 */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s ease;
+  color: #fff;
+}
+
+.sidebar-toggle:hover {
+  background-color: #66b1ff;
+}
+
+/* 折叠状态下将按钮吸附到最左侧 */
+.sidebar-toggle.collapsed {
+  left: 0;
+  border-radius: 8px;         /* 独立悬浮小胶囊 */
+}
+
+/* 侧边栏折叠时，右侧内容占满 */
+.department-sidebar.collapsed ~ .schedule-content {
+  margin-left: 0;
 }
 
 /* 自定义滚动条样式 */
@@ -3213,12 +3551,33 @@ onMounted(async () => {
   align-items: center;
   height: 200px;
 }
+/* 表格容器 - 添加横向滚动 */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+/* 自定义横向滚动条样式 */
+.table-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background-color: #d0d7de;
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+  background-color: #b0b7be;
+}
+
 .schedule-table {
   width: 100%;
+  min-width: 1200px; /* 设置最小宽度，超出则滚动 */
   border-collapse: collapse;
   text-align: center;
   table-layout: auto;
-  max-width: 100%;
 }
 .schedule-table th, .schedule-table td {
   border: 1px solid #ebeef5;
@@ -3794,6 +4153,15 @@ onMounted(async () => {
   border: 1px solid #f5dab1;
   border-radius: 6px;
   font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.conflict-summary:hover {
+  background-color: #ffe7ba;
+  border-color: #e6a23c;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(230, 162, 60, 0.3);
 }
 
 .detect-conflicts-btn {
@@ -3870,15 +4238,165 @@ onMounted(async () => {
   transition: all 0.2s ease;
 }
 
+/* 自定义事件内容样式 - 日视图/周视图 */
+.calendar-container :deep(.fc-event-custom-day) {
+  padding: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.calendar-container :deep(.fc-event-time) {
+  font-weight: 600;
+  font-size: 11px;
+  margin-bottom: 2px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.calendar-container :deep(.fc-event-title-day) {
+  margin-bottom: 2px;
+}
+
+.calendar-container :deep(.fc-event-title-day strong) {
+  font-weight: 600;
+  color: #fff;
+}
+
+.calendar-container :deep(.fc-event-identifier) {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.9);
+  margin-left: 2px;
+}
+
+.calendar-container :deep(.fc-event-department) {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 2px;
+  font-style: italic;
+}
+
+.calendar-container :deep(.fc-event-location) {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.calendar-container :deep(.fc-event-location i) {
+  font-size: 10px;
+}
+
+/* 自定义事件内容样式 - 月视图 */
+.calendar-container :deep(.fc-event-custom-month) {
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.calendar-container :deep(.fc-event-title-month) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.calendar-container :deep(.fc-event-title-month strong) {
+  font-weight: 600;
+  color: #303133;
+  font-size: 13px;
+}
+
+.calendar-container :deep(.fc-event-custom-month .fc-event-identifier) {
+  font-size: 12px;
+  color: #606266;
+  font-weight: 500;
+}
+
+/* 月视图事件样式 - 白底黑字 + 彩色边框 */
+.calendar-container :deep(.fc-daygrid-event.shift-morning) {
+  background-color: #ffffff !important;
+  border-left: 4px solid #67C23A !important;
+  border-top: 1px solid #e4e7ed;
+  border-right: 1px solid #e4e7ed;
+  border-bottom: 1px solid #e4e7ed;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.calendar-container :deep(.fc-daygrid-event.shift-morning:hover) {
+  box-shadow: 0 2px 8px rgba(103, 194, 58, 0.3);
+  border-left-width: 5px;
+  transform: translateX(-1px);
+}
+
+.calendar-container :deep(.fc-daygrid-event.shift-afternoon) {
+  background-color: #ffffff !important;
+  border-left: 4px solid #409EFF !important;
+  border-top: 1px solid #e4e7ed;
+  border-right: 1px solid #e4e7ed;
+  border-bottom: 1px solid #e4e7ed;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.calendar-container :deep(.fc-daygrid-event.shift-afternoon:hover) {
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+  border-left-width: 5px;
+  transform: translateX(-1px);
+}
+
+/* 日视图/周视图事件样式 - 保持彩色背景 */
+.calendar-container :deep(.fc-timegrid-event.shift-morning) {
+  background-color: #67C23A !important;
+  border-color: #529b2e !important;
+}
+
+.calendar-container :deep(.fc-timegrid-event.shift-afternoon) {
+  background-color: #409EFF !important;
+  border-color: #337ecc !important;
+}
+
+/* 日视图/周视图的文字保持白色 */
+.calendar-container :deep(.fc-timegrid-event .fc-event-title-day strong),
+.calendar-container :deep(.fc-timegrid-event .fc-event-identifier),
+.calendar-container :deep(.fc-timegrid-event .fc-event-department),
+.calendar-container :deep(.fc-timegrid-event .fc-event-location) {
+  color: #fff !important;
+}
+
 /* 日历事件冲突样式 */
 .calendar-container :deep(.fc-event.conflict-critical) {
+  border-color: #f56c6c !important;
+}
+
+.calendar-container :deep(.fc-daygrid-event.conflict-critical) {
+  background-color: #FEF0F0 !important;
+  border-left-color: #f56c6c !important;
+}
+
+.calendar-container :deep(.fc-timegrid-event.conflict-critical) {
   background-color: #f56c6c !important;
   border-color: #f56c6c !important;
 }
 
 .calendar-container :deep(.fc-event.conflict-warning) {
+  border-color: #e6a23c !important;
+}
+
+.calendar-container :deep(.fc-daygrid-event.conflict-warning) {
+  background-color: #FDF6EC !important;
+  border-left-color: #e6a23c !important;
+}
+
+.calendar-container :deep(.fc-timegrid-event.conflict-warning) {
   background-color: #e6a23c !important;
   border-color: #e6a23c !important;
+}
+
+.calendar-container :deep(.fc-event.has-conflict) {
+  box-shadow: 0 0 8px rgba(245, 108, 108, 0.6);
 }
 
 /* 时间段班次不匹配样式 */
@@ -3902,6 +4420,154 @@ onMounted(async () => {
 
 .shift-mismatch-warning .warning-icon {
   font-size: 12px;
+}
+
+/* 冲突详情对话框样式 */
+.conflict-dialog :deep(.el-dialog__body) {
+  padding: 20px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.conflict-summary-header {
+  margin-bottom: 20px;
+}
+
+.conflict-stats {
+  display: flex;
+  gap: 20px;
+  margin-top: 8px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.stat-item.critical {
+  color: #f56c6c;
+}
+
+.stat-item.warning {
+  color: #e6a23c;
+}
+
+.conflict-list {
+  margin-top: 16px;
+}
+
+.conflict-item {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.conflict-item.conflict-critical {
+  border-left: 4px solid #f56c6c;
+}
+
+.conflict-item.conflict-warning {
+  border-left: 4px solid #e6a23c;
+}
+
+.conflict-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.conflict-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.conflict-icon.critical-icon {
+  color: #f56c6c;
+}
+
+.conflict-icon.warning-icon {
+  color: #e6a23c;
+}
+
+.conflict-type-badge {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.badge-critical {
+  background-color: #fef0f0;
+  color: #f56c6c;
+  border: 1px solid #fbc4c4;
+}
+
+.badge-warning {
+  background-color: #fdf6ec;
+  color: #e6a23c;
+  border: 1px solid #f5dab1;
+}
+
+.conflict-desc {
+  color: #606266;
+  font-size: 14px;
+  flex: 1;
+}
+
+.conflict-details {
+  padding: 16px;
+  background-color: #f9fafb;
+  border-radius: 4px;
+}
+
+.conflict-doctors {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e4e7ed;
+}
+
+.doctors-title {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.doctors-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.conflict-dialog :deep(.el-collapse-item__header) {
+  padding: 12px 16px;
+  background-color: #fff;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+.conflict-dialog :deep(.el-collapse-item__header:hover) {
+  background-color: #f5f7fa;
+}
+
+.conflict-dialog :deep(.el-collapse-item__content) {
+  padding: 0;
+}
+
+.conflict-dialog :deep(.el-descriptions__label) {
+  font-weight: 500;
+  background-color: #fafafa;
+}
+
+.conflict-dialog :deep(.el-dialog__footer) {
+  padding: 15px 20px;
+  border-top: 1px solid #e4e7ed;
 }
 </style>
 

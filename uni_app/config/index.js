@@ -15,5 +15,7 @@ const production = {
 // 当前使用的配置（开发阶段使用 development）
 const config = development
 
+// 同时支持 default 和 named export
 export default config
+export { config }
 
