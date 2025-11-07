@@ -79,7 +79,7 @@
 </template>
 
 <script>
-	import { mockWaitlist } from '../../api/mockData.js'
+	import { getPatientWaitlist } from '../../api/appointment.js'
 	
 	export default {
 		data() {
@@ -109,6 +109,8 @@
 			this.loadWaitlistCount()
 		},
 		onShow() {
+			// 页面显示时先重置候补数量，避免显示旧数据
+			this.$set(this, 'waitlistCount', 0)
 			// 页面显示时刷新数据
 			this.loadPatientInfo()
 			this.loadUpcomingCount()
@@ -171,9 +173,74 @@
 					url: '/pages/appointments/appointments'
 				})
 			},
-			loadWaitlistCount() {
-				const allWaitlist = JSON.parse(JSON.stringify(mockWaitlist))
-				this.waitlistCount = allWaitlist.filter(w => w.status === 'waiting' || w.status === 'notified').length
+			async loadWaitlistCount() {
+				try {
+					const patientInfo = uni.getStorageSync('patientInfo')
+					if (!patientInfo || !patientInfo.id) {
+						console.log('个人中心 - 未登录，候补数量设为0')
+						this.$set(this, 'waitlistCount', 0)
+						return
+					}
+					
+					// 先重置为0，避免使用旧数据
+					this.$set(this, 'waitlistCount', 0)
+					
+					const waitlistResponse = await getPatientWaitlist(patientInfo.id)
+					console.log('个人中心 - 候补列表响应:', waitlistResponse)
+					
+					if (waitlistResponse && waitlistResponse.code === '200' && waitlistResponse.data) {
+						const waitlistData = waitlistResponse.data
+						console.log('个人中心 - 候补数据:', waitlistData)
+						
+						// 确保是数组
+						const waitlistArray = Array.isArray(waitlistData) ? waitlistData : []
+						
+						// 过滤状态：只统计 waiting（等待中）和 notified（已通知）的候补
+						const validCount = waitlistArray.filter(w => {
+							const status = (w.status || '').toLowerCase()
+							return status === 'waiting' || status === 'notified'
+						}).length
+						
+						this.$set(this, 'waitlistCount', validCount)
+						console.log('个人中心 - 候补数量统计:', {
+							总数: waitlistArray.length,
+							有效候补: validCount,
+							更新后的waitlistCount: this.waitlistCount
+						})
+						
+						// 强制更新视图
+						this.$nextTick(() => {
+							this.$forceUpdate()
+							console.log('个人中心 - $nextTick后waitlistCount:', this.waitlistCount)
+						})
+					} else if (Array.isArray(waitlistResponse)) {
+						// 如果直接返回数组
+						const validCount = waitlistResponse.filter(w => {
+							const status = (w.status || '').toLowerCase()
+							return status === 'waiting' || status === 'notified'
+						}).length
+						this.$set(this, 'waitlistCount', validCount)
+						console.log('个人中心 - 候补数量统计（直接数组）:', {
+							总数: waitlistResponse.length,
+							有效候补: validCount
+						})
+						this.$nextTick(() => {
+							this.$forceUpdate()
+						})
+					} else {
+						console.log('个人中心 - 候补数据格式异常，设置为0')
+						this.$set(this, 'waitlistCount', 0)
+						this.$nextTick(() => {
+							this.$forceUpdate()
+						})
+					}
+				} catch (error) {
+					console.error('个人中心 - 加载候补数量失败:', error)
+					this.$set(this, 'waitlistCount', 0)
+					this.$nextTick(() => {
+						this.$forceUpdate()
+					})
+				}
 			},
 			navigateToWaitlist() {
 				uni.navigateTo({

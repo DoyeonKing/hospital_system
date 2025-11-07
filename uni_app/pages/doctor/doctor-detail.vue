@@ -7,7 +7,7 @@
 		<view class="content">
 			<!-- 医生基本信息卡片 -->
 			<view class="doctor-header-card">
-				<image class="doctor-avatar" :src="doctorInfo.photoUrl" mode="aspectFill"></image>
+				<image class="doctor-avatar" :src="doctorInfo.photoUrl || defaultAvatar" mode="aspectFill" @error="handleImageError"></image>
 				<view class="doctor-basic">
 					<view class="doctor-name-row">
 						<text class="doctor-name">{{ doctorInfo.doctorName }}</text>
@@ -78,7 +78,8 @@
 		data() {
 			return {
 				doctorId: null,
-				doctorInfo: {}
+				doctorInfo: {},
+				defaultAvatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'
 			}
 		},
 		onLoad(options) {
@@ -93,37 +94,34 @@
 					console.log('医生详情API响应:', response)
 					console.log('响应数据类型:', typeof response)
 					
-					// 处理不同的响应格式
+					// 处理不同的返回格式
 					let doctorData = null
 					
-					// 情况1: 直接返回 DoctorResponse 对象
-					if (response && response.doctorId) {
+					// 格式1: { code: '200', data: DoctorResponse }
+					if (response && response.code === '200' && response.data) {
+						doctorData = response.data
+					}
+					// 格式2: 直接返回 DoctorResponse 对象
+					else if (response && (response.fullName || response.doctorId)) {
 						doctorData = response
 					}
-					// 情况2: 包装在 data 字段中
-					else if (response && response.data && response.data.doctorId) {
-						doctorData = response.data
-					}
-					// 情况3: code/data 格式
-					else if (response && response.code === '200' && response.data) {
-						doctorData = response.data
+					// 格式3: 后端直接返回 DoctorResponse（通过 ResponseEntity）
+					else if (response && response.doctorId) {
+						doctorData = response
 					}
 					
-					// 如果成功获取到医生数据，进行适配
-					if (doctorData && doctorData.fullName) {
+					if (doctorData && (doctorData.fullName || doctorData.doctorId)) {
 						this.doctorInfo = {
-							doctorName: doctorData.fullName,
+							doctorName: doctorData.fullName || '未知医生',
 							doctorTitle: doctorData.title || '医师',
-							departmentName: doctorData.department ? doctorData.department.name : '未知科室',
+							departmentName: doctorData.department ? (doctorData.department.name || doctorData.department.departmentName) : '未知科室',
 							specialty: doctorData.specialty || '暂无专长信息',
 							photoUrl: doctorData.photoUrl || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
-							bio: doctorData.bio || '暂无简介',
-							education: doctorData.education || '',
-							experience: doctorData.experience || '',
-							awards: doctorData.awards || ''
+							bio: doctorData.bio || '医生详情功能开发中...'
 						}
+						console.log('医生详情处理成功:', this.doctorInfo)
 					} else {
-						throw new Error('返回数据格式异常或医生不存在')
+						throw new Error('返回数据格式异常: ' + JSON.stringify(response))
 					}
 				} catch (error) {
 					console.error('获取医生详情失败:', error)
@@ -148,6 +146,17 @@
 							bio: '暂无简介'
 						}
 					}
+				}
+			},
+			
+			// 图片加载失败处理
+			handleImageError(e) {
+				console.log('医生头像加载失败，使用默认头像')
+				// 设置为默认头像
+				this.doctorInfo.photoUrl = this.defaultAvatar
+				// 如果 e.target 存在，直接设置 src
+				if (e && e.target) {
+					e.target.src = this.defaultAvatar
 				}
 			}
 		}

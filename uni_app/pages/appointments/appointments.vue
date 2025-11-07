@@ -69,13 +69,13 @@
 						<!-- 已完成状态：同时显示取消预约和查看详情按钮 -->
 						<template v-if="isCompletedStatus(appointment.status)">
 							<view class="action-btn cancel-btn" @click.stop="handleCancel(getAppointmentId(appointment))">
-								<text class="btn-text">取消预约</text>
-							</view>
+						<text class="btn-text">取消预约</text>
+					</view>
 							<view class="action-btn view-btn" @click.stop="navigateToDetail(getAppointmentId(appointment))">
 								<text class="btn-text">查看详情</text>
 							</view>
 						</template>
-					</view>
+				</view>
 				</view>
 			</view>
 			

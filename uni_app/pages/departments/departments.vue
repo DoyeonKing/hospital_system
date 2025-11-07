@@ -85,16 +85,27 @@
 					const response = await getDepartmentTree()
 					console.log('获取科室树数据:', response)
 					
+					let allDepartments = []
 					// 后端返回的是数组格式，不是标准Result格式
 					if (Array.isArray(response)) {
-						this.departments = response
+						allDepartments = response
 					} else if (response.code === '200' && response.data) {
-						this.departments = response.data
+						allDepartments = response.data
 					} else {
 						// 如果后端失败，使用Mock数据
 						console.log('使用Mock数据')
-						this.departments = JSON.parse(JSON.stringify(mockDepartments))
+						allDepartments = JSON.parse(JSON.stringify(mockDepartments))
 					}
+					
+					// 过滤掉不应该在患者挂号中显示的科室
+					// 排除：医技科室、行政科室
+					const excludedNames = ['医技科室', '行政科室']
+					this.departments = allDepartments.filter(dept => {
+						const name = dept.name || dept.parentDepartmentName || ''
+						return !excludedNames.includes(name)
+					})
+					
+					console.log('过滤后的科室列表:', this.departments)
 					
 					if (this.departments.length > 0) {
 						this.selectedParentId = this.departments[0].id
@@ -102,7 +113,13 @@
 				} catch (error) {
 					console.error('加载科室列表失败:', error)
 					// 使用Mock数据作为fallback
-					this.departments = JSON.parse(JSON.stringify(mockDepartments))
+					const allDepartments = JSON.parse(JSON.stringify(mockDepartments))
+					// 同样过滤掉不应该显示的科室
+					const excludedNames = ['医技科室', '行政科室']
+					this.departments = allDepartments.filter(dept => {
+						const name = dept.name || dept.parentDepartmentName || ''
+						return !excludedNames.includes(name)
+					})
 					if (this.departments.length > 0) {
 						this.selectedParentId = this.departments[0].id
 					}
