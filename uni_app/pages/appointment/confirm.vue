@@ -51,14 +51,6 @@
 				</view>
 			</view>
 			
-			<!-- 温馨提示 -->
-			<view class="tips-card">
-				<text class="tips-title">💡 温馨提示</text>
-				<text class="tips-text">1. 请提前15分钟到达诊室候诊</text>
-				<text class="tips-text">2. 如无法按时就诊，请提前取消预约</text>
-				<text class="tips-text">3. 取消预约需在就诊前24小时进行</text>
-			</view>
-			
 			<!-- 确认按钮 -->
 			<view class="confirm-section">
 				<button class="confirm-btn" @click="handleConfirm">确认预约</button>
@@ -266,30 +258,6 @@
 		color: #FF6B6B;
 		font-size: 32rpx;
 		font-weight: 700;
-	}
-
-	.tips-card {
-		background: #FEF3E2;
-		border-radius: 16rpx;
-		padding: 24rpx;
-		margin-bottom: 20rpx;
-		border-left: 4rpx solid #F59E0B;
-	}
-
-	.tips-title {
-		display: block;
-		font-size: 28rpx;
-		font-weight: 600;
-		color: #92400E;
-		margin-bottom: 16rpx;
-	}
-
-	.tips-text {
-		display: block;
-		font-size: 24rpx;
-		color: #78350F;
-		margin-bottom: 8rpx;
-		line-height: 1.6;
 	}
 
 	.confirm-section {

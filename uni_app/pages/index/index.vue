@@ -55,6 +55,26 @@
 			</view>
 		</view>
 
+		<!-- 即将就诊提醒卡片（简化版） -->
+		<view class="appointment-card" v-if="upcomingAppointment && isWithin24Hours">
+			<view class="appointment-icon">🔔</view>
+			<view class="appointment-content">
+				<text class="appointment-title">即将就诊</text>
+				<text class="appointment-info-text">{{ formatTime(upcomingAppointment.scheduleTime) }} · {{ upcomingAppointment.departmentName }} · {{ upcomingAppointment.doctorName }}</text>
+			</view>
+			<text class="appointment-number">#{{ upcomingAppointment.queueNumber }}</text>
+		</view>
+
+		<!-- 候补提醒卡片 -->
+		<view class="waitlist-card" v-if="waitlistCount > 0" @click="navigateToWaitlist">
+			<view class="waitlist-icon">⏳</view>
+			<view class="waitlist-content">
+				<text class="waitlist-title">我的候补</text>
+				<text class="waitlist-info">您有 {{ waitlistCount }} 个候补记录</text>
+			</view>
+			<text class="waitlist-arrow">></text>
+		</view>
+
 		<!-- 合并的信息卡片：今日可预约 + 热门科室 -->
 		<view class="info-card">
 			<view class="card-header">
@@ -119,26 +139,6 @@
 			</view>
 		</view>
 
-		<!-- 即将就诊提醒卡片（简化版） -->
-		<view class="appointment-card" v-if="upcomingAppointment && isWithin24Hours">
-			<view class="appointment-icon">🔔</view>
-			<view class="appointment-content">
-				<text class="appointment-title">即将就诊</text>
-				<text class="appointment-info-text">{{ formatTime(upcomingAppointment.scheduleTime) }} · {{ upcomingAppointment.departmentName }} · {{ upcomingAppointment.doctorName }}</text>
-			</view>
-			<text class="appointment-number">#{{ upcomingAppointment.queueNumber }}</text>
-		</view>
-
-		<!-- 候补提醒卡片 -->
-		<view class="waitlist-card" v-if="waitlistCount > 0" @click="navigateToWaitlist">
-			<view class="waitlist-icon">⏳</view>
-			<view class="waitlist-content">
-				<text class="waitlist-title">我的候补</text>
-				<text class="waitlist-info">您有 {{ waitlistCount }} 个候补记录</text>
-			</view>
-			<text class="waitlist-arrow">></text>
-		</view>
-
 		<!-- 加载状态 -->
 		<view class="loading" v-if="loading">
 			<text class="loading-text">加载中...</text>
@@ -192,6 +192,8 @@
 			this.loadPageData()
 		},
 		onShow() {
+			// 页面显示时先重置候补数量，避免显示旧数据
+			this.$set(this, 'waitlistCount', 0)
 			// 页面显示时刷新数据
 			this.loadPageData()
 			// 同步待就诊数量到storage
@@ -292,32 +294,50 @@
 					const popularResponse = await getPopularDepartments()
 					console.log('首页 - 热门科室响应:', popularResponse)
 					
+					const excludedNames = ['医技科室', '行政科室'] // 排除不应该显示的科室
+					
 					if (popularResponse && popularResponse.code === '200' && popularResponse.data) {
 						// 如果返回的是数组
-						this.popularDepartments = Array.isArray(popularResponse.data) 
-							? popularResponse.data.map(dept => ({
+						const deptList = Array.isArray(popularResponse.data) 
+							? popularResponse.data
+							: [popularResponse.data]
+						
+						this.popularDepartments = deptList
+							.filter(dept => {
+								const name = dept.name || dept.departmentName || ''
+								return !excludedNames.includes(name)
+							})
+							.map(dept => ({
 								id: dept.departmentId || dept.id,
 								name: dept.name || dept.departmentName
 							}))
-							: [{
-								id: popularResponse.data.departmentId || popularResponse.data.id,
-								name: popularResponse.data.name || popularResponse.data.departmentName
-							}]
 					} else if (Array.isArray(popularResponse)) {
 						// 直接返回数组
-						this.popularDepartments = popularResponse.map(dept => ({
-							id: dept.departmentId || dept.id,
-							name: dept.name || dept.departmentName
-						}))
+						this.popularDepartments = popularResponse
+							.filter(dept => {
+								const name = dept.name || dept.departmentName || ''
+								return !excludedNames.includes(name)
+							})
+							.map(dept => ({
+								id: dept.departmentId || dept.id,
+								name: dept.name || dept.departmentName
+							}))
 					} else {
 						// 如果后端没有popular接口，使用科室树获取父科室作为热门科室
 						console.log('首页 - 热门科室接口不可用，使用科室树获取父科室')
 						try {
 							const treeResponse = await getDepartmentTree()
+							const excludedNames = ['医技科室', '行政科室'] // 排除不应该显示的科室
+							
 							if (Array.isArray(treeResponse)) {
 								// 取前6个父科室作为热门科室（DepartmentTreeDTO 结构：id, name, type, children）
 								this.popularDepartments = treeResponse
-									.filter(item => item.type === 'parent' || !item.type) // 只取父科室
+									.filter(item => {
+										// 只取父科室，并排除医技科室和行政科室
+										const isParent = item.type === 'parent' || !item.type
+										const name = item.name || ''
+										return isParent && !excludedNames.includes(name)
+									})
 									.slice(0, 6)
 									.map(parent => ({
 										id: parent.id,
@@ -325,7 +345,11 @@
 									}))
 							} else if (treeResponse && Array.isArray(treeResponse.data)) {
 								this.popularDepartments = treeResponse.data
-									.filter(item => item.type === 'parent' || !item.type)
+									.filter(item => {
+										const isParent = item.type === 'parent' || !item.type
+										const name = item.name || ''
+										return isParent && !excludedNames.includes(name)
+									})
 									.slice(0, 6)
 									.map(parent => ({
 										id: parent.id,
@@ -357,30 +381,90 @@
 						const appointmentResponse = await getUpcomingAppointments(patientInfo.id)
 						console.log('即将就诊预约响应:', appointmentResponse)
 						if (appointmentResponse && appointmentResponse.code === '200' && appointmentResponse.data) {
-							// 取第一个即将就诊的预约
-							this.upcomingAppointment = appointmentResponse.data.length > 0 ? appointmentResponse.data[0] : null
+							// 过滤掉已取消的预约，取第一个即将就诊的预约
+							const validAppointments = appointmentResponse.data.filter(apt => 
+								apt.status !== 'cancelled' && apt.status !== 'CANCELLED'
+							)
+							this.upcomingAppointment = validAppointments.length > 0 ? validAppointments[0] : null
 						} else {
 							this.upcomingAppointment = null
 						}
 						
-						// 获取候补数量
+						// 获取候补数量（只统计等待中和已通知的候补）
 						const waitlistResponse = await getPatientWaitlist(patientInfo.id)
-						console.log('候补列表响应:', waitlistResponse)
+						console.log('首页 - 候补列表响应:', waitlistResponse)
+						console.log('首页 - 候补列表响应类型:', typeof waitlistResponse, '是否为数组:', Array.isArray(waitlistResponse))
+						
+						// 先重置为0，避免使用旧数据，并强制更新视图
+						this.$set(this, 'waitlistCount', 0)
+						
 						if (waitlistResponse && waitlistResponse.code === '200' && waitlistResponse.data) {
-							this.waitlistCount = waitlistResponse.data.filter(w => 
-								w.status === 'WAITING' || w.status === 'NOTIFIED'
-							).length
+							const waitlistData = waitlistResponse.data
+							console.log('首页 - 候补数据:', waitlistData)
+							console.log('首页 - 候补数据长度:', Array.isArray(waitlistData) ? waitlistData.length : 0)
+							
+							// 确保是数组
+							const waitlistArray = Array.isArray(waitlistData) ? waitlistData : []
+							
+							// 过滤状态：只统计 waiting（等待中）和 notified（已通知）的候补
+							// 排除 expired（已过期）、booked（已预约）、cancelled（已取消）等状态
+							const validCount = waitlistArray.filter(w => {
+								const status = (w.status || '').toLowerCase()
+								return status === 'waiting' || status === 'notified'
+							}).length
+							this.$set(this, 'waitlistCount', validCount)
+							
+							console.log('首页 - 候补数量统计:', {
+								总数: waitlistArray.length,
+								有效候补: validCount,
+								更新后的waitlistCount: this.waitlistCount,
+								所有状态: waitlistArray.map(w => w.status),
+								所有候补项: waitlistArray.map(w => ({
+									id: w.id || w.waitlistId,
+									status: w.status,
+									departmentName: w.departmentName
+								}))
+							})
+							
+							// 强制更新视图
+							this.$nextTick(() => {
+								this.$forceUpdate()
+								console.log('首页 - $nextTick后waitlistCount:', this.waitlistCount)
+							})
+						} else if (Array.isArray(waitlistResponse)) {
+							// 如果直接返回数组
+							console.log('首页 - 候补数据直接是数组:', waitlistResponse)
+							const validCount = waitlistResponse.filter(w => {
+								const status = (w.status || '').toLowerCase()
+								return status === 'waiting' || status === 'notified'
+							}).length
+							this.$set(this, 'waitlistCount', validCount)
+							console.log('首页 - 候补数量统计（直接数组）:', {
+								总数: waitlistResponse.length,
+								有效候补: validCount,
+								更新后的waitlistCount: this.waitlistCount
+							})
+							// 强制更新视图
+							this.$nextTick(() => {
+								this.$forceUpdate()
+								console.log('首页 - $nextTick后waitlistCount（直接数组）:', this.waitlistCount)
+							})
 						} else {
-							this.waitlistCount = 0
+							console.log('首页 - 候补数据格式异常，设置为0')
+							this.$set(this, 'waitlistCount', 0)
+							this.$nextTick(() => {
+								this.$forceUpdate()
+								console.log('首页 - $nextTick后waitlistCount（异常）:', this.waitlistCount)
+							})
 						}
 					} else {
 						this.upcomingAppointment = null
-						this.waitlistCount = 0
+						this.$set(this, 'waitlistCount', 0)
 					}
 				} catch (error) {
 					console.error('加载预约/候补数据失败:', error)
 					this.upcomingAppointment = null
-					this.waitlistCount = 0
+					this.$set(this, 'waitlistCount', 0)
 				}
 				
 				this.loading = false

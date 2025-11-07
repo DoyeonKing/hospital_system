@@ -190,23 +190,154 @@
 					console.error('创建预约失败，详细信息:', error)
 					console.error('错误堆栈:', error.stack)
 					
-					// 如果是重复预约错误，提示更友好
+					// 如果是重复预约错误，检查是否有已取消的预约，如果有则恢复预约
 					const errorMessage = error.message || ''
 					if (errorMessage.includes('already has an appointment') || errorMessage.includes('已预约')) {
-						uni.showModal({
-							title: '预约提示',
-							content: '您已预约过该排班，请前往预约列表查看',
-							showCancel: false,
-							success: () => {
-								uni.switchTab({
-									url: '/pages/appointments/appointments'
+						// 检查是否有该排班的已取消预约
+						try {
+							const appointmentApi = await import('../../api/appointment.js')
+							const appointmentsResponse = await appointmentApi.getPatientAppointments(this.patientInfo.id)
+							const appointments = appointmentsResponse?.data || appointmentsResponse || []
+							
+							// 查找该排班的预约（包括已取消的）
+							const existingAppointment = appointments.find(apt => 
+								apt.scheduleId === this.scheduleId
+							)
+							
+							if (existingAppointment) {
+								// 找到该排班的预约，检查状态
+								console.log('找到该排班的预约:', existingAppointment)
+								const appointmentId = existingAppointment.appointmentId || existingAppointment.id
+								const currentStatus = existingAppointment.status
+								
+								// 如果是已取消状态，尝试恢复
+								if (currentStatus === 'cancelled' || currentStatus === 'CANCELLED') {
+									try {
+										uni.showLoading({ title: '处理中...' })
+										
+										// 更新预约状态：从 cancelled 改为 scheduled（已预约，待支付）
+										// 注意：数据库字段可能不支持 PENDING_PAYMENT，所以使用 scheduled
+										const updateResponse = await appointmentApi.updateAppointmentPayment(
+											appointmentId,
+											{
+												status: 'scheduled',
+												paymentStatus: 'unpaid'
+											}
+										)
+										
+										console.log('更新预约完整响应:', JSON.stringify(updateResponse, null, 2))
+										
+										uni.hideLoading()
+										
+										// 处理不同的响应格式
+										let updatedAppointment = null
+										if (updateResponse && updateResponse.code === '200' && updateResponse.data) {
+											updatedAppointment = updateResponse.data
+										} else if (updateResponse && updateResponse.appointmentId) {
+											updatedAppointment = updateResponse
+										} else if (updateResponse && updateResponse.data && updateResponse.data.appointmentId) {
+											updatedAppointment = updateResponse.data
+										}
+										
+										if (updatedAppointment) {
+											// 恢复成功，使用恢复后的预约ID
+											this.appointmentId = updatedAppointment.appointmentId || updatedAppointment.id || appointmentId
+											this.appointmentCreated = true
+											console.log('预约恢复成功，appointmentId:', this.appointmentId)
+											// 不显示提示，和正常挂号一样
+										} else {
+											console.error('更新预约响应格式异常，完整响应:', updateResponse)
+											const errorMsg = updateResponse?.msg || updateResponse?.message || updateResponse?.error || '恢复预约失败'
+											throw new Error(errorMsg)
+										}
+									} catch (restoreError) {
+										uni.hideLoading()
+										console.error('恢复预约失败，错误对象:', restoreError)
+										console.error('恢复预约失败，错误消息:', restoreError.message)
+										console.error('恢复预约失败，错误堆栈:', restoreError.stack)
+										
+										// 提取错误信息
+										let errorMsg = restoreError.message || ''
+										if (restoreError.response) {
+											errorMsg = restoreError.response.msg || restoreError.response.message || errorMsg
+										}
+										
+										uni.showModal({
+											title: '预约失败',
+											content: errorMsg || '无法恢复预约，请稍后再试或联系客服处理。',
+											showCancel: true,
+											confirmText: '查看预约',
+											cancelText: '返回',
+											success: (res) => {
+												if (res.confirm) {
+													uni.switchTab({
+														url: '/pages/appointments/appointments'
+													})
+												} else {
+													uni.navigateBack()
+												}
+											}
+										})
+									}
+								} else {
+									// 不是已取消状态，说明是有效的重复预约
+									uni.showModal({
+										title: '预约提示',
+										content: '您已预约过该排班，请前往预约列表查看',
+										showCancel: false,
+										success: () => {
+											uni.switchTab({
+												url: '/pages/appointments/appointments'
+											})
+										}
+									})
+								}
+							} else {
+								// 没有已取消的预约，说明是有效的重复预约
+								uni.showModal({
+									title: '预约提示',
+									content: '您已预约过该排班，请前往预约列表查看',
+									showCancel: false,
+									success: () => {
+										uni.switchTab({
+											url: '/pages/appointments/appointments'
+										})
+									}
 								})
 							}
-						})
+						} catch (checkError) {
+							console.error('检查预约列表失败:', checkError)
+							// 如果检查失败，使用默认提示
+							uni.showModal({
+								title: '预约提示',
+								content: '您已预约过该排班，请前往预约列表查看',
+								showCancel: false,
+								success: () => {
+									uni.switchTab({
+										url: '/pages/appointments/appointments'
+									})
+								}
+							})
+						}
 					} else {
+						// 检查是否是时间过期错误
+						const errorMessage = error.message || ''
+						let displayMessage = errorMessage
+						
+						if (errorMessage.includes('Cannot book past or ongoing schedules') || 
+						    errorMessage.includes('past or ongoing') ||
+						    errorMessage.includes('不能预约过去') ||
+						    errorMessage.includes('时间已过期')) {
+							displayMessage = '该排班时间已过期，无法预约。请选择其他时间段的排班。'
+						} else if (errorMessage.includes('No available slots')) {
+							displayMessage = '该排班号源已满，无法预约。'
+						} else if (errorMessage.includes('not active')) {
+							displayMessage = '该排班不可预约。'
+						}
+						
 						uni.showModal({
 							title: '预约失败',
-							content: error.message || '创建预约失败，请重试',
+							content: displayMessage,
 							showCancel: false,
 							success: () => {
 								uni.navigateBack()
