@@ -76,6 +76,12 @@
 							</view>
 						</template>
 				</view>
+				<!-- 已取消状态：显示改约按钮 -->
+				<view class="appointment-actions" v-if="isCancelledStatus(appointment.status)">
+					<view class="action-btn reschedule-btn" @click.stop="navigateToDepartments">
+						<text class="btn-text reschedule-text">改约</text>
+					</view>
+				</view>
 				</view>
 			</view>
 			
@@ -685,6 +691,16 @@
 
 	.view-btn .btn-text {
 		color: #38A2AC;
+	}
+
+	.reschedule-btn {
+		background: linear-gradient(135deg, #7be6d8 0%, #4FD9C3 100%);
+		border: none;
+	}
+
+	.reschedule-text {
+		color: #ffffff;
+		font-weight: 600;
 	}
 
 	.btn-text {

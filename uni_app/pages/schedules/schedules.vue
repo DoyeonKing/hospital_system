@@ -87,8 +87,8 @@
 										<text class="time-label">🕐 就诊时间</text>
 										<text class="time-value">{{ schedule.slotName }}</text>
 									</view>
-									<view class="status-tag" :class="{ 'full-tag': schedule.remainingSlots === 0 }">
-										{{ schedule.remainingSlots === 0 ? '已约满' : '可预约' }}
+								<view class="status-tag" :class="{ 'full-tag': isScheduleFull(schedule) }">
+									{{ isScheduleFull(schedule) ? '已约满' : '可预约' }}
 									</view>
 								</view>
 								
@@ -111,9 +111,9 @@
 									</view>
 									<view 
 										class="action-btn" 
-										:class="{ 'full-btn': schedule.remainingSlots === 0 }"
+										:class="{ 'full-btn': isScheduleFull(schedule) }"
 									>
-										{{ schedule.remainingSlots === 0 ? '候补' : '预约' }}
+										{{ isScheduleFull(schedule) ? '候补' : '预约' }}
 									</view>
 								</view>
 							</view>
@@ -142,6 +142,7 @@
 	import { mockSchedules } from '../../api/mockData.js'
 	import { mockDoctorDetails } from '../../api/mockData.js'
 	import { getSchedulesByDepartment } from '../../api/schedule.js'
+	import { createWaitlist } from '../../api/appointment.js'
 	
 	export default {
 		data() {
@@ -263,6 +264,25 @@
 			}
 		},
 		methods: {
+			// 判断号源是否已满
+			isScheduleFull(schedule) {
+				if (!schedule) return false
+				// 优先使用 remainingSlots
+				if (schedule.remainingSlots !== undefined && schedule.remainingSlots !== null) {
+					if (Number(schedule.remainingSlots) <= 0) {
+						return true
+					}
+				}
+				// 其次使用 bookedSlots 与 totalSlots
+				if (schedule.bookedSlots !== undefined && schedule.totalSlots !== undefined) {
+					const booked = Number(schedule.bookedSlots)
+					const total = Number(schedule.totalSlots)
+					if (!isNaN(booked) && !isNaN(total) && total > 0 && booked >= total) {
+						return true
+					}
+				}
+				return false
+			},
 			// 初始化日期选项
 			initDateOptions() {
 				const options = []
@@ -473,7 +493,7 @@
 		
 		// 跳转到确认页面或候补页面
 		navigateToConfirm(schedule) {
-			if (schedule.remainingSlots === 0) {
+			if (this.isScheduleFull(schedule)) {
 				// 已约满，跳转到候补申请
 				uni.showModal({
 					title: '号源已满',
@@ -494,19 +514,69 @@
 			})
 		},
 		
-		// 跳转到候补申请
-		navigateToWaitlist(schedule) {
-			// TODO: 调用后端API创建候补申请
-			// 模拟：显示提示并跳转到候补列表
-			uni.showToast({
-				title: '候补申请成功',
-				icon: 'success'
-			})
-			setTimeout(() => {
-				uni.navigateTo({
-					url: '/pages/waitlist/waitlist'
+		// 创建候补申请并跳转到候补列表
+		async navigateToWaitlist(schedule) {
+			try {
+				const patientInfo = uni.getStorageSync('patientInfo')
+				if (!patientInfo || !patientInfo.id) {
+					uni.showToast({
+						title: '请先登录',
+						icon: 'none'
+					})
+					return
+				}
+
+				uni.showLoading({ title: '申请中...' })
+
+				const payload = {
+					patientId: patientInfo.id,
+					scheduleId: schedule.scheduleId
+				}
+				const response = await createWaitlist(payload)
+				console.log('创建候补响应:', response)
+
+				let success = false
+				let message = '候补申请成功'
+				if (response) {
+					if (response.code === '200') {
+						success = true
+					} else if (response.waitlistId || (response.data && response.data.waitlistId)) {
+						success = true
+					} else if (response.msg) {
+						message = response.msg
+					}
+				}
+
+				if (success) {
+					uni.showToast({
+						title: message,
+						icon: 'success'
+					})
+					setTimeout(() => {
+						uni.navigateTo({
+							url: '/pages/waitlist/waitlist'
+						})
+					}, 1500)
+				} else {
+					uni.showToast({
+						title: message || '候补申请失败',
+						icon: 'none'
+					})
+				}
+			} catch (error) {
+				console.error('候补申请失败:', error)
+				let errorMessage = error?.msg || error?.message || '候补申请失败，请稍后再试'
+				if (error?.response?.data) {
+					const data = error.response.data
+					errorMessage = data?.msg || data?.message || errorMessage
+				}
+				uni.showToast({
+					title: errorMessage,
+					icon: 'none'
 				})
-			}, 1500)
+			} finally {
+				uni.hideLoading()
+			}
 		}
 	}
 }
