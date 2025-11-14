@@ -4,7 +4,6 @@ import com.example.springboot.common.Constants;
 import com.example.springboot.dto.appointment.AppointmentCreateRequest;
 import com.example.springboot.dto.appointment.AppointmentResponse;
 import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
-import com.example.springboot.dto.payment.AppointmentPaymentRequest;
 import com.example.springboot.dto.schedule.ScheduleResponse;
 import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Patient;
@@ -229,19 +228,12 @@ public class AppointmentService {
     }
 
     @Transactional
-    public AppointmentResponse processPayment(Integer appointmentId, AppointmentPaymentRequest paymentData) {
+    public AppointmentResponse processPayment(Integer appointmentId, AppointmentUpdateRequest paymentData) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id " + appointmentId));
 
-        // 仅处理支付相关字段更新
-        if (paymentData.getPaymentStatus() != null) {
-            appointment.setPaymentStatus(paymentData.getPaymentStatus());
-        }
-        if (paymentData.getPaymentMethod() != null) {
-            appointment.setPaymentMethod(paymentData.getPaymentMethod());
-        }
-        if (paymentData.getTransactionId() != null) {
-            appointment.setTransactionId(paymentData.getTransactionId());
+        if (appointment.getPaymentStatus() == PaymentStatus.paid) {
+            throw new BadRequestException("Appointment is already paid");
         }
 
         paymentData.setPaymentStatus(PaymentStatus.paid);
