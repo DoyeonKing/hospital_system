@@ -43,8 +43,7 @@
 </template>
 
 <script>
-	// import { getMessages, markMessageAsRead } from '../../api/message.js'
-	import { mockMessages } from '../../api/mockData.js'
+	import { getUserNotifications, markAsRead, markAllAsRead } from '../../api/notification.js'
 
 	export default {
 		data() {
@@ -52,7 +51,7 @@
 				loading: false,
 				isIOS: false,
 				buttonWidth: 0, // 按钮宽度（px）
-				messageList: [],
+				notificationList: [],
 				conversationList: [],
 				swipeOffset: {},
 				touchStartX: 0,
@@ -79,46 +78,97 @@
 			this.loadMessages()
 			uni.stopPullDownRefresh()
 		},
-	methods: {
-		// 加载消息列表 - 按发送者分组
-		loadMessages() {
+		methods: {
+		// 加载通知列表 - 按类型分组
+		async loadMessages() {
 			this.loading = true
-			// 加载所有消息
-			this.messageList = JSON.parse(JSON.stringify(mockMessages))
-			
-			// 保存到全局存储供对话详情页使用
-			uni.setStorageSync('allMessages', this.messageList)
-			
-			// 按发送者分组
-			const conversationMap = {}
-			this.messageList.forEach(msg => {
-				const senderId = msg.senderId || msg.type
-				if (!conversationMap[senderId]) {
-					conversationMap[senderId] = {
-						senderId: senderId,
-						senderName: msg.senderName || msg.type,
-						icon: msg.type,
-						latestMessage: msg,
-						unreadCount: 0,
-						messages: []
+			try {
+				const patientInfo = uni.getStorageSync('patientInfo')
+				if (!patientInfo || !patientInfo.id) {
+					console.warn('未登录，无法加载通知')
+					this.conversationList = []
+					this.loading = false
+					return
+				}
+				
+				// 调用通知API
+				const notifications = await getUserNotifications(patientInfo.id, 'patient')
+				console.log('获取到的通知列表:', notifications)
+				
+				// 处理响应格式（可能是数组或包装格式）
+				let notificationList = []
+				if (Array.isArray(notifications)) {
+					notificationList = notifications
+				} else if (notifications && notifications.data && Array.isArray(notifications.data)) {
+					notificationList = notifications.data
+				}
+				
+				this.notificationList = notificationList
+				
+				// 保存到全局存储
+				uni.setStorageSync('allNotifications', notificationList)
+				
+				// 按通知类型分组
+				const conversationMap = {}
+				notificationList.forEach(notification => {
+					const type = notification.type || 'system_notice'
+					const typeName = this.getTypeName(type)
+					
+					if (!conversationMap[type]) {
+						conversationMap[type] = {
+							senderId: type,
+							senderName: typeName,
+							icon: type,
+							latestMessage: {
+								content: notification.content,
+								createTime: notification.sentAt
+							},
+							unreadCount: 0,
+							messages: []
+						}
 					}
-				}
-				conversationMap[senderId].messages.push(msg)
-				if (!msg.isRead) {
-					conversationMap[senderId].unreadCount++
-				}
-				// 更新最新消息
-				if (new Date(msg.createTime) > new Date(conversationMap[senderId].latestMessage.createTime)) {
-					conversationMap[senderId].latestMessage = msg
-				}
-			})
-			
-			// 转换为数组并排序（最新消息在前）
-			this.conversationList = Object.values(conversationMap).sort((a, b) => {
-				return new Date(b.latestMessage.createTime) - new Date(a.latestMessage.createTime)
-			})
-			
-			this.loading = false
+					conversationMap[type].messages.push(notification)
+					if (notification.status === 'unread') {
+						conversationMap[type].unreadCount++
+					}
+					// 更新最新消息
+					const sentAt = new Date(notification.sentAt)
+					const latestSentAt = new Date(conversationMap[type].latestMessage.createTime)
+					if (sentAt > latestSentAt) {
+						conversationMap[type].latestMessage = {
+							content: notification.content,
+							createTime: notification.sentAt
+						}
+					}
+				})
+				
+				// 转换为数组并排序（最新消息在前）
+				this.conversationList = Object.values(conversationMap).sort((a, b) => {
+					return new Date(b.latestMessage.createTime) - new Date(a.latestMessage.createTime)
+				})
+			} catch (error) {
+				console.error('加载通知列表失败:', error)
+				uni.showToast({
+					title: '加载失败，请重试',
+					icon: 'none'
+				})
+				this.conversationList = []
+			} finally {
+				this.loading = false
+			}
+		},
+		
+		// 获取通知类型名称
+		getTypeName(type) {
+			const typeMap = {
+				'payment_success': '支付通知',
+				'appointment_reminder': '预约提醒',
+				'cancellation': '取消通知',
+				'waitlist_available': '候补通知',
+				'schedule_change': '排班变更',
+				'system_notice': '系统通知'
+			}
+			return typeMap[type] || '系统通知'
 		},
 		
 		// 处理对话点击
@@ -155,6 +205,12 @@
 		// 获取消息图标
 		getMessageIcon(type) {
 			const icons = {
+				'payment_success': '💰',
+				'appointment_reminder': '📅',
+				'cancellation': '🚫',
+				'waitlist_available': '⏳',
+				'schedule_change': '📢',
+				'system_notice': '🔔',
 				'appointment': '📅',
 				'cancel': '🚫',
 				'system': '🔔',

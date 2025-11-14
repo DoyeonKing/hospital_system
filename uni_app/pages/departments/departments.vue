@@ -5,54 +5,68 @@
 		</view>
 		
 		<view class="content">
-			<!-- 搜索栏 -->
-			<view class="search-bar">
-				<input 
-					class="search-input" 
-					v-model="searchKeyword" 
-					placeholder="请输入科室名称" 
-					@input="handleSearch"
-				/>
-				<text class="search-icon">🔍</text>
+			<!-- 加载状态 -->
+			<view class="loading-container" v-if="loading">
+				<text class="loading-text">加载中...</text>
 			</view>
 			
-			<!-- 科室列表（两栏布局） -->
-			<view class="department-container">
-				<!-- 左侧：父科室列表 -->
-				<view class="parent-departments">
-					<view 
-						class="parent-item" 
-						v-for="dept in departments" 
-						:key="dept.id"
-						:class="{ active: selectedParentId === dept.id }"
-						@click="selectParent(dept.id)"
-					>
-						<text class="parent-name">{{ dept.name }}</text>
+			<!-- 内容区域 -->
+			<template v-else>
+				<!-- 搜索栏 -->
+				<view class="search-bar">
+					<input 
+						class="search-input" 
+						v-model="searchKeyword" 
+						placeholder="请输入科室名称" 
+						@input="handleSearch"
+					/>
+					<text class="search-icon">🔍</text>
+				</view>
+				
+				<!-- 科室列表（两栏布局） -->
+				<view class="department-container" v-if="departments.length > 0">
+					<!-- 左侧：父科室列表 -->
+					<view class="parent-departments">
+						<view 
+							class="parent-item" 
+							v-for="dept in departments" 
+							:key="dept.id"
+							:class="{ active: selectedParentId === dept.id }"
+							@click="selectParent(dept.id)"
+						>
+							<text class="parent-name">{{ dept.name }}</text>
+						</view>
+					</view>
+					
+					<!-- 右侧：子科室列表 -->
+					<view class="sub-departments">
+						<view 
+							class="sub-item" 
+							v-for="subDept in currentSubDepartments" 
+							:key="subDept.id"
+							@click="navigateToSchedule(subDept.id, subDept.name)"
+						>
+							<view class="sub-info">
+								<text class="sub-name">{{ subDept.name }}</text>
+								<text class="sub-desc" v-if="subDept.description">{{ subDept.description }}</text>
+							</view>
+							<text class="arrow">></text>
+						</view>
+						
+						<!-- 空状态 -->
+						<view class="empty-state" v-if="currentSubDepartments.length === 0 && selectedParentId">
+							<text class="empty-icon">🏥</text>
+							<text class="empty-text">该科室暂无子科室</text>
+						</view>
 					</view>
 				</view>
 				
-				<!-- 右侧：子科室列表 -->
-				<view class="sub-departments">
-					<view 
-						class="sub-item" 
-						v-for="subDept in currentSubDepartments" 
-						:key="subDept.id"
-						@click="navigateToSchedule(subDept.id, subDept.name)"
-					>
-						<view class="sub-info">
-							<text class="sub-name">{{ subDept.name }}</text>
-							<text class="sub-desc" v-if="subDept.description">{{ subDept.description }}</text>
-						</view>
-						<text class="arrow">></text>
-					</view>
-					
-					<!-- 空状态 -->
-					<view class="empty-state" v-if="currentSubDepartments.length === 0">
-						<text class="empty-icon">🏥</text>
-						<text class="empty-text">该科室暂无子科室</text>
-					</view>
+				<!-- 无数据状态 -->
+				<view class="empty-container" v-else>
+					<text class="empty-icon">🏥</text>
+					<text class="empty-text">暂无科室数据</text>
 				</view>
-			</view>
+			</template>
 		</view>
 	</view>
 </template>
@@ -66,7 +80,8 @@
 			return {
 				departments: [],
 				selectedParentId: null,
-				searchKeyword: ''
+				searchKeyword: '',
+				loading: true
 			}
 		},
 		computed: {
@@ -81,6 +96,7 @@
 		},
 		methods: {
 			async loadDepartments() {
+				this.loading = true
 				try {
 					const response = await getDepartmentTree()
 					console.log('获取科室树数据:', response)
@@ -89,7 +105,7 @@
 					// 后端返回的是数组格式，不是标准Result格式
 					if (Array.isArray(response)) {
 						allDepartments = response
-					} else if (response.code === '200' && response.data) {
+					} else if (response && response.code === '200' && response.data) {
 						allDepartments = response.data
 					} else {
 						// 如果后端失败，使用Mock数据
@@ -123,6 +139,8 @@
 					if (this.departments.length > 0) {
 						this.selectedParentId = this.departments[0].id
 					}
+				} finally {
+					this.loading = false
 				}
 			},
 			selectParent(parentId) {
@@ -148,7 +166,7 @@
 	}
 
 	.page-header {
-		background: linear-gradient(135deg, lighten($color-primary, 10%) 0%, $color-primary 100%);
+		background: linear-gradient(135deg, #5FE0D4 0%, #4FD1C5 100%);
 		padding: 40rpx 30rpx 30rpx;
 	}
 
@@ -212,7 +230,7 @@
 
 	.parent-item.active {
 		background: #ffffff;
-		color: $color-primary;
+		color: #4FD1C5;
 		font-weight: 600;
 	}
 
@@ -279,5 +297,26 @@
 		display: block;
 		font-size: 28rpx;
 		color: #718096;
+	}
+
+	.loading-container {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		padding: 200rpx 0;
+	}
+
+	.loading-text {
+		font-size: 28rpx;
+		color: #718096;
+	}
+
+	.empty-container {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		padding: 200rpx 40rpx;
+		text-align: center;
 	}
 </style>

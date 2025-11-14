@@ -69,8 +69,8 @@
 						<!-- 已完成状态：同时显示取消预约和查看详情按钮 -->
 						<template v-if="isCompletedStatus(appointment.status)">
 							<view class="action-btn cancel-btn" @click.stop="handleCancel(getAppointmentId(appointment))">
-						<text class="btn-text">取消预约</text>
-					</view>
+								<text class="btn-text">取消预约</text>
+							</view>
 							<view class="action-btn view-btn" @click.stop="navigateToDetail(getAppointmentId(appointment))">
 								<text class="btn-text">查看详情</text>
 							</view>
@@ -78,7 +78,12 @@
 				</view>
 				<!-- 已取消状态：显示改约按钮 -->
 				<view class="appointment-actions" v-if="isCancelledStatus(appointment.status)">
-					<view class="action-btn reschedule-btn" @click.stop="navigateToDepartments">
+					<view 
+						class="action-btn reschedule-btn" 
+						:data-index="index"
+						:data-appointment-id="getAppointmentId(appointment)"
+						@click.stop="handleReschedule"
+					>
 						<text class="btn-text reschedule-text">改约</text>
 					</view>
 				</view>
@@ -336,13 +341,23 @@
 			
 			// 格式化日期时间
 			formatDateTime(dateString) {
-				if (!dateString) return ''
-				const date = new Date(dateString)
-				const month = date.getMonth() + 1
-				const day = date.getDate()
-				const hours = date.getHours().toString().padStart(2, '0')
-				const minutes = date.getMinutes().toString().padStart(2, '0')
-				return month + '月' + day + '日 ' + hours + ':' + minutes
+				try {
+					if (!dateString) return ''
+					const date = new Date(dateString)
+					// 检查日期是否有效
+					if (isNaN(date.getTime())) {
+						console.warn('无效的日期:', dateString)
+						return ''
+					}
+					const month = date.getMonth() + 1
+					const day = date.getDate()
+					const hours = date.getHours().toString().padStart(2, '0')
+					const minutes = date.getMinutes().toString().padStart(2, '0')
+					return month + '月' + day + '日 ' + hours + ':' + minutes
+				} catch (error) {
+					console.error('格式化日期失败:', error, dateString)
+					return ''
+				}
 			},
 			
 			// 获取预约的 key（用于 v-for）
@@ -372,6 +387,191 @@
 				return this.isCancelledStatus(appointment.status) ? { 'cancelled-line': true } : {}
 			},
 			
+		// 处理改约
+		handleReschedule(e) {
+			// 从事件对象中获取 data 属性
+			const index = e.currentTarget.dataset.index
+			const appointmentId = e.currentTarget.dataset.appointmentId
+			
+			// 通过索引或ID获取 appointment
+			let appointment = null
+			if (index !== undefined && index !== null && this.appointmentList[index]) {
+				appointment = this.appointmentList[index]
+			} else if (appointmentId) {
+				appointment = this.appointmentList.find(apt => 
+					(apt.id && apt.id == appointmentId) || 
+					(apt.appointmentId && apt.appointmentId == appointmentId)
+				)
+			}
+			
+			// 检查 appointment 是否存在
+			if (!appointment) {
+				console.error('handleReschedule: appointment 为空', { 
+					index, 
+					appointmentId, 
+					listLength: this.appointmentList.length,
+					appointmentList: this.appointmentList
+				})
+				uni.showToast({
+					title: '预约信息错误',
+					icon: 'none'
+				})
+				return
+			}
+			
+			console.log('handleReschedule: 预约信息', {
+				appointmentId: appointment.appointmentId || appointment.id,
+				departmentId: appointment.departmentId,
+				departmentName: appointment.departmentName
+			})
+			
+			// 保存科室信息到局部变量，避免回调中访问不到
+			const departmentId = appointment.departmentId
+			const departmentName = appointment.departmentName
+			
+			uni.showActionSheet({
+				itemList: ['换科室', '换时间段', '换医生'],
+				success: (res) => {
+					if (res.tapIndex === 0) {
+						// 换科室：跳转到科室选择页面
+						this.navigateToDepartments()
+					} else if (res.tapIndex === 1) {
+						// 换时间段：同一医生，选择不同时间段
+						if (departmentId && departmentName && appointment.doctorId) {
+							// 获取当前预约的日期
+							let scheduleDate = ''
+							if (appointment.scheduleTime) {
+								const date = new Date(appointment.scheduleTime)
+								if (!isNaN(date.getTime())) {
+									const year = date.getFullYear()
+									const month = String(date.getMonth() + 1).padStart(2, '0')
+									const day = String(date.getDate()).padStart(2, '0')
+									scheduleDate = `${year}-${month}-${day}`
+								}
+							}
+							
+							// 跳转到排班页面，默认选中原医生，只显示该医生的时间段
+							const params = {
+								departmentId: departmentId,
+								departmentName: departmentName,
+								reschedule: 'true',
+								rescheduleType: 'time', // 换时间段
+								appointmentId: appointment.appointmentId || appointment.id,
+								doctorId: appointment.doctorId
+							}
+							
+							// 如果有日期信息，也传递过去
+							if (scheduleDate) {
+								params.scheduleDate = scheduleDate
+							}
+							
+							const queryString = Object.keys(params)
+								.map(key => `${key}=${encodeURIComponent(params[key])}`)
+								.join('&')
+							
+							uni.navigateTo({
+								url: `/pages/schedules/schedules?${queryString}`
+							})
+						} else {
+							// 如果没有完整信息，跳转到排班页面显示所有选项
+							this.navigateToRescheduleSchedules(departmentId, departmentName, appointment)
+						}
+					} else if (res.tapIndex === 2) {
+						// 换医生：同一科室，可以选择不同医生和时间段
+						if (departmentId && departmentName) {
+							// 获取当前预约的日期
+							let scheduleDate = ''
+							if (appointment.scheduleTime) {
+								const date = new Date(appointment.scheduleTime)
+								if (!isNaN(date.getTime())) {
+									const year = date.getFullYear()
+									const month = String(date.getMonth() + 1).padStart(2, '0')
+									const day = String(date.getDate()).padStart(2, '0')
+									scheduleDate = `${year}-${month}-${day}`
+								}
+							}
+							
+							// 跳转到排班页面，显示该科室的所有医生和时间段
+							const params = {
+								departmentId: departmentId,
+								departmentName: departmentName,
+								reschedule: 'true',
+								rescheduleType: 'doctor', // 换医生
+								appointmentId: appointment.appointmentId || appointment.id
+							}
+							
+							// 如果有日期信息，也传递过去
+							if (scheduleDate) {
+								params.scheduleDate = scheduleDate
+							}
+							
+							const queryString = Object.keys(params)
+								.map(key => `${key}=${encodeURIComponent(params[key])}`)
+								.join('&')
+							
+							uni.navigateTo({
+								url: `/pages/schedules/schedules?${queryString}`
+							})
+						} else {
+							// 如果没有科室信息，提示并跳转到科室选择页面
+							uni.showToast({
+								title: '请先选择科室',
+								icon: 'none'
+							})
+							setTimeout(() => {
+								this.navigateToDepartments()
+							}, 1500)
+						}
+					}
+				}
+			})
+		},
+		
+		// 导航到改约排班页面（通用方法）
+		navigateToRescheduleSchedules(departmentId, departmentName, appointment) {
+			if (!departmentId || !departmentName) {
+				uni.showToast({
+					title: '请先选择科室',
+					icon: 'none'
+				})
+				setTimeout(() => {
+					this.navigateToDepartments()
+				}, 1500)
+				return
+			}
+			
+			// 获取当前预约的日期
+			let scheduleDate = ''
+			if (appointment.scheduleTime) {
+				const date = new Date(appointment.scheduleTime)
+				if (!isNaN(date.getTime())) {
+					const year = date.getFullYear()
+					const month = String(date.getMonth() + 1).padStart(2, '0')
+					const day = String(date.getDate()).padStart(2, '0')
+					scheduleDate = `${year}-${month}-${day}`
+				}
+			}
+			
+			const params = {
+				departmentId: departmentId,
+				departmentName: departmentName,
+				reschedule: 'true',
+				appointmentId: appointment.appointmentId || appointment.id
+			}
+			
+			if (scheduleDate) {
+				params.scheduleDate = scheduleDate
+			}
+			
+			const queryString = Object.keys(params)
+				.map(key => `${key}=${encodeURIComponent(params[key])}`)
+				.join('&')
+			
+			uni.navigateTo({
+				url: `/pages/schedules/schedules?${queryString}`
+			})
+		},
+		
 		// 导航到科室列表
 		navigateToDepartments() {
 			uni.navigateTo({

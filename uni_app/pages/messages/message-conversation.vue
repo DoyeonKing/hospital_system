@@ -13,74 +13,169 @@
 			:scroll-top="scrollTop"
 			@scrolltolower="loadMoreMessages"
 		>
+			<!-- 有通知时显示 -->
 			<view 
 				class="message-bubble" 
-				v-for="msg in conversation.messages" 
-				:key="msg.id"
-				:class="{ 'unread': !msg.isRead }"
+				v-for="notification in conversation.messages" 
+				:key="notification.notificationId || notification.id"
+				:class="{ 'unread': notification.status === 'unread' }"
 			>
-				<view class="message-time">{{ formatTime(msg.createTime) }}</view>
+				<view class="message-time">{{ formatTime(notification.sentAt || notification.createTime) }}</view>
 				<view class="message-content-wrapper">
-					<view class="message-title">{{ msg.title }}</view>
-					<text class="message-text">{{ msg.content }}</text>
+					<view class="message-title">{{ notification.title }}</view>
+					<text class="message-text">{{ notification.content }}</text>
 				</view>
+			</view>
+			
+			<!-- 空状态 -->
+			<view class="empty-state" v-if="conversation.messages.length === 0">
+				<text class="empty-icon">📭</text>
+				<text class="empty-text">暂无通知</text>
 			</view>
 		</scroll-view>
 	</view>
 </template>
 
 <script>
+	import { getUserNotifications, markAsRead, markAllAsRead } from '../../api/notification.js'
+	
 	export default {
 		data() {
 			return {
-				conversation: {},
+				conversation: {
+					senderId: '',
+					senderName: '',
+					messages: []
+				},
 				unreadCount: 0,
-				scrollTop: 0
+				scrollTop: 0,
+				notificationType: '' // 通知类型
 			}
 		},
 		onLoad(options) {
-			// 从路由参数获取会话ID
-			const senderId = options.senderId
+			// 从路由参数获取通知类型（senderId实际上是通知类型）
+			const notificationType = decodeURIComponent(options.senderId || '')
+			this.notificationType = notificationType
 			// 加载对话内容
-			this.loadConversation(senderId)
+			this.loadConversation(notificationType)
 		},
 		onShow() {
 			// 标记所有消息为已读
 			this.markAllAsRead()
 		},
 		methods: {
-			loadConversation(senderId) {
-				// 从全局存储获取消息列表
-				const allMessages = uni.getStorageSync('allMessages') || []
-				
-				// 筛选出该发送者的消息
-				const messages = allMessages.filter(msg => msg.senderId === senderId)
-				
-				if (messages.length === 0) {
+			async loadConversation(notificationType) {
+				try {
+					const patientInfo = uni.getStorageSync('patientInfo')
+					if (!patientInfo || !patientInfo.id) {
+						uni.showToast({
+							title: '请先登录',
+							icon: 'none'
+						})
+						return
+					}
+					
+					// 从全局存储获取通知列表，如果没有则调用API
+					let allNotifications = uni.getStorageSync('allNotifications') || []
+					
+					// 如果存储中没有数据，调用API获取
+					if (allNotifications.length === 0) {
+						const notifications = await getUserNotifications(patientInfo.id, 'patient')
+						if (Array.isArray(notifications)) {
+							allNotifications = notifications
+						} else if (notifications && notifications.data && Array.isArray(notifications.data)) {
+							allNotifications = notifications.data
+						}
+						uni.setStorageSync('allNotifications', allNotifications)
+					}
+					
+					// 筛选出该类型的通知
+					const notifications = allNotifications.filter(notif => notif.type === notificationType)
+					
+					if (notifications.length === 0) {
+						uni.showToast({
+							title: '暂无通知',
+							icon: 'none'
+						})
+						this.conversation = {
+							senderId: notificationType,
+							senderName: this.getTypeName(notificationType),
+							messages: []
+						}
+						return
+					}
+					
+					// 按时间排序（最新的在前）
+					const sortedNotifications = notifications.sort((a, b) => {
+						const timeA = new Date(a.sentAt || a.createTime || 0)
+						const timeB = new Date(b.sentAt || b.createTime || 0)
+						return timeB - timeA // 降序，最新的在前
+					})
+					
+					this.conversation = {
+						senderId: notificationType,
+						senderName: this.getTypeName(notificationType),
+						messages: sortedNotifications
+					}
+					
+					this.unreadCount = notifications.filter(notif => notif.status === 'unread').length
+				} catch (error) {
+					console.error('加载通知详情失败:', error)
 					uni.showToast({
-						title: '暂无消息',
+						title: '加载失败，请重试',
 						icon: 'none'
 					})
-					return
 				}
-				
-				this.conversation = {
-					senderId: senderId,
-					senderName: messages[0].senderName,
-					messages: messages.sort((a, b) => new Date(a.createTime) - new Date(b.createTime))
-				}
-				
-				this.unreadCount = messages.filter(msg => !msg.isRead).length
 			},
 			
-			markAllAsRead() {
-				// 将所有消息标记为已读
-				if (this.conversation.messages) {
-					this.conversation.messages.forEach(msg => {
-						msg.isRead = true
-					})
-					this.unreadCount = 0
-					// TODO: 调用API标记已读
+			// 获取通知类型名称
+			getTypeName(type) {
+				const typeMap = {
+					'payment_success': '支付通知',
+					'appointment_reminder': '预约提醒',
+					'cancellation': '取消通知',
+					'waitlist_available': '候补通知',
+					'schedule_change': '排班变更',
+					'system_notice': '系统通知'
+				}
+				return typeMap[type] || '系统通知'
+			},
+			
+			async markAllAsRead() {
+				// 调用API标记该类型的所有通知为已读
+				if (this.conversation.messages && this.conversation.messages.length > 0) {
+					try {
+						const patientInfo = uni.getStorageSync('patientInfo')
+						if (patientInfo && patientInfo.id) {
+							// 标记该类型的所有未读通知为已读
+							const unreadNotifications = this.conversation.messages.filter(
+								notif => notif.status === 'unread'
+							)
+							
+							// 批量标记为已读
+							for (const notification of unreadNotifications) {
+								try {
+									await markAsRead(notification.notificationId || notification.id)
+									notification.status = 'read'
+								} catch (error) {
+									console.error('标记通知已读失败:', error)
+								}
+							}
+							
+							this.unreadCount = 0
+							
+							// 更新全局存储
+							const allNotifications = uni.getStorageSync('allNotifications') || []
+							allNotifications.forEach(notif => {
+								if (notif.type === this.notificationType && notif.status === 'unread') {
+									notif.status = 'read'
+								}
+							})
+							uni.setStorageSync('allNotifications', allNotifications)
+						}
+					} catch (error) {
+						console.error('标记已读失败:', error)
+					}
 				}
 			},
 			
@@ -179,6 +274,26 @@
 		font-size: 26rpx;
 		color: #718096;
 		line-height: 1.6;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+	
+	.empty-state {
+		padding: 120rpx 40rpx;
+		text-align: center;
+	}
+	
+	.empty-icon {
+		display: block;
+		font-size: 120rpx;
+		margin-bottom: 30rpx;
+		opacity: 0.5;
+	}
+	
+	.empty-text {
+		display: block;
+		font-size: 28rpx;
+		color: #718096;
 	}
 </style>
 
