@@ -7,15 +7,19 @@ const DOCTOR_SESSION_KEY = 'xm-pro-doctor'; // 医生会话的localStorage key
 export const useDoctorStore = defineStore('doctor', {
     state: () => ({
         // 存储从 localStorage 读取的基本医生登录信息
-        loggedInDoctorBasicInfo: JSON.parse(localStorage.getItem(DOCTOR_SESSION_KEY)) || null,
-        // 存储通过 API 获取的详细医生信息
+        loggedInDoctorBasicInfo: JSON.parse(localStorage.getItem(DOCTOR_SESSION_KEY)) || {
+            identifier: 'D001',
+            token: 'mock-token',
+            loginTime: new Date().toISOString()
+        },
+        // 存储通过 API 获取的详细医生信息（设置默认值，假设已登录）
         detailedDoctorInfo: {
-            doctorId: '',
-            name: '',
-            department: '',
-            position: '',
-            phone: '',
-            username: '',
+            doctorId: '1',
+            name: '测试医生',
+            department: '内科',
+            position: '主治医师',
+            phone: '13900139000',
+            username: 'D001',
             // 其他医生相关信息
         },
         isLoading: false, // 可选：用于跟踪API请求状态
@@ -25,10 +29,10 @@ export const useDoctorStore = defineStore('doctor', {
     getters: {
         // 显示名称
         displayName: (state) => state.detailedDoctorInfo.name || state.loggedInDoctorBasicInfo?.name || state.loggedInDoctorBasicInfo?.identifier || '医生',
-        // 是否已登录
-        isAuthenticated: (state) => !!state.loggedInDoctorBasicInfo,
+        // 是否已登录（假设已登录）
+        isAuthenticated: (state) => true,
         // 获取医生ID
-        currentDoctorId: (state) => state.detailedDoctorInfo.doctorId || state.loggedInDoctorBasicInfo?.identifier,
+        currentDoctorId: (state) => state.detailedDoctorInfo.doctorId || state.loggedInDoctorBasicInfo?.identifier || '1',
         // 获取科室信息
         currentDepartment: (state) => state.detailedDoctorInfo.department,
         // 获取职位信息

@@ -30,4 +30,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
             @Param("today") LocalDate today,
             @Param("today") LocalDate today2,
             @Param("now") LocalTime now);
+
+    List<Appointment> findByScheduleDoctorDoctorId(Integer doctorId);
 }
