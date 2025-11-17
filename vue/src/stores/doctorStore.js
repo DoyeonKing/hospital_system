@@ -20,7 +20,11 @@ export const useDoctorStore = defineStore('doctor', {
             position: '主治医师',
             phone: '13900139000',
             username: 'D001',
-            // 其他医生相关信息
+            // --- 【新增字段】 ---
+            specialty: '', // 擅长领域
+            bio: '',       // 个人简介
+            photoUrl: '',  // 头像URL
+            // ---------------------
         },
         isLoading: false, // 可选：用于跟踪API请求状态
         error: null,      // 可选：用于存储API请求错误
@@ -50,6 +54,11 @@ export const useDoctorStore = defineStore('doctor', {
                 position: apiResponseData.doctorInfo?.position || '',
                 phone: apiResponseData.doctorInfo?.phone || '',
                 username: basicLoginInfoFromLogin.identifier || '',
+                // --- 【新增字段】 ---
+                specialty: apiResponseData.doctorInfo?.specialty || '',
+                bio: apiResponseData.doctorInfo?.bio || '',
+                photoUrl: apiResponseData.doctorInfo?.photoUrl || '',
+                // ---------------------
             };
 
             // 保存基本登录信息到 localStorage
@@ -58,7 +67,7 @@ export const useDoctorStore = defineStore('doctor', {
                 token: basicLoginInfoFromLogin.token,
                 loginTime: new Date().toISOString(),
             };
-            
+
             localStorage.setItem(DOCTOR_SESSION_KEY, JSON.stringify(basicInfo));
             this.loggedInDoctorBasicInfo = basicInfo;
 
@@ -73,7 +82,7 @@ export const useDoctorStore = defineStore('doctor', {
         logout() {
             // 清除 localStorage
             localStorage.removeItem(DOCTOR_SESSION_KEY);
-            
+
             // 重置状态
             this.loggedInDoctorBasicInfo = null;
             this.detailedDoctorInfo = {
@@ -83,6 +92,11 @@ export const useDoctorStore = defineStore('doctor', {
                 position: '',
                 phone: '',
                 username: '',
+                // --- 【新增字段】 ---
+                specialty: '',
+                bio: '',
+                photoUrl: '',
+                // ---------------------
             };
             this.error = null;
         },
@@ -99,7 +113,7 @@ export const useDoctorStore = defineStore('doctor', {
 
             try {
                 const response = await request({
-                    url: '/api/doctor/profile',
+                    url: '/api/doctor/profile', // 假设后端获取个人资料的接口
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${this.loggedInDoctorBasicInfo.token}`
@@ -134,7 +148,7 @@ export const useDoctorStore = defineStore('doctor', {
 
             try {
                 const response = await request({
-                    url: '/api/doctor/update-profile',
+                    url: '/api/doctor/update-profile', // 假设后端更新个人资料的接口
                     method: 'PUT',
                     data: updateData,
                     headers: {
