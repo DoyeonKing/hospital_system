@@ -47,7 +47,6 @@
           stripe
           @sort-change="handleSortChange"
           :default-sort="{ prop: 'appointmentNumber', order: 'ascending' }"
-          class="custom-table"
       >
         <el-table-column type="index" label="序号" width="60" align="center" />
 
@@ -59,7 +58,7 @@
             sortable="custom"
         />
 
-        <el-table-column prop="patient.fullName" label="姓名" width="120" />
+        <el-table-column prop="patient.fullName" label="姓名" width="100" />
 
         <el-table-column label="患者类型" width="100">
           <template #default="{ row }">
@@ -112,16 +111,6 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="220" fixed="right" align="center">
-          <template #default="{ row }">
-            <el-button type="primary" link size="small" :icon="Edit" @click="handleWriteRecord(row)">
-              写病历
-            </el-button>
-            <el-button type="info" link size="small" :icon="View" @click="handleViewDetails(row)" style="font-size: 14px; margin-left: 8px;">
-              查看患者信息
-            </el-button>
-          </template>
-        </el-table-column>
       </el-table>
 
       <el-pagination
@@ -145,12 +134,14 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Search, Refresh, Edit, View } from '@element-plus/icons-vue';
+// 【已修改】移除了 Edit 和 View
+import { Search, Refresh } from '@element-plus/icons-vue';
 import BackButton from '@/components/BackButton.vue';
-import { getTodaysPatients } from '@/api/patient'; // 导入 API
+import { getTodaysPatients } from '@/api/patient'; // 导入新建的 API
 import { useRouter } from 'vue-router';
 
-// --- 格式化辅助函数 (已移到顶部) ---
+// --- 【已修改】 移除了格式化函数，因为它们在顶层定义会报错 ---
+// --- 格式化辅助函数 (移到顶部) ---
 const formatDateForAPI = (date) => {
   const year = date.getFullYear();
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -202,10 +193,12 @@ const getStatusTag = (status) => {
   return tags[status] || 'default';
 };
 
+
 // --- 状态 ---
 const router = useRouter();
 const loading = ref(false);
 const patientList = ref([]);
+// 【已修改】现在可以安全调用
 const selectedDate = ref(formatDateForAPI(new Date()));
 const searchQuery = ref('');
 
@@ -218,16 +211,15 @@ const totalElements = ref(0);
 const sortField = ref('appointmentNumber');
 const sortOrder = ref('asc');
 
-// --- 【已修改】数据获取 (增加了虚拟数据的前端排序) ---
+// --- 数据获取 ---
 const fetchPatients = async () => {
   loading.value = true;
 
-  // 模拟网络延迟
+  // 【已修改】使用虚拟数据
   await new Promise(resolve => setTimeout(resolve, 500));
 
   try {
     // --- 【虚拟数据】 ---
-    // 1. 虚拟数据列表
     const mockPatientData = [
       {
         appointmentId: 1,
@@ -311,13 +303,11 @@ const fetchPatients = async () => {
       }
     ];
 
-    // 2. 【修改】应用搜索
     let filteredData = mockPatientData.filter(p =>
         p.patient.fullName.includes(searchQuery.value) ||
         p.patient.phoneNumber.includes(searchQuery.value)
     );
 
-    // 3. 【新增】应用排序
     filteredData.sort((a, b) => {
       const field = sortField.value;
       const order = sortOrder.value;
@@ -333,22 +323,16 @@ const fetchPatients = async () => {
       if (field === 'checkInTime') {
         valA = a.checkInTime;
         valB = b.checkInTime;
-
-        // 核心排序逻辑：未签到(null)的总是排在最后
-        if (valA === null && valB === null) return 0; // 两个都未签到
-        if (valA === null) return 1; // a未签到, 排在b后面
-        if (valB === null) return -1; // b未签到, 排在a后面
-
-        // 两个都已签到, 按时间排序
+        if (valA === null && valB === null) return 0;
+        if (valA === null) return 1;
+        if (valB === null) return -1;
         const dateA = new Date(valA);
         const dateB = new Date(valB);
         return order === 'asc' ? dateA - dateB : dateB - dateA;
       }
-
       return 0;
     });
 
-    // 4. 【修改】应用分页
     patientList.value = filteredData.slice(
         (currentPage.value - 1) * pageSize.value,
         currentPage.value * pageSize.value
@@ -356,7 +340,6 @@ const fetchPatients = async () => {
     totalElements.value = filteredData.length;
 
     // --- 【真实接口 - 已注释】 ---
-    // (当您准备好对接后端时，请删除上面的虚拟数据代码，并取消注释下面的代码)
     // const params = {
     //   date: selectedDate.value,
     //   query: searchQuery.value || null,
@@ -385,10 +368,8 @@ const handleSearch = () => {
 };
 
 const handleSortChange = ({ prop, order }) => {
-  // prop 是列的 prop 属性, order 是 'ascending' 或 'descending'
   sortField.value = prop;
   sortOrder.value = order === 'ascending' ? 'asc' : 'desc';
-  // 【修改】现在调用 fetchPatients() 会触发前端排序
   fetchPatients();
 };
 
@@ -403,16 +384,9 @@ const handleCurrentChange = (newPage) => {
   fetchPatients();
 };
 
-// --- 操作按钮 ---
-const handleWriteRecord = (row) => {
-  ElMessage.info(`正在为【${row.patient.fullName}】编写病历...`);
-  // router.push(`/medical-record/${row.appointmentId}`); // 假设的病历页面
-};
-
-const handleViewDetails = (row) => {
-  ElMessage.info(`正在查看【${row.patient.fullName}】的详细资料...`);
-  // router.push(`/patient-detail/${row.patient.patientId}`); // 假设的详情页面
-};
+// --- 【已删除】操作按钮 ---
+// const handleWriteRecord = (row) => { ... };
+// const handleViewDetails = (row) => { ... };
 
 // --- 生命周期 ---
 onMounted(() => {
@@ -457,15 +431,5 @@ onMounted(() => {
 .checked-in {
   color: var(--el-color-success);
   font-weight: bold;
-}
-
-/* 【新增】优化表格字体大小和行高 */
-.custom-table :deep(.el-table__cell) {
-  font-size: 14px;
-  padding: 12px 0;
-}
-.custom-table :deep(th.el-table__cell) {
-  font-size: 14px;
-  background-color: #f5f7fa;
 }
 </style>

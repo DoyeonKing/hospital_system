@@ -219,18 +219,6 @@
             </div>
           </el-card>
 
-          <el-card shadow="never" class="stat-card-item">
-            <div class="stat-content">
-              <div class="stat-icon booked">
-                <el-icon :size="24"><User /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-label">总预约人次</div>
-                <div class="stat-value">{{ scheduleStats.booked }}</div>
-              </div>
-            </div>
-          </el-card>
-
         </div>
       </el-card>
     </div>
@@ -241,9 +229,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+// 【已修改】移除了 User 图标
 import {
   ArrowLeft, ArrowRight, Calendar, Location, Refresh,
-  CircleCheck, User, Clock
+  CircleCheck, Clock
 } from '@element-plus/icons-vue'
 import { useDoctorStore } from '@/stores/doctorStore'
 import request from '@/utils/request'
@@ -279,7 +268,6 @@ const weekDates = computed(() => {
   return dates
 })
 
-// 【已修改】这个值现在用于计算统计，而不是表格
 const SHIFTS_PER_DAY = 2
 
 const getDayCountForCurrentRange = () => {
@@ -291,14 +279,14 @@ const getDayCountForCurrentRange = () => {
   return lastDay.getDate()
 }
 
-// 排班统计
+// 【已修改】排班统计
 const scheduleStats = computed(() => {
   const total = schedules.value.length
   const theoreticalSlots = getDayCountForCurrentRange() * SHIFTS_PER_DAY
   const available = Math.max(theoreticalSlots - total, 0)
-  const booked = schedules.value.reduce((sum, s) => sum + (s.bookedSlots || 0), 0)
+  // const booked = schedules.value.reduce((sum, s) => sum + (s.bookedSlots || 0), 0) // 已移除
 
-  return { total, available, booked }
+  return { total, available } // 已移除 booked
 })
 
 
@@ -332,9 +320,6 @@ const getScheduleForCell = (date, slotName) => {
   // schedules.value 只包含当前医生在当前范围内的排班
   return schedules.value.find(s => s.scheduleDate === date && s.slotName === slotName);
 }
-
-// 【已废弃】
-// const getSchedulesForDateAndShift = (date, shift) => { ... }
 
 // 获取排班状态样式类
 const getScheduleStatusClass = (schedule) => {
@@ -490,13 +475,10 @@ const changeWeek = (offset) => {
   loadSchedules()
 }
 
-// 【已废弃】
-// const handleDateChange = () => { ... }
-
 // 【已修改】加载排班数据 - 强制使用虚拟数据
 const loadSchedules = async () => {
   // 1. 确保有医生ID (用于虚拟数据)
-  const doctorId = doctorStore.currentDoctorId || doctorStore.detailedDoctorInfo?.doctorId || doctorStore.doctorInfo?.doctorId
+  const doctorId = doctorStore.currentDoctorId || doctorStore.detailedDoctorInfo.doctorId || doctorStore.doctorInfo?.doctorId
   if (!doctorId) {
     ElMessage.warning('未获取到医生ID，请重新登录')
     return
@@ -537,50 +519,6 @@ const loadSchedules = async () => {
   } finally {
     loading.value = false
   }
-
-  // --- 【真实接口 - 已注释掉】 ---
-  // (您可以稍后恢复这段代码)
-  // loading.value = true
-  // try {
-  //   const params = {
-  //     doctorId: doctorId,
-  //     startDate: startDate,
-  //     endDate: endDate,
-  //     page: 0,
-  //     size: 1000
-  //   }
-
-  //   try {
-  //     const response = await request({
-  //       url: '/api/schedules',
-  //       method: 'get',
-  //       params: params
-  //     })
-
-  //     if (response && response.content) {
-  //       schedules.value = response.content
-  //       ElMessage.success('排班数据加载成功')
-  //     } else {
-  //       schedules.value = [] // 真实接口返回空
-  //       ElMessage.info('当前范围暂无排班数据')
-  //     }
-  //   } catch (apiError) {
-  //     console.log('API调用失败，使用虚拟数据:', apiError.message)
-  //     schedules.value = generateMockSchedules(startDate, endDate) // API失败时才启用虚拟数据
-  //     ElMessage.info('使用模拟数据展示（后端服务未连接）')
-  //   }
-
-  //   if(currentView.value === 'month' && !selectedDayDate.value) {
-  //     selectedDayDate.value = new Date().toISOString().split('T')[0];
-  //   }
-
-  // } catch (error) {
-  //   console.error('加载排班数据失败:', error)
-  //   schedules.value = generateMockSchedules(startDate, endDate)
-  //   ElMessage.info('使用模拟数据展示')
-  // } finally {
-  //   loading.value = false
-  // }
 }
 
 
@@ -967,9 +905,7 @@ onMounted(() => {
   background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
 }
 
-.stat-icon.booked {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-}
+/* 【已删除】 .stat-icon.booked */
 
 .stat-info {
   flex: 1;

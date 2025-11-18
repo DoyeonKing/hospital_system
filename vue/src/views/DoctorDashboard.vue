@@ -19,36 +19,44 @@
     </div>
 
     <div class="main-content">
+
+      <div class="banner-card">
+        <div class="banner-text">
+          恪守医德 造福于民
+        </div>
+      </div>
+
       <div class="stats-row">
         <div class="stat-card">
           <div class="stat-icon patients">
             <el-icon :size="32"><User /></el-icon>
           </div>
           <div class="stat-info">
-            <p class="stat-label">今日接诊</p>
+            <p class="stat-label">今日总接诊 (虚拟)</p>
             <h3 class="stat-value">23</h3>
           </div>
         </div>
 
         <div class="stat-card">
           <div class="stat-icon appointments">
-            <el-icon :size="32"><Clock /></el-icon>
+            <el-icon :size="32"><Sunrise /></el-icon>
           </div>
           <div class="stat-info">
-            <p class="stat-label">待处理预约</p>
-            <h3 class="stat-value">8</h3>
+            <p class="stat-label">上午班患者 (虚拟)</p>
+            <h3 class="stat-value">12</h3>
           </div>
         </div>
 
         <div class="stat-card">
           <div class="stat-icon records">
-            <el-icon :size="32"><Document /></el-icon>
+            <el-icon :size="32"><Sunny /></el-icon>
           </div>
           <div class="stat-info">
-            <p class="stat-label">本周病历</p>
-            <h3 class="stat-value">156</h3>
+            <p class="stat-label">下午班患者 (虚拟)</p>
+            <h3 class="stat-value">11</h3>
           </div>
         </div>
+
       </div>
 
       <div class="content-grid">
@@ -154,6 +162,14 @@
                 <h4>我的排班</h4>
                 <p>查看和管理排班信息</p>
               </div>
+
+              <div class="function-card" @click="goToLeaveRequest">
+                <div class="card-icon warning">
+                  <el-icon :size="36"><Box /></el-icon>
+                </div>
+                <h4>休假申请</h4>
+                <p>提交和查看休假请求</p>
+              </div>
             </div>
           </div>
         </div>
@@ -241,16 +257,16 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+// 【已修改】导入新图标
 import {
   UserFilled, Document, Calendar, DataAnalysis,
   User, Clock, Star, SwitchButton,
   OfficeBuilding, Phone, Edit, Key,
-  Plus, Bell
+  Plus, Bell, Box,
+  Sunrise, Sunny // <-- 新增图标
 } from '@element-plus/icons-vue'
 import { useDoctorStore } from '@/stores/doctorStore'
-// 【注意】我们不再需要从 @/api/schedule 导入，因为虚拟数据在下面
-// import { getAllSchedules } from '@/api/schedule'
-// 【新增】导入默认头像
+// import { getAllSchedules } from '@/api/schedule' // (使用虚拟数据，暂时注释)
 import defaultAvatar from '@/assets/doctor.jpg';
 
 const router = useRouter()
@@ -264,13 +280,13 @@ const passwordDialogVisible = ref(false)
 const editFormRef = ref(null)
 const passwordFormRef = ref(null)
 
-// --- 【已修改】编辑表单 (基于新需求) ---
+// --- 编辑表单 ---
 const editForm = reactive({
-  name: '', // full_name (设为只读)
+  name: '',
   phoneNumber: '',
-  specialty: '', // 对应表结构的 specialty
-  bio: '', // 对应表结构的 bio
-  photoUrl: '' // 对应表结构的 photo_url
+  specialty: '',
+  bio: '',
+  photoUrl: ''
 })
 
 // --- 密码表单 ---
@@ -280,7 +296,7 @@ const passwordForm = reactive({
   confirmPassword: ''
 })
 
-// --- 【已修改】编辑表单验证规则 ---
+// --- 编辑表单验证规则 ---
 const editRules = reactive({
   phoneNumber: [
     { required: true, message: '请输入手机号', trigger: 'blur' },
@@ -316,7 +332,6 @@ const passwordRules = reactive({
 const scheduleLoading = ref(false)
 const todaySchedules = ref([])
 const currentDoctorId = computed(() => {
-  // 【修改】使用您 store 中的 getter
   return doctorStore.currentDoctorId;
 })
 const formatDateForAPI = (date) => {
@@ -369,7 +384,6 @@ const handleLogout = async () => {
     await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
       confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning',
     })
-    // 【修改】调用您 store 中的 logout
     doctorStore.logout()
     ElMessage.success('已退出登录')
     router.push('/login')
@@ -378,21 +392,20 @@ const handleLogout = async () => {
   }
 }
 
-// --- 【已修改】编辑资料 ---
+// --- 编辑资料 ---
 const editProfile = () => {
   // 填充当前信息
   const info = doctorStore.detailedDoctorInfo;
-  editForm.name = info.name || doctorStore.displayName; // (只读)
-  editForm.phoneNumber = info.phone || ''; // (可写)
-  // 【新增】从 store 加载 bio 和 photoUrl (假设它们存在)
-  editForm.specialty = info.specialty || ''; // (可写)
-  editForm.bio = info.bio || ''; // (可写)
-  editForm.photoUrl = info.photoUrl || defaultAvatar; // (可写)
+  editForm.name = info.name || doctorStore.displayName;
+  editForm.phoneNumber = info.phone || '';
+  editForm.specialty = info.specialty || '';
+  editForm.bio = info.bio || '';
+  editForm.photoUrl = info.photoUrl || defaultAvatar;
 
   editDialogVisible.value = true;
 }
 
-// --- 【已修改】保存资料 (调用异步 action) ---
+// --- 保存资料 (调用异步 action) ---
 const saveProfile = async () => {
   if (!editFormRef.value) return
 
@@ -403,23 +416,18 @@ const saveProfile = async () => {
     return
   }
 
-  // 只提取允许修改的字段 (匹配表结构)
   const dataToUpdate = {
     phoneNumber: editForm.phoneNumber,
-    specialty: editForm.specialty, // 【新增】
+    specialty: editForm.specialty,
     bio: editForm.bio,
     photoUrl: editForm.photoUrl === defaultAvatar ? null : editForm.photoUrl
   };
 
-  // 调用 store 中的异步 action
-  // 【注意】您 store 中的 updateDoctorInfo 假设的URL是 /api/doctor/update-profile
   const success = await doctorStore.updateDoctorInfo(dataToUpdate)
 
   if (success) {
     ElMessage.success('资料更新成功')
     editDialogVisible.value = false
-
-    // 【新增】保存后立即刷新 store，确保 Personal Info 卡片数据同步
     await doctorStore.fetchDetailedDoctorInfo();
   } else {
     ElMessage.error(doctorStore.error || '更新失败')
@@ -443,7 +451,6 @@ const savePassword = async () => {
     return
   }
 
-  // 【修改】调用您 store 中的 changePassword
   const success = await doctorStore.changePassword(passwordForm.oldPassword, passwordForm.newPassword)
 
   if (success) {
@@ -456,19 +463,15 @@ const savePassword = async () => {
   }
 }
 
-// --- 【新增】头像上传处理 ---
+// --- 头像上传处理 ---
 const handleAvatarSuccess = (response) => {
-  // 假设后端返回 { data: { url: '...' } }
-  // 【重要】您需要根据您后端的真实文件上传接口的返回格式来修改这里
   if (response && response.data && response.data.url) {
     editForm.photoUrl = response.data.url;
     ElMessage.success('头像上传成功');
   } else {
-    // 模拟一个成功的上传
     const mockUrl = `https://picsum.photos/100?random=${Math.random()}`;
     editForm.photoUrl = mockUrl;
     ElMessage.success('头像上传成功 (模拟)');
-    // ElMessage.error('头像上传失败：无效的响应');
   }
 }
 
@@ -496,16 +499,15 @@ const viewTodayAppointments = () => {
 const goToSchedule = () => {
   router.push('/my-schedule')
 }
+const goToLeaveRequest = () => {
+  router.push('/leave-request')
+}
 
 // --- 页面加载时 ---
 onMounted(() => {
-  // 【修改】确保加载时获取最新数据
   if (doctorStore.isAuthenticated) {
-    // 【修改】调用您 store 中的 fetchDetailedDoctorInfo
     doctorStore.fetchDetailedDoctorInfo();
   }
-
-  // 加载今日排班
   loadTodaySchedule();
 })
 </script>
@@ -574,6 +576,42 @@ onMounted(() => {
   margin: 0 auto;
   padding: 32px;
 }
+
+/* 【新增】标语卡片 */
+.banner-card {
+  height: 120px;
+  border-radius: 16px;
+  margin-bottom: 32px;
+  /* 【已修改】使用您 assets 目录下的图片 */
+  background-image: url('@/assets/7d5af898a55918db907cb51a56353c6b.jpg');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+.banner-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4); /* 40% 黑色遮罩 */
+  z-index: 1;
+}
+.banner-text {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: #ffffff;
+  z-index: 2;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+
 .stats-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -604,9 +642,10 @@ onMounted(() => {
   justify-content: center;
   color: #fff;
 }
+/* 【已修改】调整了图标对应的渐变色 */
 .stat-icon.patients { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-.stat-icon.appointments { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
-.stat-icon.records { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+.stat-icon.appointments { background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); }
+.stat-icon.records { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
 .stat-info { flex: 1; }
 .stat-label { font-size: 0.9rem; color: #909399; margin: 0 0 8px 0; }
 .stat-value { font-size: 2rem; font-weight: 600; color: #2c3e50; margin: 0; }
@@ -711,6 +750,7 @@ onMounted(() => {
 .card-icon.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
 .card-icon.success { background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); }
 .card-icon.danger { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #f56c6c; }
+.card-icon.warning { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #d9822b; }
 .function-card h4 { font-size: 1.1rem; font-weight: 600; color: #2c3e50; margin: 0 0 8px 0; }
 .function-card p { font-size: 0.85rem; color: #909399; margin: 0; line-height: 1.4; }
 

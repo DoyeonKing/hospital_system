@@ -1,58 +1,66 @@
 <template>
   <div class="login-container">
-    <el-card class="login-card">
-      <template #header>
-        <div class="card-header">
-          <el-icon :size="28" style="margin-right: 12px;"><DataAnalysis /></el-icon>
-          <h2>医生工作台登录</h2>
-        </div>
-      </template>
+    <div class="login-box">
+      <div class="login-left">
+        <img src="@/assets/de3970cd7e9eae3e18cfd42895ad9c8e.jpg" alt="Hospital Background" />
+      </div>
 
-      <el-form :model="loginForm" :rules="loginRules" ref="loginFormRef" @keyup.enter="handleLogin">
-        <el-form-item prop="identifier">
-          <el-input
-              v-model="loginForm.identifier"
-              placeholder="请输入工号"
-              :prefix-icon="User"
-              size="large"
-          />
-        </el-form-item>
-        <el-form-item prop="password">
-          <el-input
-              v-model="loginForm.password"
-              type="password"
-              placeholder="请输入密码"
-              show-password
-              :prefix-icon="Lock"
-              size="large"
-          />
-        </el-form-item>
+      <div class="login-right">
+        <el-card class="login-card">
+          <template #header>
+            <div class="card-header">
+              <el-icon :size="28" style="margin-right: 12px; color: #409EFF;"><DataAnalysis /></el-icon>
+              <h2>医生工作台登录</h2>
+            </div>
+          </template>
 
-        <el-form-item>
-          <el-button
-              type="primary"
-              style="width: 100%;"
-              size="large"
-              @click="handleLogin"
-              :loading="loading"
-          >
-            登 录
-          </el-button>
-        </el-form-item>
+          <el-form :model="loginForm" :rules="loginRules" ref="loginFormRef" @keyup.enter="handleLogin">
+            <el-form-item prop="identifier">
+              <el-input
+                  v-model="loginForm.identifier"
+                  placeholder="请输入工号"
+                  :prefix-icon="User"
+                  size="large"
+              />
+            </el-form-item>
+            <el-form-item prop="password">
+              <el-input
+                  v-model="loginForm.password"
+                  type="password"
+                  placeholder="请输入密码"
+                  show-password
+                  :prefix-icon="Lock"
+                  size="large"
+              />
+            </el-form-item>
 
-        <el-form-item>
-          <el-button
-              type="success"
-              plain
-              style="width: 100%;"
-              size="large"
-              @click="bypassLogin"
-          >
-            (无后端) 直接跳转到工作台
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+            <el-form-item>
+              <el-button
+                  type="primary"
+                  style="width: 100%;"
+                  size="large"
+                  @click="handleLogin"
+                  :loading="loading"
+              >
+                登 录
+              </el-button>
+            </el-form-item>
+
+            <el-form-item>
+              <el-button
+                  type="success"
+                  plain
+                  style="width: 100%;"
+                  size="large"
+                  @click="bypassLogin"
+              >
+                (无后端) 直接跳转到工作台
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -62,6 +70,8 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { User, Lock, DataAnalysis } from '@element-plus/icons-vue';
 import { useDoctorStore } from '@/stores/doctorStore';
+// 【新增】导入默认头像
+import defaultAvatar from '@/assets/doctor.jpg';
 
 const router = useRouter();
 const doctorStore = useDoctorStore();
@@ -79,7 +89,7 @@ const loginRules = reactive({
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 });
 
-// 【已修改】模拟登录
+// 模拟登录
 // 这个函数会*假装*登录成功，并调用 store.loginSuccess
 const handleLogin = async () => {
   if (!loginFormRef.value) return;
@@ -96,9 +106,9 @@ const handleLogin = async () => {
           department: '模拟科室',
           position: '模拟职称',
           phone: '13812345678',
-          specialty: '模拟擅长领域',
+          specialty: '高血压、糖尿病 (模拟)',
           bio: '这是一个模拟登录的医生简介。',
-          photoUrl: '@/assets/doctor.jpg'
+          photoUrl: defaultAvatar // 使用导入的本地头像
         }
       };
 
@@ -107,7 +117,7 @@ const handleLogin = async () => {
         token: 'mock-token-123456' // 模拟一个 Token
       };
 
-      // 调用 store action 来设置状态
+      // 调用 store action 来设置状态 (使用您提供的 store)
       doctorStore.loginSuccess(mockApiResponse, basicLoginInfo);
 
       await new Promise(r => setTimeout(r, 500)); // 模拟网络延迟
@@ -135,12 +145,45 @@ const bypassLogin = () => {
   height: 100vh;
   width: 100%;
   background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
+  overflow: hidden;
+}
+
+.login-box {
+  width: 900px; /* 调整总宽度 */
+  height: 550px; /* 调整总高度 */
+  display: grid;
+  grid-template-columns: 1.2fr 1fr; /* 左侧稍宽 */
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  background-color: #ffffff;
+}
+
+/* 左侧图片 */
+.login-left {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.login-left img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* 确保图片填满容器而不变形 */
+}
+
+/* 右侧表单 */
+.login-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
 }
 
 .login-card {
-  width: 400px;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  border: none;
+  box-shadow: none;
 }
 
 .card-header {
@@ -150,5 +193,19 @@ const bypassLogin = () => {
   font-size: 1.2rem;
   font-weight: 600;
   color: #2c3e50;
+  margin-bottom: 20px;
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 22px; /* 增加表单项间距 */
+}
+
+:deep(.el-input__inner) {
+  height: 40px; /* 增加输入框高度 */
+}
+
+.el-button {
+  height: 45px; /* 增加按钮高度 */
+  font-size: 16px;
 }
 </style>
