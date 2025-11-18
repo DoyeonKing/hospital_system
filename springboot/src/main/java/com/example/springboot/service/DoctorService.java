@@ -3,9 +3,12 @@ package com.example.springboot.service;
 import com.example.springboot.dto.auth.LoginResponse;
 import com.example.springboot.dto.department.DepartmentDTO;
 import com.example.springboot.dto.doctor.DoctorActivateRequest;
+import com.example.springboot.dto.doctor.DoctorChangePasswordRequest;
 import com.example.springboot.dto.doctor.DoctorResponse;
+import com.example.springboot.dto.doctor.DoctorUpdateInfoRequest;
 import com.example.springboot.entity.Doctor;
 import com.example.springboot.entity.enums.DoctorStatus;
+import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.DoctorRepository;
 import com.example.springboot.repository.ScheduleRepository;
@@ -14,6 +17,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -373,5 +378,97 @@ public class DoctorService {
             dto.setDepartment(deptDto);
         }
         return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Doctor> findByIdentifier(String identifier) {
+        return doctorRepository.findByIdentifier(identifier);
+    }
+
+    // DoctorService.java 中添加方法
+    @Transactional
+    public DoctorResponse updateDoctorInfo(DoctorUpdateInfoRequest request) {
+        // 1. 根据工号查找医生
+        Doctor doctor = doctorRepository.findByIdentifier(request.getIdentifier())
+                .orElseThrow(() -> new ResourceNotFoundException("医生不存在: " + request.getIdentifier()));
+
+        // 2. 更新可编辑字段（仅更新非空字段）
+        if (request.getPhoneNumber() != null) {
+            // 验证手机号唯一性
+            if (doctorRepository.existsByPhoneNumberAndIdentifierNot(request.getPhoneNumber(), request.getIdentifier())) {
+                throw new BadRequestException("手机号已被使用");
+            }
+            doctor.setPhoneNumber(request.getPhoneNumber());
+        }
+
+        if (request.getSpecialty() != null) {
+            doctor.setSpecialty(request.getSpecialty());
+        }
+
+        if (request.getBio() != null) {
+            doctor.setBio(request.getBio());
+        }
+
+        // 3. 处理头像上传
+        if (request.getAvatarFile() != null && !request.getAvatarFile().isEmpty()) {
+            try {
+                // 生成唯一文件名（避免重复）
+                String originalFilename = request.getAvatarFile().getOriginalFilename();
+                String fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
+                String fileName = "doctor_avatar_" + System.currentTimeMillis() + fileExtension;
+
+                // 定义存储路径（实际项目中建议使用配置文件配置）
+                String uploadDir = "uploads/doctor_avatars/";
+                File dir = new File(uploadDir);
+                if (!dir.exists()) {
+                    dir.mkdirs();
+                }
+
+                // 保存文件
+                File dest = new File(uploadDir + fileName);
+                request.getAvatarFile().transferTo(dest);
+
+                // 更新数据库中的图片路径
+                doctor.setPhotoUrl(uploadDir + fileName);
+            } catch (IOException e) {
+                throw new RuntimeException("头像上传失败: " + e.getMessage());
+            }
+        }
+
+        // 4. 保存更新
+        Doctor updatedDoctor = doctorRepository.save(doctor);
+        return convertToResponseDto(updatedDoctor);
+    }
+
+    // 在DoctorService.java中添加以下方法
+    /**
+     * 根据医生工号修改密码
+     * @param request 包含工号、旧密码、新密码和确认密码的请求对象
+     */
+    @Transactional
+    public void changePassword(DoctorChangePasswordRequest request) {
+        // 1. 校验新密码与确认密码一致性
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("新密码与确认密码不一致");
+        }
+
+        // 2. 根据工号查询医生信息
+        Doctor doctor = doctorRepository.findByIdentifier(request.getIdentifier())
+                .orElseThrow(() -> new ResourceNotFoundException("医生工号不存在"));
+
+        // 3. 验证旧密码是否正确
+        if (!passwordEncoderUtil.matches(request.getOldPassword(), doctor.getPasswordHash())) {
+            throw new IllegalArgumentException("旧密码验证失败");
+        }
+
+        // 4. 验证新密码与旧密码是否相同（可选，增强安全性）
+        if (passwordEncoderUtil.matches(request.getNewPassword(), doctor.getPasswordHash())) {
+            throw new IllegalArgumentException("新密码不能与旧密码相同");
+        }
+
+        // 5. 加密新密码并更新
+        String newPasswordHash = passwordEncoderUtil.encodePassword(request.getNewPassword());
+        doctor.setPasswordHash(newPasswordHash);
+        doctorRepository.save(doctor);
     }
 }
