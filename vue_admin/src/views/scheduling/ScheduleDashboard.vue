@@ -41,26 +41,26 @@
              <!-- 科室标题行 -->
              <div class="header-title-row">
                <span class="department-title">{{ selectedDepartmentName }}<span v-if="selectedDepartmentCode && selectedDepartmentCode !== 'N/A'"> ({{ selectedDepartmentCode }})</span> - 排班管理</span>
-               
-               <!-- 排班状态指示器 -->
-               <div class="schedule-status-indicator">
-                 <div v-if="scheduleStatus.saving" class="status-saving">
-                   <el-icon class="is-loading"><Loading /></el-icon>
-                   <span>正在保存排班...</span>
-                 </div>
-                 <div v-else-if="scheduleStatus.lastSaved" class="status-success">
-                   <el-icon><CircleCheck /></el-icon>
-                   <span>最后保存：{{ scheduleStatus.lastSaved.doctor }} - {{ scheduleStatus.lastSaved.timestamp }}</span>
-                 </div>
-                 <div v-else-if="scheduleStatus.error" class="status-error">
-                   <el-icon><CircleClose /></el-icon>
-                   <span>保存失败：{{ scheduleStatus.error.doctor }} - {{ scheduleStatus.error.timestamp }}</span>
+             
+             <!-- 排班状态指示器 -->
+             <div class="schedule-status-indicator">
+               <div v-if="scheduleStatus.saving" class="status-saving">
+                 <el-icon class="is-loading"><Loading /></el-icon>
+                 <span>正在保存排班...</span>
+               </div>
+               <div v-else-if="scheduleStatus.lastSaved" class="status-success">
+                 <el-icon><CircleCheck /></el-icon>
+                 <span>最后保存：{{ scheduleStatus.lastSaved.doctor }} - {{ scheduleStatus.lastSaved.timestamp }}</span>
+               </div>
+               <div v-else-if="scheduleStatus.error" class="status-error">
+                 <el-icon><CircleClose /></el-icon>
+                 <span>保存失败：{{ scheduleStatus.error.doctor }} - {{ scheduleStatus.error.timestamp }}</span>
                  </div>
                </div>
              </div>
              
              <!-- 按钮控制行 -->
-            <div class="header-controls">
+             <div class="header-controls">
               <!-- 自动排班按钮 -->
               <el-button 
                 class="action-btn btn-auto"
@@ -536,7 +536,7 @@ const selectedDepartmentName = computed(() => {
     const sub = parent.children.find(c => c.id === activeSub.value);
     if (sub) {
       return sub.name;
-    }
+  }
   }
   
   return '未知科室';
@@ -915,7 +915,7 @@ const removeDoctorFromShift = async (doctor, date, shift, showMessage = true) =>
         } else {
           if (!timeSlot) {
             console.warn('无法删除后端排班记录：缺少时间段信息');
-            if (showMessage) {
+          if (showMessage) {
               ElMessage.warning('无法删除后端排班记录：缺少时间段信息');
             }
           } else if (!location) {
@@ -3249,10 +3249,10 @@ onMounted(async () => {
   await loadTimeSlots();
   
   // 如果API调用失败，立即使用备用数据
-  if (timeSlots.value.length === 0) {
-    console.log('时间段数据为空，使用备用数据');
-    loadFallbackTimeSlots();
-  }
+    if (timeSlots.value.length === 0) {
+      console.log('时间段数据为空，使用备用数据');
+      loadFallbackTimeSlots();
+    }
   
   // 延迟执行冲突检测，确保数据已经加载完成
   setTimeout(() => {

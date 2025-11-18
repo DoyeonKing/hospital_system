@@ -33,6 +33,14 @@ public class AppointmentController {
     }
 
     /**
+     * 获取指定医生的预约患者列表
+     */
+    @GetMapping("/doctor/{doctorId}")
+    public ResponseEntity<List<AppointmentResponse>> getDoctorAppointments(@PathVariable Integer doctorId) {
+        return ResponseEntity.ok(appointmentService.findByDoctorId(doctorId));
+    }
+
+    /**
      * 获取患者即将就诊的预约
      */
     @GetMapping("/patient/{patientId}/upcoming")
