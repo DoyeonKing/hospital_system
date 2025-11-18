@@ -1,6 +1,5 @@
 <template>
   <div class="login-container">
-    <!-- 左侧装饰区域 -->
     <div class="decoration-section">
       <div class="decoration-content">
         <h1>医生工作台</h1>
@@ -25,7 +24,6 @@
       </div>
     </div>
 
-    <!-- 右侧登录表单 -->
     <div class="form-section">
       <div class="form-container">
         <div class="form-header">
@@ -33,44 +31,43 @@
           <p>{{ isActivation ? '账户激活' : '请输入您的医生账户信息' }}</p>
         </div>
 
-        <!-- 登录表单 -->
         <div v-if="!isActivation" class="login-form">
-          <el-form 
-            ref="loginFormRef" 
-            :model="loginForm" 
-            :rules="loginRules" 
-            @submit.prevent="handleLogin"
+          <el-form
+              ref="loginFormRef"
+              :model="loginForm"
+              :rules="loginRules"
+              @submit.prevent="handleLogin"
           >
             <el-form-item prop="identifier">
               <el-input
-                v-model="loginForm.identifier"
-                placeholder="请输入工号"
-                size="large"
-                prefix-icon="User"
-                clearable
+                  v-model="loginForm.identifier"
+                  placeholder="请输入工号"
+                  size="large"
+                  prefix-icon="User"
+                  clearable
               />
             </el-form-item>
 
             <el-form-item prop="password">
               <el-input
-                v-model="loginForm.password"
-                type="password"
-                placeholder="请输入密码"
-                size="large"
-                prefix-icon="Lock"
-                show-password
-                clearable
-                @keyup.enter="handleLogin"
+                  v-model="loginForm.password"
+                  type="password"
+                  placeholder="请输入密码"
+                  size="large"
+                  prefix-icon="Lock"
+                  show-password
+                  clearable
+                  @keyup.enter="handleLogin"
               />
             </el-form-item>
 
             <el-form-item>
               <el-button
-                type="primary"
-                size="large"
-                class="login-btn"
-                :loading="loading"
-                @click="handleLogin"
+                  type="primary"
+                  size="large"
+                  class="login-btn"
+                  :loading="loading"
+                  @click="handleLogin"
               >
                 {{ loading ? '登录中...' : '登录' }}
               </el-button>
@@ -78,15 +75,13 @@
           </el-form>
 
           <div class="form-footer">
-            <el-button type="text" @click="switchToActivation">
+            <el-button type="primary" link @click="switchToActivation">
               首次使用？点击激活账户
             </el-button>
           </div>
         </div>
 
-        <!-- 激活表单 -->
         <div v-else class="activation-form">
-          <!-- 激活步骤指示器 -->
           <div class="step-indicator">
             <div class="step" :class="{ active: activationStep >= 1, completed: activationStep > 1 }">
               <div class="step-number">1</div>
@@ -99,43 +94,42 @@
             </div>
           </div>
 
-          <!-- 第一步：验证初始信息 -->
           <div v-if="activationStep === 1" class="step-content">
             <h3 class="step-title">第一步：验证初始信息</h3>
-            <el-form 
-              ref="activationFormRef" 
-              :model="activationForm" 
-              :rules="activationRules1"
+            <el-form
+                ref="activationFormRef"
+                :model="activationForm"
+                :rules="activationRules1"
             >
               <el-form-item prop="identifier">
                 <el-input
-                  v-model="activationForm.identifier"
-                  placeholder="请输入工号"
-                  size="large"
-                  prefix-icon="User"
-                  clearable
+                    v-model="activationForm.identifier"
+                    placeholder="请输入工号"
+                    size="large"
+                    prefix-icon="User"
+                    clearable
                 />
               </el-form-item>
 
               <el-form-item prop="initialPassword">
                 <el-input
-                  v-model="activationForm.initialPassword"
-                  type="password"
-                  placeholder="请输入初始密码"
-                  size="large"
-                  prefix-icon="Lock"
-                  show-password
-                  clearable
+                    v-model="activationForm.initialPassword"
+                    type="password"
+                    placeholder="请输入初始密码"
+                    size="large"
+                    prefix-icon="Lock"
+                    show-password
+                    clearable
                 />
               </el-form-item>
 
               <el-form-item>
                 <el-button
-                  type="primary"
-                  size="large"
-                  class="login-btn"
-                  :loading="loading"
-                  @click="handleActivationStep1"
+                    type="primary"
+                    size="large"
+                    class="login-btn"
+                    :loading="loading"
+                    @click="handleActivationStep1"
                 >
                   {{ loading ? '验证中...' : '下一步' }}
                 </el-button>
@@ -143,61 +137,60 @@
             </el-form>
           </div>
 
-          <!-- 第二步：身份验证 -->
           <div v-if="activationStep === 2" class="step-content">
             <h3 class="step-title">第二步：身份验证</h3>
             <div class="info-desc">
               <el-icon><Lock /></el-icon>
               <span>为了您的账户安全，请输入您的身份证号进行验证</span>
             </div>
-            
-            <el-form 
-              ref="activationFormRef2" 
-              :model="activationForm" 
-              :rules="activationRules2"
+
+            <el-form
+                ref="activationFormRef2"
+                :model="activationForm"
+                :rules="activationRules2"
             >
               <el-form-item prop="idCardInput">
                 <el-input
-                  v-model="activationForm.idCardInput"
-                  placeholder="请输入身份证号后6位"
-                  size="large"
-                  prefix-icon="CreditCard"
-                  maxlength="6"
-                  clearable
+                    v-model="activationForm.idCardInput"
+                    placeholder="请输入身份证号后6位"
+                    size="large"
+                    prefix-icon="CreditCard"
+                    maxlength="6"
+                    clearable
                 />
               </el-form-item>
 
               <el-form-item prop="newPassword">
                 <el-input
-                  v-model="activationForm.newPassword"
-                  type="password"
-                  placeholder="请输入新密码（6-20位）"
-                  size="large"
-                  prefix-icon="Lock"
-                  show-password
-                  clearable
+                    v-model="activationForm.newPassword"
+                    type="password"
+                    placeholder="请输入新密码（6-20位）"
+                    size="large"
+                    prefix-icon="Lock"
+                    show-password
+                    clearable
                 />
               </el-form-item>
 
               <el-form-item prop="confirmPassword">
                 <el-input
-                  v-model="activationForm.confirmPassword"
-                  type="password"
-                  placeholder="请再次输入新密码"
-                  size="large"
-                  prefix-icon="Lock"
-                  show-password
-                  clearable
+                    v-model="activationForm.confirmPassword"
+                    type="password"
+                    placeholder="请再次输入新密码"
+                    size="large"
+                    prefix-icon="Lock"
+                    show-password
+                    clearable
                 />
               </el-form-item>
 
               <el-form-item>
                 <el-button
-                  type="primary"
-                  size="large"
-                  class="login-btn"
-                  :loading="loading"
-                  @click="handleActivationStep2"
+                    type="primary"
+                    size="large"
+                    class="login-btn"
+                    :loading="loading"
+                    @click="handleActivationStep2"
                 >
                   {{ loading ? '激活中...' : '完成激活' }}
                 </el-button>
@@ -206,7 +199,7 @@
           </div>
 
           <div class="form-footer">
-            <el-button type="text" @click="switchToLogin">
+            <el-button type="primary" link @click="switchToLogin">
               返回登录
             </el-button>
           </div>
@@ -220,7 +213,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Check } from '@element-plus/icons-vue'
+// 【已修复】添加 CreditCard 图标导入
+import { User, Lock, Check, CreditCard } from '@element-plus/icons-vue'
 import { useDoctorStore } from '@/stores/doctorStore'
 import request from '@/utils/request'
 
@@ -331,7 +325,7 @@ const switchToLogin = () => {
 // 医生正常登录
 const handleLogin = async () => {
   if (!loginFormRef.value) return
-  
+
   try {
     const valid = await loginFormRef.value.validate()
     if (!valid) return
@@ -342,6 +336,7 @@ const handleLogin = async () => {
   loading.value = true
 
   try {
+    // 调用后端登录接口
     const response = await request({
       url: '/api/doctor/auth/login',
       method: 'POST',
@@ -353,13 +348,13 @@ const handleLogin = async () => {
 
     if (response.code === '200' || response.code === 200) {
       // 保存登录信息到store
-      const loginData = response.data
+      // 这里需要确保 response.data 的结构和您 store 中的 loginSuccess 方法匹配
       doctorStore.loginSuccess(response.data, {
         identifier: loginForm.identifier
       })
 
       ElMessage.success('登录成功')
-      
+
       // 立即跳转到医生工作台
       router.push('/doctor-dashboard')
     } else {
@@ -376,7 +371,7 @@ const handleLogin = async () => {
 // 激活第一步：验证初始登录信息
 const handleActivationStep1 = async () => {
   if (!activationFormRef.value) return
-  
+
   try {
     const valid = await activationFormRef.value.validate()
     if (!valid) return
@@ -396,11 +391,6 @@ const handleActivationStep1 = async () => {
       }
     })
 
-    // 后端返回的是简单的 JSON 对象，不是标准的 response 格式
-    // 成功返回: {"message": "初始信息验证成功，请继续身份验证"}
-    // 失败返回: {"error": "错误信息"}
-    console.log('第一步验证响应:', response)
-    
     if (response && response.message) {
       // 验证成功，进入第二步
       activationStep.value = 2
@@ -412,7 +402,6 @@ const handleActivationStep1 = async () => {
     }
   } catch (error) {
     console.error('验证请求失败:', error)
-    // 错误已经在响应拦截器中处理过了，这里不需要再显示
     if (!error.response) {
       ElMessage.error('无法连接到服务器，请检查后端是否启动')
     }
@@ -424,7 +413,7 @@ const handleActivationStep1 = async () => {
 // 激活第二步：身份验证和密码设置
 const handleActivationStep2 = async () => {
   if (!activationFormRef2.value) return
-  
+
   try {
     const valid = await activationFormRef2.value.validate()
     if (!valid) return
@@ -440,17 +429,12 @@ const handleActivationStep2 = async () => {
       method: 'POST',
       data: {
         identifier: activationForm.identifier,
-        idCardEnding: activationForm.idCardInput,  // 发送用户输入的后6位
+        idCardEnding: activationForm.idCardInput,
         newPassword: activationForm.newPassword,
         confirmPassword: activationForm.confirmPassword
       }
     })
 
-    // 后端返回的是简单的 JSON 对象
-    // 成功返回: {"message": "账户激活成功，请返回登录"}
-    // 失败返回: {"error": "错误信息"}
-    console.log('第二步激活响应:', response)
-    
     if (response && response.message) {
       ElMessage.success('账户激活成功！请使用新密码登录。')
       // 返回登录界面
@@ -464,7 +448,6 @@ const handleActivationStep2 = async () => {
     }
   } catch (error) {
     console.error('激活请求失败:', error)
-    // 错误已经在响应拦截器中处理过了，这里不需要再显示
     if (!error.response) {
       ElMessage.error('无法连接到服务器，请检查后端是否启动')
     }
@@ -747,30 +730,30 @@ onMounted(() => {
   .login-container {
     flex-direction: column;
   }
-  
+
   .decoration-section {
     flex: none;
     height: 200px;
   }
-  
+
   .decoration-content h1 {
     font-size: 1.8rem;
   }
-  
+
   .decoration-image img {
     width: 120px;
     height: 120px;
   }
-  
+
   .features {
     margin-top: 20px;
   }
-  
+
   .form-section {
     flex: 1;
     padding: 20px;
   }
-  
+
   .form-container {
     padding: 30px 20px;
   }
