@@ -21,6 +21,33 @@
 			}
 		},
 		{
+			"path": "pages/departments/departments",
+			"style": {
+				"navigationBarTitleText": "选择科室",
+				"navigationBarBackgroundColor": "#4FD9C3",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F8F8F8"
+			}
+		},
+		{
+			"path": "pages/schedules/schedules",
+			"style": {
+				"navigationBarTitleText": "医生排班",
+				"navigationBarBackgroundColor": "#4FD9C3",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F8F8F8"
+			}
+		},
+		{
+			"path": "pages/appointment/confirm",
+			"style": {
+				"navigationBarTitleText": "预约确认",
+				"navigationBarBackgroundColor": "#4FD9C3",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F8F8F8"
+			}
+		},
+		{
 			"path": "pages/appointments/appointments",
 			"style": {
 				"navigationBarTitleText": "我的预约",
@@ -54,33 +81,6 @@
 				"navigationBarTitleText": "对话详情",
 				"navigationBarBackgroundColor": "#FFFFFF",
 				"navigationBarTextStyle": "black",
-				"backgroundColor": "#F8F8F8"
-			}
-		},
-		{
-			"path": "pages/departments/departments",
-			"style": {
-				"navigationBarTitleText": "选择科室",
-				"navigationBarBackgroundColor": "#4FD9C3",
-				"navigationBarTextStyle": "white",
-				"backgroundColor": "#F8F8F8"
-			}
-		},
-		{
-			"path": "pages/schedules/schedules",
-			"style": {
-				"navigationBarTitleText": "医生排班",
-				"navigationBarBackgroundColor": "#4FD9C3",
-				"navigationBarTextStyle": "white",
-				"backgroundColor": "#F8F8F8"
-			}
-		},
-		{
-			"path": "pages/appointment/confirm",
-			"style": {
-				"navigationBarTitleText": "预约确认",
-				"navigationBarBackgroundColor": "#4FD9C3",
-				"navigationBarTextStyle": "white",
 				"backgroundColor": "#F8F8F8"
 			}
 		},

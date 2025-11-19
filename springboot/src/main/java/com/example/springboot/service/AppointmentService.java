@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,6 +37,7 @@ public class AppointmentService {
     private final DepartmentService departmentService; // To get Department details for response
     private final TimeSlotService timeSlotService; // To get TimeSlot details for response
     private final ScheduleService scheduleService;
+    private final NotificationService notificationService;
 
 
     @Autowired
@@ -46,7 +48,8 @@ public class AppointmentService {
                               DoctorService doctorService,
                               DepartmentService departmentService,
                               TimeSlotService timeSlotService,
-                              ScheduleService scheduleService) {
+                              ScheduleService scheduleService,
+                              NotificationService notificationService) {
         this.appointmentRepository = appointmentRepository;
         this.patientRepository = patientRepository;
         this.scheduleRepository = scheduleRepository;
@@ -55,6 +58,7 @@ public class AppointmentService {
         this.departmentService = departmentService;
         this.timeSlotService = timeSlotService;
         this.scheduleService = scheduleService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -108,7 +112,7 @@ public class AppointmentService {
         Appointment appointment = new Appointment();
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
-        appointment.setAppointmentNumber(schedule.getBookedSlots() + 1); // 自动分配就诊序号
+        appointment.setAppointmentNumber(getNextAppointmentNumberForRebooking(schedule, patient)); // 自动分配就诊序号
         appointment.setStatus(AppointmentStatus.scheduled); // 初始状态为待支付
         appointment.setPaymentStatus(PaymentStatus.unpaid);
         appointment.setCreatedAt(LocalDateTime.now());
@@ -125,18 +129,23 @@ public class AppointmentService {
         Appointment existingAppointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id " + id));
 
+        AppointmentStatus originalStatus = existingAppointment.getStatus();
+        boolean shouldRestoreSlots = false;
+        boolean shouldAssignNewNumber = false;
+
         // Update fields if provided in request
         if (request.getAppointmentNumber() != null) existingAppointment.setAppointmentNumber(request.getAppointmentNumber());
         if (request.getStatus() != null) {
+            AppointmentStatus newStatus = request.getStatus();
             // Handle specific status transitions and logic
-            if (request.getStatus() == AppointmentStatus.cancelled && existingAppointment.getStatus() != AppointmentStatus.cancelled) {
+            if (newStatus == AppointmentStatus.cancelled && originalStatus != AppointmentStatus.cancelled) {
                 // 如果是取消预约，需要减少排班的已预约数
                 Schedule schedule = existingAppointment.getSchedule();
                 if (schedule.getBookedSlots() > 0) {
                     schedule.setBookedSlots(schedule.getBookedSlots() - 1);
                     scheduleRepository.save(schedule);
                 }
-            } else if (request.getStatus() == AppointmentStatus.NO_SHOW && existingAppointment.getStatus() != AppointmentStatus.NO_SHOW) {
+            } else if (newStatus == AppointmentStatus.NO_SHOW && originalStatus != AppointmentStatus.NO_SHOW) {
                 // 如果是爽约，增加患者爽约次数并检查是否加入黑名单
                 Patient patient = existingAppointment.getPatient();
                 if (patient.getPatientProfile() != null) {
@@ -152,13 +161,27 @@ public class AppointmentService {
                     schedule.setBookedSlots(schedule.getBookedSlots() - 1);
                     scheduleRepository.save(schedule);
                 }
+            } else if (originalStatus == AppointmentStatus.cancelled && isActiveStatus(newStatus)) {
+                shouldRestoreSlots = true;
+                shouldAssignNewNumber = true;
             }
-            existingAppointment.setStatus(request.getStatus());
+            existingAppointment.setStatus(newStatus);
         }
         if (request.getPaymentStatus() != null) existingAppointment.setPaymentStatus(request.getPaymentStatus());
         if (request.getPaymentMethod() != null) existingAppointment.setPaymentMethod(request.getPaymentMethod());
         if (request.getTransactionId() != null) existingAppointment.setTransactionId(request.getTransactionId());
         if (request.getCheckInTime() != null) existingAppointment.setCheckInTime(request.getCheckInTime());
+
+        if (shouldAssignNewNumber) {
+            existingAppointment.setAppointmentNumber(
+                    getNextAppointmentNumberForRebooking(existingAppointment.getSchedule(), existingAppointment.getPatient()));
+        }
+
+        if (shouldRestoreSlots) {
+            Schedule schedule = existingAppointment.getSchedule();
+            schedule.setBookedSlots(schedule.getBookedSlots() + 1);
+            scheduleRepository.save(schedule);
+        }
 
         return convertToResponseDto(appointmentRepository.save(existingAppointment));
     }
@@ -231,7 +254,45 @@ public class AppointmentService {
 
         AppointmentUpdateRequest request = new AppointmentUpdateRequest();
         request.setStatus(AppointmentStatus.cancelled);
-        return updateAppointment(appointmentId, request);
+        AppointmentResponse response = updateAppointment(appointmentId, request);
+        
+        // 取消预约后发送通知
+        try {
+            Schedule schedule = appointment.getSchedule();
+            String departmentName = "未知科室";
+            String doctorName = "未知医生";
+            String scheduleDate = "";
+            String slotName = "";
+            
+            if (schedule != null) {
+                if (schedule.getDoctor() != null && schedule.getDoctor().getDepartment() != null) {
+                    departmentName = schedule.getDoctor().getDepartment().getName();
+                }
+                if (schedule.getDoctor() != null) {
+                    doctorName = schedule.getDoctor().getFullName();
+                }
+                if (schedule.getScheduleDate() != null) {
+                    scheduleDate = schedule.getScheduleDate().toString();
+                }
+                if (schedule.getSlot() != null) {
+                    slotName = schedule.getSlot().getSlotName();
+                }
+            }
+            
+            notificationService.sendCancellationNotification(
+                    appointment.getPatient().getPatientId().intValue(),
+                    appointmentId,
+                    departmentName,
+                    doctorName,
+                    scheduleDate,
+                    slotName
+            );
+        } catch (Exception e) {
+            // 通知发送失败不影响取消流程，只记录日志
+            System.err.println("Failed to send cancellation notification: " + e.getMessage());
+        }
+        
+        return response;
     }
 
     @Transactional
@@ -250,6 +311,67 @@ public class AppointmentService {
             paymentData.setStatus(AppointmentStatus.scheduled); // 从待支付改为已预约
         }
         // 如果已经是 scheduled 状态，则保持 scheduled 状态不变
-        return updateAppointment(appointmentId, paymentData);
+        AppointmentResponse response = updateAppointment(appointmentId, paymentData);
+        
+        // 支付成功后发送通知
+        try {
+            Schedule schedule = appointment.getSchedule();
+            String departmentName = "未知科室";
+            String doctorName = "未知医生";
+            String scheduleDate = "";
+            String slotName = "";
+            Double fee = 0.0;
+            
+            if (schedule != null) {
+                if (schedule.getDoctor() != null && schedule.getDoctor().getDepartment() != null) {
+                    departmentName = schedule.getDoctor().getDepartment().getName();
+                }
+                if (schedule.getDoctor() != null) {
+                    doctorName = schedule.getDoctor().getFullName();
+                }
+                if (schedule.getScheduleDate() != null) {
+                    scheduleDate = schedule.getScheduleDate().toString();
+                }
+                if (schedule.getSlot() != null) {
+                    slotName = schedule.getSlot().getSlotName();
+                }
+                if (schedule.getFee() != null) {
+                    fee = schedule.getFee().doubleValue();
+                }
+            }
+            
+            notificationService.sendPaymentSuccessNotification(
+                    appointment.getPatient().getPatientId().intValue(),
+                    appointmentId,
+                    departmentName,
+                    doctorName,
+                    scheduleDate,
+                    slotName,
+                    fee
+            );
+        } catch (Exception e) {
+            // 通知发送失败不影响支付流程，只记录日志
+            System.err.println("Failed to send payment success notification: " + e.getMessage());
+        }
+        
+        return response;
+    }
+
+    private int getNextAppointmentNumberForRebooking(Schedule schedule, Patient patient) {
+        Appointment lastAppointment = appointmentRepository.findTopByScheduleOrderByAppointmentNumberDesc(schedule);
+        int baseNumber = (lastAppointment == null || lastAppointment.getAppointmentNumber() == null)
+                ? 0
+                : lastAppointment.getAppointmentNumber();
+
+        if (lastAppointment != null && lastAppointment.getPatient() != null
+                && Objects.equals(lastAppointment.getPatient().getPatientId(), patient.getPatientId())) {
+            return baseNumber + 1;
+        }
+
+        return baseNumber + 1;
+    }
+
+    private boolean isActiveStatus(AppointmentStatus status) {
+        return status == AppointmentStatus.scheduled || status == AppointmentStatus.PENDING_PAYMENT;
     }
 }

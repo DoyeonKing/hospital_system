@@ -147,7 +147,7 @@
 </template>
 
 <script>
-	import { mockTodaySchedules, mockPopularDepartments, mockPatientInfo, mockMessages } from '../../api/mockData.js'
+	import { mockTodaySchedules, mockPopularDepartments, mockPatientInfo } from '../../api/mockData.js'
 	import { getTodaySchedules, getPopularDepartments, getDepartmentTree } from '../../api/schedule.js'
 	import { getUpcomingAppointments, getPatientWaitlist } from '../../api/appointment.js'
 	
@@ -370,8 +370,20 @@
 					this.popularDepartments = JSON.parse(JSON.stringify(mockPopularDepartments))
 				}
 				
-				// 加载未读消息数量（暂时使用mock）
-				this.unreadCount = mockMessages.filter(msg => !msg.isRead).length
+				// 加载未读通知数量
+				try {
+					const patientInfo = uni.getStorageSync('patientInfo')
+					if (patientInfo && patientInfo.id) {
+						const { getUnreadCount } = await import('../../api/notification.js')
+						const count = await getUnreadCount(patientInfo.id, 'patient')
+						this.unreadCount = count || 0
+					} else {
+						this.unreadCount = 0
+					}
+				} catch (error) {
+					console.error('加载未读通知数量失败:', error)
+					this.unreadCount = 0
+				}
 				
 				// 加载即将就诊的预约（调用真实API）
 				try {

@@ -1,7 +1,7 @@
 <template>
 	<view class="container">
 		<view class="page-header">
-			<text class="page-title">{{ departmentName }}</text>
+			<text class="page-title">{{ isReschedule ? '改约 - ' + departmentName : departmentName }}</text>
 		</view>
 		
 		<view class="content">
@@ -155,7 +155,11 @@
 				selectedDoctorId: null,
 				selectedDate: 'all',
 				dateOptions: [],
-				defaultAvatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'
+				defaultAvatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
+				isReschedule: false, // 是否为改约场景
+				rescheduleType: '', // 改约类型：'time' 换时间段, 'doctor' 换医生
+				originalAppointmentId: null, // 原预约ID
+				originalDoctorId: null // 原医生ID（换时间段时使用）
 			}
 		},
 		computed: {
@@ -238,7 +242,15 @@
 			try {
 				this.departmentId = parseInt(options.departmentId)
 				this.departmentName = decodeURIComponent(options.departmentName || '')
+				
+				// 检查是否为改约场景
+				this.isReschedule = options.reschedule === 'true'
+				this.rescheduleType = options.rescheduleType || '' // 'time' 或 'doctor'
+				this.originalAppointmentId = options.appointmentId ? parseInt(options.appointmentId) : null
+				this.originalDoctorId = options.doctorId ? parseInt(options.doctorId) : null
+				
 				console.log('排班页加载 - departmentId:', this.departmentId, 'departmentName:', this.departmentName)
+				console.log('改约场景:', this.isReschedule, '改约类型:', this.rescheduleType, '原预约ID:', this.originalAppointmentId, '原医生ID:', this.originalDoctorId)
 				
 				// 验证参数是否有效
 				if (isNaN(this.departmentId)) {
@@ -254,6 +266,12 @@
 				}
 				
 				this.initDateOptions()
+				
+				// 如果是改约场景且有日期信息，默认选中该日期
+				if (this.isReschedule && options.scheduleDate) {
+					this.selectedDate = options.scheduleDate
+				}
+				
 				this.loadSchedules()
 			} catch (error) {
 				console.error('排班页加载失败:', error)
@@ -393,10 +411,24 @@
 			console.log('排班页 - 医生列表:', this.doctorList)
 			console.log('排班页 - 医生详情Map:', this.doctorDetailsMap)
 			
-			// 默认选中第一个医生
+			// 根据改约类型设置默认选中的医生
 			if (this.doctorList.length > 0) {
-				this.selectedDoctorId = this.doctorList[0].doctorId
-				console.log('排班页 - 默认选中的医生ID:', this.selectedDoctorId)
+				if (this.isReschedule && this.rescheduleType === 'time' && this.originalDoctorId) {
+					// 换时间段：默认选中原医生
+					const originalDoctor = this.doctorList.find(d => d.doctorId === this.originalDoctorId)
+					if (originalDoctor) {
+						this.selectedDoctorId = this.originalDoctorId
+						console.log('排班页 - 改约换时间段，默认选中原医生ID:', this.selectedDoctorId)
+					} else {
+						// 如果找不到原医生，选中第一个
+						this.selectedDoctorId = this.doctorList[0].doctorId
+						console.log('排班页 - 原医生不存在，默认选中第一个医生ID:', this.selectedDoctorId)
+					}
+				} else {
+					// 换医生或普通场景：默认选中第一个医生
+					this.selectedDoctorId = this.doctorList[0].doctorId
+					console.log('排班页 - 默认选中的医生ID:', this.selectedDoctorId)
+				}
 			} else {
 				console.warn('排班页 - 没有找到任何医生！')
 			}
@@ -422,7 +454,19 @@
 					this.doctorList = Object.values(doctorMap)
 					
 					if (this.doctorList.length > 0) {
-						this.selectedDoctorId = this.doctorList[0].doctorId
+						// 根据改约类型设置默认选中的医生
+						if (this.isReschedule && this.rescheduleType === 'time' && this.originalDoctorId) {
+							// 换时间段：默认选中原医生
+							const originalDoctor = this.doctorList.find(d => d.doctorId === this.originalDoctorId)
+							if (originalDoctor) {
+								this.selectedDoctorId = this.originalDoctorId
+							} else {
+								this.selectedDoctorId = this.doctorList[0].doctorId
+							}
+						} else {
+							// 换医生或普通场景：默认选中第一个医生
+							this.selectedDoctorId = this.doctorList[0].doctorId
+						}
 					}
 				} catch (fallbackError) {
 					console.error('Fallback失败:', fallbackError)
@@ -509,8 +553,16 @@
 				return
 			}
 			
+			// 构建跳转URL
+			let url = `/pages/appointment/confirm?scheduleId=${schedule.scheduleId}`
+			
+			// 如果是改约场景，传递原预约ID
+			if (this.isReschedule && this.originalAppointmentId) {
+				url += `&reschedule=true&originalAppointmentId=${this.originalAppointmentId}`
+			}
+			
 			uni.navigateTo({
-				url: `/pages/appointment/confirm?scheduleId=${schedule.scheduleId}`
+				url: url
 			})
 		},
 		
@@ -589,7 +641,7 @@
 	}
 
 	.page-header {
-		background: linear-gradient(135deg, lighten($color-primary, 10%) 0%, $color-primary 100%);
+		background: linear-gradient(135deg, #5FE0D4 0%, #4FD1C5 100%);
 		padding: 40rpx 30rpx 30rpx;
 	}
 
@@ -622,7 +674,7 @@
 	}
 
 	.date-btn.active {
-		background: linear-gradient(135deg, lighten($color-primary, 10%) 0%, $color-primary 100%);
+		background: linear-gradient(135deg, #5FE0D4 0%, #4FD1C5 100%);
 		color: #ffffff;
 	}
 
@@ -667,7 +719,7 @@
 
 	.doctor-item.active {
 		background: #F0FDFC;
-		border-left: 4rpx solid $color-primary;
+		border-left: 4rpx solid #4FD1C5;
 	}
 
 	.doctor-avatar-small {
@@ -826,14 +878,14 @@
 
 	.date-header {
 		padding: 20rpx 0;
-		border-bottom: 2rpx solid $color-primary;
+		border-bottom: 2rpx solid #4FD1C5;
 		margin-bottom: 20rpx;
 	}
 
 	.date-title {
 		font-size: 28rpx;
 		font-weight: 600;
-		color: $color-primary;
+		color: #4FD1C5;
 	}
 
 	.schedule-card {
@@ -925,7 +977,7 @@
 	.slots-value {
 		font-size: 36rpx;
 		font-weight: 700;
-		color: $color-primary;
+		color: #4FD1C5;
 		margin-right: 4rpx;
 	}
 
@@ -960,7 +1012,7 @@
 
 	.action-btn {
 		padding: 12rpx 32rpx;
-		background: linear-gradient(135deg, lighten($color-primary, 10%) 0%, $color-primary 100%);
+		background: linear-gradient(135deg, #5FE0D4 0%, #4FD1C5 100%);
 		border-radius: 50rpx;
 		color: #ffffff;
 		font-size: 28rpx;

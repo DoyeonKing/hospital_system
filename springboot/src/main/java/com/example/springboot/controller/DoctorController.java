@@ -9,18 +9,11 @@ import com.example.springboot.repository.AppointmentRepository;
 import com.example.springboot.entity.Doctor;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.service.DoctorService;
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 import java.time.LocalDate;
 import java.util.List;

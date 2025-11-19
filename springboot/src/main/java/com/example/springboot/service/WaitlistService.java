@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,6 +42,7 @@ public class WaitlistService {
     private final PatientService patientService; // For converting patient entity to DTO
     private final ScheduleService scheduleService;
     private final AppointmentService appointmentService; // For converting schedule entity to DTO
+    private final NotificationService notificationService;
 
     @Autowired
     public WaitlistService(WaitlistRepository waitlistRepository,
@@ -49,7 +51,8 @@ public class WaitlistService {
                            AppointmentRepository appointmentRepository,
                            PatientService patientService,
                            ScheduleService scheduleService,
-                           AppointmentService appointmentService) {
+                           AppointmentService appointmentService,
+                           NotificationService notificationService) {
         this.waitlistRepository = waitlistRepository;
         this.patientRepository = patientRepository;
         this.scheduleRepository = scheduleRepository;
@@ -57,6 +60,7 @@ public class WaitlistService {
         this.patientService = patientService;
         this.scheduleService = scheduleService;
         this.appointmentService = appointmentService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -176,7 +180,7 @@ public class WaitlistService {
             Appointment newAppointment = new Appointment();
             newAppointment.setPatient(patient);
             newAppointment.setSchedule(schedule);
-            newAppointment.setAppointmentNumber(schedule.getBookedSlots() + 1);
+            newAppointment.setAppointmentNumber(getNextAppointmentNumber(schedule, patient));
             newAppointment.setStatus(AppointmentStatus.PENDING_PAYMENT); // 初始状态待支付
             newAppointment.setPaymentStatus(PaymentStatus.unpaid);
             newAppointment.setCreatedAt(LocalDateTime.now());
@@ -184,11 +188,48 @@ public class WaitlistService {
             schedule.setBookedSlots(schedule.getBookedSlots() + 1); // 增加已预约数
             scheduleRepository.save(schedule); // 保存排班
 
-            waitlist.setStatus(WaitlistStatus.booked); // 标记候补已完成（已预约）
-            waitlist.setNotificationSentAt(LocalDateTime.now()); // 假设此时通知已发送
+            waitlist.setStatus(WaitlistStatus.notified); // 标记为已通知（等待支付）
+            waitlist.setNotificationSentAt(LocalDateTime.now()); // 记录通知发送时间
             waitlistRepository.save(waitlist); // 保存候补
 
-            return appointmentRepository.save(newAppointment); // 保存并返回新预约
+            Appointment savedAppointment = appointmentRepository.save(newAppointment); // 保存新预约
+            
+            // 发送候补可用通知
+            try {
+                String departmentName = "未知科室";
+                String doctorName = "未知医生";
+                String scheduleDate = "";
+                String slotName = "";
+                
+                if (schedule != null) {
+                    if (schedule.getDoctor() != null && schedule.getDoctor().getDepartment() != null) {
+                        departmentName = schedule.getDoctor().getDepartment().getName();
+                    }
+                    if (schedule.getDoctor() != null) {
+                        doctorName = schedule.getDoctor().getFullName();
+                    }
+                    if (schedule.getScheduleDate() != null) {
+                        scheduleDate = schedule.getScheduleDate().toString();
+                    }
+                    if (schedule.getSlot() != null) {
+                        slotName = schedule.getSlot().getSlotName();
+                    }
+                }
+                
+                notificationService.sendWaitlistAvailableNotification(
+                        patient.getPatientId().intValue(),
+                        waitlist.getWaitlistId(),
+                        departmentName,
+                        doctorName,
+                        scheduleDate,
+                        slotName
+                );
+            } catch (Exception e) {
+                // 通知发送失败不影响流程，只记录日志
+                System.err.println("Failed to send waitlist available notification: " + e.getMessage());
+            }
+            
+            return savedAppointment; // 返回新预约
         }
         return null; // 没有找到可以成功转换的候补人员
     }
@@ -254,7 +295,7 @@ public class WaitlistService {
         Appointment appointment = new Appointment();
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
-        appointment.setAppointmentNumber(schedule.getBookedSlots() + 1);
+        appointment.setAppointmentNumber(getNextAppointmentNumber(schedule, patient));
         appointment.setStatus(AppointmentStatus.scheduled);  // 已预约状态
         appointment.setPaymentStatus(PaymentStatus.paid);    // 已支付
         appointment.setPaymentMethod(paymentData.getPaymentMethod());
@@ -269,8 +310,64 @@ public class WaitlistService {
         waitlist.setStatus(WaitlistStatus.booked);
         waitlistRepository.save(waitlist);
 
-        // 8. 保存预约并返回
+        // 8. 保存预约
         Appointment savedAppointment = appointmentRepository.save(appointment);
+        
+        // 9. 发送支付成功通知
+        try {
+            String departmentName = "未知科室";
+            String doctorName = "未知医生";
+            String scheduleDate = "";
+            String slotName = "";
+            Double fee = 0.0;
+            
+            if (schedule != null) {
+                if (schedule.getDoctor() != null && schedule.getDoctor().getDepartment() != null) {
+                    departmentName = schedule.getDoctor().getDepartment().getName();
+                }
+                if (schedule.getDoctor() != null) {
+                    doctorName = schedule.getDoctor().getFullName();
+                }
+                if (schedule.getScheduleDate() != null) {
+                    scheduleDate = schedule.getScheduleDate().toString();
+                }
+                if (schedule.getSlot() != null) {
+                    slotName = schedule.getSlot().getSlotName();
+                }
+                if (schedule.getFee() != null) {
+                    fee = schedule.getFee().doubleValue();
+                }
+            }
+            
+            notificationService.sendPaymentSuccessNotification(
+                    patient.getPatientId().intValue(),
+                    savedAppointment.getAppointmentId(),
+                    departmentName,
+                    doctorName,
+                    scheduleDate,
+                    slotName,
+                    fee
+            );
+        } catch (Exception e) {
+            // 通知发送失败不影响支付流程，只记录日志
+            System.err.println("Failed to send payment success notification for waitlist: " + e.getMessage());
+        }
+        
         return appointmentService.findAppointmentById(savedAppointment.getAppointmentId());
+    }
+
+    private int getNextAppointmentNumber(Schedule schedule, Patient patient) {
+        Appointment lastAppointment = appointmentRepository.findTopByScheduleOrderByAppointmentNumberDesc(schedule);
+        int baseNumber = (lastAppointment == null || lastAppointment.getAppointmentNumber() == null)
+                ? 0
+                : lastAppointment.getAppointmentNumber();
+
+        if (lastAppointment != null && lastAppointment.getPatient() != null
+                && patient != null
+                && Objects.equals(lastAppointment.getPatient().getPatientId(), patient.getPatientId())) {
+            return baseNumber + 1;
+        }
+
+        return baseNumber + 1;
     }
 }

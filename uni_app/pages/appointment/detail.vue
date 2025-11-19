@@ -41,9 +41,9 @@
 					<text class="label">就诊时间：</text>
 					<text class="value">{{ formatDateTime(appointment.scheduleTime) }}</text>
 				</view>
-				<view class="info-row" v-if="isConfirmedStatus(appointment.status)">
+				<view class="info-row" v-if="isConfirmedStatus(appointment.status) && (appointment.queueNumber || appointment.appointmentNumber)">
 					<text class="label">排队号：</text>
-					<text class="value queue-number">第{{ appointment.queueNumber }}号</text>
+					<text class="value queue-number">第{{ appointment.queueNumber || appointment.appointmentNumber }}号</text>
 				</view>
 				<view class="info-row">
 					<text class="label">预约时间：</text>
@@ -106,59 +106,61 @@ onLoad(options) {
 },
 		methods: {
 	async loadAppointmentDetail() {
-		// 如果有URL参数，说明是新建的预约，使用URL参数
-		if (this.urlParams.departmentName && this.urlParams.doctorName) {
-			const now = new Date()
-			// 解析就诊日期
-			let scheduleTime
-			if (this.urlParams.scheduleDate) {
-				// scheduleDate 格式：2024-01-15
-				scheduleTime = new Date(this.urlParams.scheduleDate + 'T12:00:00').toISOString()
-			} else {
-				scheduleTime = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
-			}
-			
-		this.appointment = {
-			id: this.appointmentId,
-			departmentName: this.urlParams.departmentName,
-			doctorName: this.urlParams.doctorTitle ? `${this.urlParams.doctorName} ${this.urlParams.doctorTitle}` : this.urlParams.doctorName,
-			scheduleTime: scheduleTime,
-			appointmentTime: now.toISOString(),
-			status: 'confirmed',
-			queueNumber: Math.floor(Math.random() * 20) + 1,
-			patientName: this.patientInfo.name || '张三',
-			patientId: this.patientInfo.id || 1
-		}
-		} else {
-			// 调用后端API获取预约详情
-			this.loading = true
-			try {
-				const response = await getAppointmentDetail(this.appointmentId)
-				console.log('预约详情响应:', response)
-				
-				if (response && response.code === '200' && response.data) {
-					this.appointment = response.data
-					console.log('[detail] 预约详情数据:', JSON.stringify(this.appointment, null, 2))
-					console.log('[detail] 预约状态:', this.appointment.status)
-					console.log('[detail] isConfirmedStatus:', this.isConfirmedStatus(this.appointment.status))
-					console.log('[detail] isCompletedStatus:', this.isCompletedStatus(this.appointment.status))
-					console.log('[detail] isCancelledStatus:', this.isCancelledStatus(this.appointment.status))
-					console.log('[detail] 应该显示取消按钮:', this.isConfirmedStatus(this.appointment.status) || this.isCompletedStatus(this.appointment.status))
+		if (!this.appointmentId) {
+			// 没有预约ID时（例如演示场景），尝试使用URL参数构建基础信息
+			if (this.urlParams.departmentName && this.urlParams.doctorName) {
+				const now = new Date()
+				let scheduleTime
+				if (this.urlParams.scheduleDate) {
+					scheduleTime = new Date(this.urlParams.scheduleDate + 'T12:00:00').toISOString()
 				} else {
-					uni.showToast({
-						title: response?.msg || '加载失败',
-						icon: 'none'
-					})
+					scheduleTime = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
 				}
-			} catch (error) {
-				console.error('加载预约详情失败:', error)
+				this.appointment = {
+					departmentName: this.urlParams.departmentName,
+					doctorName: this.urlParams.doctorTitle ? `${this.urlParams.doctorName} ${this.urlParams.doctorTitle}` : this.urlParams.doctorName,
+					scheduleTime: scheduleTime,
+					appointmentTime: now.toISOString(),
+					status: 'confirmed',
+					queueNumber: null,
+					appointmentNumber: null,
+					patientName: this.patientInfo.name || '张三',
+					patientId: this.patientInfo.id || 1
+				}
+			} else {
 				uni.showToast({
-					title: '加载失败，请重试',
+					title: '缺少预约信息',
 					icon: 'none'
 				})
-			} finally {
-				this.loading = false
 			}
+			return
+		}
+		
+		this.loading = true
+		try {
+			const response = await getAppointmentDetail(this.appointmentId)
+			console.log('预约详情响应:', response)
+			
+			if (response && response.code === '200' && response.data) {
+				this.appointment = response.data
+				console.log('[detail] 预约详情数据:', JSON.stringify(this.appointment, null, 2))
+				console.log('[detail] 预约状态:', this.appointment.status)
+				console.log('[detail] 就诊序号:', this.appointment.queueNumber || this.appointment.appointmentNumber)
+				console.log('[detail] isConfirmedStatus:', this.isConfirmedStatus(this.appointment.status))
+				console.log('[detail] isCompletedStatus:', this.isCompletedStatus(this.appointment.status))
+				console.log('[detail] isCancelledStatus:', this.isCancelledStatus(this.appointment.status))
+				console.log('[detail] 应该显示取消按钮:', this.isConfirmedStatus(this.appointment.status) || this.isCompletedStatus(this.appointment.status))
+			} else {
+				throw new Error(response?.msg || '加载预约详情失败')
+			}
+		} catch (error) {
+			console.error('加载预约详情失败:', error)
+			uni.showToast({
+				title: error.message || '加载失败，请重试',
+				icon: 'none'
+			})
+		} finally {
+			this.loading = false
 		}
 	},
 			
