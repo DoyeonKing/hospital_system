@@ -266,7 +266,7 @@ import {
   Sunrise, Sunny // <-- 新增图标
 } from '@element-plus/icons-vue'
 import { useDoctorStore } from '@/stores/doctorStore'
-// import { getAllSchedules } from '@/api/schedule' // (使用虚拟数据，暂时注释)
+import { getSchedulesByDoctorId } from '@/api/schedule'
 import defaultAvatar from '@/assets/doctor.jpg';
 
 const router = useRouter()
@@ -341,29 +341,47 @@ const formatDateForAPI = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-// --- 加载今日排班 (使用虚拟数据) ---
+// --- 加载今日排班 (调用真实API) ---
 const loadTodaySchedule = async () => {
-  const doctorId = currentDoctorId.value;
+  // 从localStorage获取doctorId
+  const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'))
+  const doctorId = savedInfo?.doctorId || currentDoctorId.value;
+  
+  if (!doctorId) {
+    console.error('无法获取医生ID');
+    return;
+  }
+  
   scheduleLoading.value = true;
-  await new Promise(resolve => setTimeout(resolve, 500)); // 模拟加载
 
   try {
     const today = formatDateForAPI(new Date());
-    const mockTodaySchedules = [
-      {
-        scheduleId: 201, doctorId: doctorId, scheduleDate: today,
-        startTime: '08:00', endTime: '12:00',
-        slotName: '上午门诊', location: '门诊楼301室 (虚拟)',
-      },
-      {
-        scheduleId: 202, doctorId: doctorId, scheduleDate: today,
-        startTime: '14:00', endTime: '17:00',
-        slotName: '下午门诊', location: '门诊楼203室 (虚拟)',
-      }
-    ];
-    todaySchedules.value = mockTodaySchedules;
+    console.log('=== 加载今日排班 ===');
+    console.log('doctorId:', doctorId);
+    console.log('today:', today);
+    
+    // 调用后端API获取今日排班
+    const response = await getSchedulesByDoctorId(doctorId, {
+      startDate: today,
+      endDate: today,
+      page: 0,
+      size: 100
+    });
+    
+    console.log('API响应:', response);
+    
+    // 处理分页响应
+    if (response && response.content) {
+      todaySchedules.value = response.content;
+      console.log('今日排班数据:', todaySchedules.value);
+    } else {
+      todaySchedules.value = [];
+      console.log('今日无排班数据');
+    }
   } catch (error) {
+    console.error('加载今日排班失败:', error);
     ElMessage.error("加载今日排班失败: " + (error.message || '未知错误'));
+    todaySchedules.value = [];
   } finally {
     scheduleLoading.value = false;
   }

@@ -39,93 +39,119 @@
         </el-button>
       </div>
 
-      <el-table
-          v-loading="loading"
-          :data="patientList"
-          style="width: 100%; margin-top: 20px;"
-          border
-          stripe
-          @sort-change="handleSortChange"
-          :default-sort="{ prop: 'appointmentNumber', order: 'ascending' }"
-      >
-        <el-table-column type="index" label="序号" width="60" align="center" />
-
-        <el-table-column
-            prop="appointmentNumber"
-            label="就诊序号"
-            width="110"
-            align="center"
-            sortable="custom"
-        />
-
-        <el-table-column prop="patient.fullName" label="姓名" width="100" />
-
-        <el-table-column label="患者类型" width="100">
-          <template #default="{ row }">
-            <el-tag :type="getPatientTypeTag(row.patient?.patientType)">
-              {{ formatPatientType(row.patient?.patientType) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="patient.phoneNumber" label="手机号" width="130" />
-
-        <el-table-column
-            prop="checkInTime"
-            label="现场签到时间"
-            width="170"
-            sortable="custom"
+      <!-- 上午排班 -->
+      <div class="schedule-section">
+        <div class="section-header morning-header">
+          <span class="section-title"> 上午排班</span>
+          <span class="patient-count">{{ morningPatients.length }} 人</span>
+        </div>
+        <el-table
+            v-loading="loading"
+            :data="morningPatients"
+            style="width: 100%;"
+            border
+            stripe
         >
-          <template #default="{ row }">
-            <span :class="{'checked-in': !!row.checkInTime}">
-              {{ formatDateTime(row.checkInTime) || '未签到' }}
-            </span>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="status" label="预约状态" width="110" align="center">
-          <template #default="{ row }">
-            <el-tag :type="getStatusTag(row.status)" size="small">
-              {{ formatStatus(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="过敏史" width="150">
-          <template #default="{ row }">
-            <el-tooltip effect="dark" :content="row.patient?.patientProfile?.allergies || '无'" placement="top">
-              <span class="text-truncate">
-                {{ row.patient?.patientProfile?.allergies || '无' }}
+          <el-table-column type="index" label="序号" width="60" align="center" />
+          <el-table-column prop="appointmentNumber" label="就诊序号" width="110" align="center" />
+          <el-table-column prop="patient.fullName" label="姓名" width="100" />
+          <el-table-column label="患者类型" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getPatientTypeTag(row.patient?.patientType)">
+                {{ formatPatientType(row.patient?.patientType) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="patient.phoneNumber" label="手机号" width="130" />
+          <el-table-column prop="checkInTime" label="现场签到时间" width="170">
+            <template #default="{ row }">
+              <span :class="{'checked-in': !!row.checkInTime}">
+                {{ formatDateTime(row.checkInTime) || '未签到' }}
               </span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
+            </template>
+          </el-table-column>
+          <el-table-column prop="status" label="预约状态" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag :type="getStatusTag(row.status)" size="small">
+                {{ formatStatus(row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="过敏史" width="150">
+            <template #default="{ row }">
+              <el-tooltip effect="dark" :content="row.patient?.patientProfile?.allergies || '无'" placement="top">
+                <span class="text-truncate">{{ row.patient?.patientProfile?.allergies || '无' }}</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column label="基础病史" min-width="180">
+            <template #default="{ row }">
+              <el-tooltip effect="dark" :content="row.patient?.patientProfile?.medicalHistory || '无'" placement="top">
+                <span class="text-truncate">{{ row.patient?.patientProfile?.medicalHistory || '无' }}</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!loading && morningPatients.length === 0" description="上午暂无患者" :image-size="100" />
+      </div>
 
-        <el-table-column label="基础病史" min-width="180">
-          <template #default="{ row }">
-            <el-tooltip effect="dark" :content="row.patient?.patientProfile?.medicalHistory || '无'" placement="top">
-              <span class="text-truncate">
-                {{ row.patient?.patientProfile?.medicalHistory || '无' }}
+      <!-- 下午排班 -->
+      <div class="schedule-section">
+        <div class="section-header afternoon-header">
+          <span class="section-title"> 下午排班</span>
+          <span class="patient-count">{{ afternoonPatients.length }} 人</span>
+        </div>
+        <el-table
+            v-loading="loading"
+            :data="afternoonPatients"
+            style="width: 100%;"
+            border
+            stripe
+        >
+          <el-table-column type="index" label="序号" width="60" align="center" />
+          <el-table-column prop="appointmentNumber" label="就诊序号" width="110" align="center" />
+          <el-table-column prop="patient.fullName" label="姓名" width="100" />
+          <el-table-column label="患者类型" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getPatientTypeTag(row.patient?.patientType)">
+                {{ formatPatientType(row.patient?.patientType) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="patient.phoneNumber" label="手机号" width="130" />
+          <el-table-column prop="checkInTime" label="现场签到时间" width="170">
+            <template #default="{ row }">
+              <span :class="{'checked-in': !!row.checkInTime}">
+                {{ formatDateTime(row.checkInTime) || '未签到' }}
               </span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
+            </template>
+          </el-table-column>
+          <el-table-column prop="status" label="预约状态" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag :type="getStatusTag(row.status)" size="small">
+                {{ formatStatus(row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="过敏史" width="150">
+            <template #default="{ row }">
+              <el-tooltip effect="dark" :content="row.patient?.patientProfile?.allergies || '无'" placement="top">
+                <span class="text-truncate">{{ row.patient?.patientProfile?.allergies || '无' }}</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column label="基础病史" min-width="180">
+            <template #default="{ row }">
+              <el-tooltip effect="dark" :content="row.patient?.patientProfile?.medicalHistory || '无'" placement="top">
+                <span class="text-truncate">{{ row.patient?.patientProfile?.medicalHistory || '无' }}</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!loading && afternoonPatients.length === 0" description="下午暂无患者" :image-size="100" />
+      </div>
 
-      </el-table>
-
-      <el-pagination
-          v-if="totalElements > 0"
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="totalElements"
-          :page-sizes="[10, 20, 50, 100]"
-          :page-size="pageSize"
-          :current-page="currentPage"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-          style="margin-top: 20px; justify-content: flex-end;"
-      />
-
-      <el-empty v-if="!loading && patientList.length === 0" description="当日暂无患者" :image-size="120" />
+      <el-empty v-if="!loading && allPatients.length === 0" description="当日暂无患者" :image-size="120" />
 
     </el-card>
   </div>
@@ -134,14 +160,12 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { ElMessage } from 'element-plus';
-// 【已修改】移除了 Edit 和 View
 import { Search, Refresh } from '@element-plus/icons-vue';
 import BackButton from '@/components/BackButton.vue';
-import { getTodaysPatients } from '@/api/patient'; // 导入新建的 API
+import { getTodaysPatients } from '@/api/patient';
 import { useRouter } from 'vue-router';
+import { useDoctorStore } from '@/stores/doctorStore';
 
-// --- 【已修改】 移除了格式化函数，因为它们在顶层定义会报错 ---
-// --- 格式化辅助函数 (移到顶部) ---
 const formatDateForAPI = (date) => {
   const year = date.getFullYear();
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -193,200 +217,74 @@ const getStatusTag = (status) => {
   return tags[status] || 'default';
 };
 
-
-// --- 状态 ---
 const router = useRouter();
+const doctorStore = useDoctorStore();
 const loading = ref(false);
-const patientList = ref([]);
-// 【已修改】现在可以安全调用
+const allPatients = ref([]);
 const selectedDate = ref(formatDateForAPI(new Date()));
 const searchQuery = ref('');
 
-// --- 分页状态 ---
-const currentPage = ref(1);
-const pageSize = ref(10);
-const totalElements = ref(0);
+const morningPatients = computed(() => {
+  return allPatients.value.filter(p => {
+    if (!p.startTime) return false;
+    const hour = parseInt(p.startTime.split(':')[0]);
+    return hour < 12;
+  });
+});
 
-// --- 排序状态 ---
-const sortField = ref('appointmentNumber');
-const sortOrder = ref('asc');
+const afternoonPatients = computed(() => {
+  return allPatients.value.filter(p => {
+    if (!p.startTime) return false;
+    const hour = parseInt(p.startTime.split(':')[0]);
+    return hour >= 12;
+  });
+});
 
-// --- 数据获取 ---
 const fetchPatients = async () => {
   loading.value = true;
 
-  // 【已修改】使用虚拟数据
-  await new Promise(resolve => setTimeout(resolve, 500));
-
   try {
-    // --- 【虚拟数据】 ---
-    const mockPatientData = [
-      {
-        appointmentId: 1,
-        appointmentNumber: 1,
-        checkInTime: '2025-11-17T09:05:00',
-        status: 'scheduled',
-        patient: {
-          patientId: 101,
-          fullName: '张三 (虚拟)',
-          patientType: 'student',
-          phoneNumber: '13800138001',
-          patientProfile: {
-            allergies: '青霉素过敏',
-            medicalHistory: '无'
-          }
-        }
-      },
-      {
-        appointmentId: 2,
-        appointmentNumber: 2,
-        checkInTime: null, // 未签到
-        status: 'scheduled',
-        patient: {
-          patientId: 102,
-          fullName: '李四 (虚拟)',
-          patientType: 'teacher',
-          phoneNumber: '13900139002',
-          patientProfile: {
-            allergies: '无',
-            medicalHistory: '高血压, 需常年服药'
-          }
-        }
-      },
-      {
-        appointmentId: 3,
-        appointmentNumber: 3,
-        checkInTime: '2025-11-17T09:15:00', // 签到时间晚
-        status: 'completed',
-        patient: {
-          patientId: 103,
-          fullName: '王五 (虚拟)',
-          patientType: 'staff',
-          phoneNumber: '13700137003',
-          patientProfile: {
-            allergies: '花粉, 芒果',
-            medicalHistory: '糖尿病'
-          }
-        }
-      },
-      {
-        appointmentId: 4,
-        appointmentNumber: 4,
-        checkInTime: '2025-11-17T09:02:00', // 签到时间早
-        status: 'scheduled',
-        patient: {
-          patientId: 104,
-          fullName: '赵六 (虚拟)',
-          patientType: 'student',
-          phoneNumber: '13600136004',
-          patientProfile: {
-            allergies: '无',
-            medicalHistory: '无'
-          }
-        }
-      },
-      {
-        appointmentId: 5,
-        appointmentNumber: 5,
-        checkInTime: null, // 未签到
-        status: 'no_show',
-        patient: {
-          patientId: 105,
-          fullName: '孙七 (虚拟)',
-          patientType: 'student',
-          phoneNumber: '13500135005',
-          patientProfile: {
-            allergies: '无',
-            medicalHistory: '无'
-          }
-        }
-      }
-    ];
-
-    let filteredData = mockPatientData.filter(p =>
-        p.patient.fullName.includes(searchQuery.value) ||
-        p.patient.phoneNumber.includes(searchQuery.value)
-    );
-
-    filteredData.sort((a, b) => {
-      const field = sortField.value;
-      const order = sortOrder.value;
-
-      let valA, valB;
-
-      if (field === 'appointmentNumber') {
-        valA = a.appointmentNumber;
-        valB = b.appointmentNumber;
-        return order === 'asc' ? valA - valB : valB - valA;
-      }
-
-      if (field === 'checkInTime') {
-        valA = a.checkInTime;
-        valB = b.checkInTime;
-        if (valA === null && valB === null) return 0;
-        if (valA === null) return 1;
-        if (valB === null) return -1;
-        const dateA = new Date(valA);
-        const dateB = new Date(valB);
-        return order === 'asc' ? dateA - dateB : dateB - dateA;
-      }
-      return 0;
-    });
-
-    patientList.value = filteredData.slice(
-        (currentPage.value - 1) * pageSize.value,
-        currentPage.value * pageSize.value
-    );
-    totalElements.value = filteredData.length;
-
-    // --- 【真实接口 - 已注释】 ---
-    // const params = {
-    //   date: selectedDate.value,
-    //   query: searchQuery.value || null,
-    //   page: currentPage.value - 1,
-    //   size: pageSize.value,
-    //   sort: `${sortField.value},${sortOrder.value}`
-    // };
-    // const response = await getTodaysPatients(params);
-    // patientList.value = response.content || [];
-    // totalElements.value = response.totalElements || 0;
-    // --- 【真实接口结束】 ---
-
+    const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'))
+    const doctorId = savedInfo?.doctorId || doctorStore.currentDoctorId;
+    
+    if (!doctorId) {
+      ElMessage.error('无法获取医生ID，请重新登录');
+      loading.value = false;
+      return;
+    }
+    
+    console.log('=== 获取患者列表 ===');
+    console.log('doctorId:', doctorId);
+    console.log('date:', selectedDate.value);
+    
+    const response = await getTodaysPatients(doctorId, selectedDate.value);
+    console.log('API响应:', response);
+    
+    let patients = Array.isArray(response) ? response : [];
+    
+    if (searchQuery.value) {
+      patients = patients.filter(p =>
+          (p.patient?.fullName || '').includes(searchQuery.value) ||
+          (p.patient?.phoneNumber || '').includes(searchQuery.value)
+      );
+    }
+    
+    allPatients.value = patients;
+    console.log('患者列表:', allPatients.value);
+    console.log('上午患者:', morningPatients.value.length);
+    console.log('下午患者:', afternoonPatients.value.length);
+    
   } catch (error) {
     ElMessage.error('加载患者列表失败：' + (error.message || '未知错误'));
-    patientList.value = [];
-    totalElements.value = 0;
+    allPatients.value = [];
   } finally {
     loading.value = false;
   }
 };
 
-// --- 事件处理 ---
 const handleSearch = () => {
-  currentPage.value = 1; // 搜索时重置到第一页
   fetchPatients();
 };
-
-const handleSortChange = ({ prop, order }) => {
-  sortField.value = prop;
-  sortOrder.value = order === 'ascending' ? 'asc' : 'desc';
-  fetchPatients();
-};
-
-const handleSizeChange = (newSize) => {
-  pageSize.value = newSize;
-  currentPage.value = 1; // 切换size时重置到第一页
-  fetchPatients();
-};
-
-const handleCurrentChange = (newPage) => {
-  currentPage.value = newPage;
-  fetchPatients();
-};
-
-// --- 【已删除】操作按钮 ---
-// const handleWriteRecord = (row) => { ... };
-// const handleViewDetails = (row) => { ... };
 
 // --- 生命周期 ---
 onMounted(() => {
@@ -428,8 +326,49 @@ onMounted(() => {
   white-space: normal;
   line-height: 1.5;
 }
+
 .checked-in {
   color: var(--el-color-success);
   font-weight: bold;
+}
+
+/* 排班区域样式 */
+.schedule-section {
+  margin-top: 24px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+.morning-header {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  color: #2c3e50;
+}
+
+.afternoon-header {
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+  color: #2c3e50;
+}
+
+.section-title {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.patient-count {
+  font-size: 14px;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  color: #606266;
 }
 </style>

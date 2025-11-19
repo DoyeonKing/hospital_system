@@ -32,4 +32,23 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
             @Param("now") LocalTime now);
 
     List<Appointment> findByScheduleDoctorDoctorId(Integer doctorId);
+    
+    /**
+     * 根据医生ID和日期查询预约列表（包含患者和患者档案信息）
+     * @param doctorId 医生ID
+     * @param scheduleDate 排班日期
+     * @return 预约列表
+     */
+    @Query("SELECT a FROM Appointment a " +
+           "LEFT JOIN FETCH a.patient p " +
+           "LEFT JOIN FETCH p.patientProfile " +
+           "LEFT JOIN FETCH a.schedule s " +
+           "LEFT JOIN FETCH s.doctor " +
+           "LEFT JOIN FETCH s.slot " +
+           "WHERE s.doctor.doctorId = :doctorId " +
+           "AND s.scheduleDate = :scheduleDate " +
+           "ORDER BY s.slot.startTime ASC, a.appointmentNumber ASC")
+    List<Appointment> findByDoctorIdAndDate(
+            @Param("doctorId") Integer doctorId,
+            @Param("scheduleDate") LocalDate scheduleDate);
 }
