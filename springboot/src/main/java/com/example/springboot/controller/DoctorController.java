@@ -1,12 +1,11 @@
 package com.example.springboot.controller;
 
 import com.example.springboot.dto.appointment.PatientAppointmentDTO;
-import com.example.springboot.dto.doctor.DoctorResponse;
-import com.example.springboot.entity.Appointment;
-import com.example.springboot.repository.AppointmentRepository;
 import com.example.springboot.dto.doctor.DoctorChangePasswordRequest;
 import com.example.springboot.dto.doctor.DoctorResponse;
 import com.example.springboot.dto.doctor.DoctorUpdateInfoRequest;
+import com.example.springboot.entity.Appointment;
+import com.example.springboot.repository.AppointmentRepository;
 import com.example.springboot.entity.Doctor;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.service.DoctorService;
@@ -88,6 +87,8 @@ public class DoctorController {
             System.err.println("获取患者列表时发生错误: " + e.getMessage());
             e.printStackTrace();
             return new ResponseEntity<>("获取患者列表时发生错误: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 
     /**
      * 通过医生工号获取医生信息
