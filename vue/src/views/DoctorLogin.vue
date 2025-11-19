@@ -41,7 +41,7 @@
             <el-form-item prop="identifier">
               <el-input
                   v-model="loginForm.identifier"
-                  placeholder="请输入工号"
+                  placeholder="请输入工号 (默认: D001)"
                   size="large"
                   prefix-icon="User"
                   clearable
@@ -213,10 +213,10 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-// 【已修复】添加 CreditCard 图标导入
 import { User, Lock, Check, CreditCard } from '@element-plus/icons-vue'
 import { useDoctorStore } from '@/stores/doctorStore'
 import request from '@/utils/request'
+import defaultAvatar from '@/assets/doctor.jpg';
 
 const router = useRouter()
 const doctorStore = useDoctorStore()
@@ -233,16 +233,16 @@ const activationStep = ref(1)
 
 // 登录表单
 const loginForm = reactive({
-  identifier: '',
-  password: ''
+  identifier: 'D001',
+  password: '123'
 })
 
 // 激活表单
 const activationForm = reactive({
   identifier: '',
   initialPassword: '',
-  idCard: '',           // 从后端获取的脱敏身份证号
-  idCardInput: '',      // 用户输入的身份证号后6位
+  idCard: '',
+  idCardInput: '',
   newPassword: '',
   confirmPassword: ''
 })
@@ -255,7 +255,7 @@ const loginRules = reactive({
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, max: 20, message: '密码长度在6-20个字符', trigger: 'blur' }
+    { min: 3, max: 20, message: '密码长度在3-20个字符', trigger: 'blur' }
   ]
 })
 
@@ -267,7 +267,7 @@ const activationRules1 = reactive({
   ],
   initialPassword: [
     { required: true, message: '请输入初始密码', trigger: 'blur' },
-    { min: 6, max: 20, message: '密码长度在6-20个字符', trigger: 'blur' }
+    { min: 3, max: 20, message: '密码长度在3-20个字符', trigger: 'blur' }
   ]
 })
 
@@ -301,7 +301,6 @@ const activationRules2 = reactive({
 const switchToActivation = () => {
   isActivation.value = true
   activationStep.value = 1
-  // 清空激活表单
   Object.assign(activationForm, {
     identifier: '',
     initialPassword: '',
@@ -315,14 +314,13 @@ const switchToActivation = () => {
 const switchToLogin = () => {
   isActivation.value = false
   activationStep.value = 1
-  // 清空登录表单
   Object.assign(loginForm, {
     identifier: '',
     password: ''
   })
 }
 
-// 医生正常登录
+// 医生登录 (核心修改部分)
 const handleLogin = async () => {
   if (!loginFormRef.value) return
 
@@ -336,8 +334,8 @@ const handleLogin = async () => {
   loading.value = true
 
   try {
-    // 调用后端登录接口
-    const response = await request({
+    // 1. 第一步：认证，获取Token
+    const loginRes = await request({
       url: '/api/doctor/auth/login',
       method: 'POST',
       data: {
@@ -346,48 +344,119 @@ const handleLogin = async () => {
       }
     })
 
-    if (response.code === '200' || response.code === 200) {
-      // 【调试】打印登录响应数据
-      console.log('=== 登录响应数据 ===')
-      console.log('response:', response)
-      console.log('response.data:', response.data)
-      console.log('response.data.userInfo:', response.data?.userInfo)
-      console.log('====================')
+    if (loginRes.code === '200' || loginRes.code === 200) {
+      const loginData = loginRes.data || {}
+      const loginDoctorInfo = loginData.userInfo || {}
+      const token = loginData.token || `temp-token-${loginDoctorInfo.identifier || loginForm.identifier}`
 
-      // 保存登录信息到store
-      // 这里需要确保 response.data 的结构和您 store 中的 loginSuccess 方法匹配
-      doctorStore.loginSuccess(response.data, {
-        identifier: loginForm.identifier
-      })
+      if (!loginData.token) {
+        console.warn('登录响应未返回 token，已使用临时 token 占位，后端启用鉴权后请返回实际 token。')
+      }
 
-      ElMessage.success('登录成功')
+      // 2. 第二步：使用 Token 调取医生详细信息
+      const detailRes = await request({
+        url: `/api/doctors/identifier/${loginForm.identifier}`,
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}` // 【修改】加上 Bearer 前缀
+        }
+      });
 
-      // 立即跳转到医生工作台
-      router.push('/doctor-dashboard')
+      // 【新增】打印返回数据，方便调试
+      console.log('医生详情接口返回:', detailRes);
+
+      // 【关键修改】兼容多种返回格式
+      let doctorData = null;
+
+      // 情况 A: 标准 Result 格式 { code: 200, data: {...} }
+      if ((detailRes.code === '200' || detailRes.code === 200) && detailRes.data) {
+        doctorData = detailRes.data;
+      }
+      // 情况 B: 直接返回对象 (无 code 字段，但有 doctorId 或 identifier)
+      else if (detailRes.doctorId || detailRes.identifier || detailRes.fullName) {
+        doctorData = detailRes;
+      }
+
+      if (doctorData) {
+        // 3. 第三步：如果有 doctorId，尝试获取完整信息（包含 specialty 和 bio）
+        let fullDoctorData = doctorData;
+        const doctorId = doctorData.doctorId || loginDoctorInfo.doctorId;
+        
+        if (doctorId) {
+          try {
+            console.log('登录后尝试获取完整医生信息，doctorId:', doctorId);
+            const fullInfoRes = await request({
+              url: `/api/doctors/${doctorId}`,
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            // 处理完整信息的响应格式
+            if (fullInfoRes.code === '200' || fullInfoRes.code === 200) {
+              fullDoctorData = fullInfoRes.data || fullDoctorData;
+            } else if (fullInfoRes.fullName || fullInfoRes.doctorId) {
+              fullDoctorData = fullInfoRes;
+            }
+            console.log('获取到完整医生信息:', fullDoctorData);
+          } catch (error) {
+            console.warn('获取完整医生信息失败，使用部分信息:', error);
+            // 如果获取完整信息失败，继续使用部分信息
+          }
+        }
+
+        // 4. 构造完整的医生信息对象
+        const fullDoctorInfo = {
+          doctorId: String(fullDoctorData.doctorId || doctorId || ''),
+          name: fullDoctorData.fullName || fullDoctorData.name || loginDoctorInfo.fullName || '医生',
+          department: fullDoctorData.department?.name 
+              || fullDoctorData.departmentName
+              || (fullDoctorData.department ? fullDoctorData.department.name : '')
+              || loginDoctorInfo.departmentName
+              || '未知科室',
+          position: fullDoctorData.title || loginDoctorInfo.title || '职称未知',
+          phone: fullDoctorData.phoneNumber || loginDoctorInfo.phoneNumber || '',
+          specialty: fullDoctorData.specialty || loginDoctorInfo.specialty || '',
+          bio: fullDoctorData.bio || loginDoctorInfo.bio || '',
+          photoUrl: fullDoctorData.photoUrl || loginDoctorInfo.photoUrl || defaultAvatar,
+          username: loginForm.identifier
+        };
+
+        // 5. 保存到 Store
+        doctorStore.loginSuccess({ doctorInfo: fullDoctorInfo }, {
+          identifier: loginForm.identifier,
+          token: token
+        })
+
+        ElMessage.success('登录成功')
+        router.push('/doctor-dashboard')
+
+      } else {
+        // 如果还是获取失败，打印详细错误
+        console.error('无法解析医生详情数据:', detailRes);
+        ElMessage.error('获取医生详情失败: 数据格式不匹配');
+      }
+
     } else {
-      ElMessage.error(response.msg || '登录失败')
+      ElMessage.error(loginRes.msg || '登录失败')
     }
   } catch (error) {
     console.error('登录请求失败:', error)
-    ElMessage.error('网络错误，请稍后重试')
+    ElMessage.error(error.msg || '网络错误，请稍后重试')
   } finally {
     loading.value = false
   }
 }
 
-// 激活第一步：验证初始登录信息
+// 激活第一步
 const handleActivationStep1 = async () => {
   if (!activationFormRef.value) return
-
   try {
-    const valid = await activationFormRef.value.validate()
-    if (!valid) return
-  } catch (error) {
-    return
-  }
+    await activationFormRef.value.validate()
+  } catch (error) { return }
 
   loading.value = true
-
   try {
     const response = await request({
       url: '/api/doctor/auth/verify',
@@ -397,9 +466,7 @@ const handleActivationStep1 = async () => {
         initialPassword: activationForm.initialPassword
       }
     })
-
     if (response && response.message) {
-      // 验证成功，进入第二步
       activationStep.value = 2
       ElMessage.success('初始信息验证成功')
     } else if (response && response.error) {
@@ -408,28 +475,20 @@ const handleActivationStep1 = async () => {
       ElMessage.error('验证失败，响应格式错误')
     }
   } catch (error) {
-    console.error('验证请求失败:', error)
-    if (!error.response) {
-      ElMessage.error('无法连接到服务器，请检查后端是否启动')
-    }
+    ElMessage.error('无法连接到服务器')
   } finally {
     loading.value = false
   }
 }
 
-// 激活第二步：身份验证和密码设置
+// 激活第二步
 const handleActivationStep2 = async () => {
   if (!activationFormRef2.value) return
-
   try {
-    const valid = await activationFormRef2.value.validate()
-    if (!valid) return
-  } catch (error) {
-    return
-  }
+    await activationFormRef2.value.validate()
+  } catch (error) { return }
 
   loading.value = true
-
   try {
     const response = await request({
       url: '/api/doctor/auth/activate',
@@ -441,23 +500,16 @@ const handleActivationStep2 = async () => {
         confirmPassword: activationForm.confirmPassword
       }
     })
-
     if (response && response.message) {
       ElMessage.success('账户激活成功！请使用新密码登录。')
-      // 返回登录界面
-      setTimeout(() => {
-        switchToLogin()
-      }, 2000)
+      setTimeout(() => { switchToLogin() }, 2000)
     } else if (response && response.error) {
       ElMessage.error(response.error)
     } else {
-      ElMessage.error('激活失败，响应格式错误')
+      ElMessage.error('激活失败')
     }
   } catch (error) {
-    console.error('激活请求失败:', error)
-    if (!error.response) {
-      ElMessage.error('无法连接到服务器，请检查后端是否启动')
-    }
+    ElMessage.error('无法连接到服务器')
   } finally {
     loading.value = false
   }
@@ -761,6 +813,7 @@ onMounted(() => {
     padding: 20px;
   }
 
+  
   .form-container {
     padding: 30px 20px;
   }
