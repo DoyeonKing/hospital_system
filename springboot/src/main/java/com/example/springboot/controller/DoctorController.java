@@ -9,10 +9,12 @@ import com.example.springboot.service.DoctorService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -70,16 +72,36 @@ public class DoctorController {
     }
 
     // DoctorController.java 中添加接口
-    @PutMapping("/info")
-    public ResponseEntity<DoctorResponse> updateDoctorInfo(
-            @RequestPart("request") @Valid DoctorUpdateInfoRequest request,
-            @RequestPart(value = "avatarFile", required = false) MultipartFile avatarFile) {
+    @PutMapping(value = "/info", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updateDoctorInfo(
+            @RequestParam("identifier") String identifier,
+            @RequestParam(value = "phoneNumber", required = false) String phoneNumber,
+            @RequestParam(value = "specialty", required = false) String specialty,
+            @RequestParam(value = "bio", required = false) String bio,
+            @RequestParam(value = "avatarFile", required = false) MultipartFile avatarFile) {
 
-        // 将文件设置到请求对象中
-        request.setAvatarFile(avatarFile);
+        try {
+            // 创建请求对象
+            DoctorUpdateInfoRequest request = new DoctorUpdateInfoRequest();
+            request.setIdentifier(identifier);
+            request.setPhoneNumber(phoneNumber);
+            request.setSpecialty(specialty);
+            request.setBio(bio);
+            request.setAvatarFile(avatarFile);
 
-        DoctorResponse response = doctorService.updateDoctorInfo(request);
-        return ResponseEntity.ok(response);
+            DoctorResponse response = doctorService.updateDoctorInfo(request);
+            return ResponseEntity.ok(response);
+
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "头像上传失败: " + e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "更新医生信息失败: " + e.getMessage()));
+        }
     }
 
     // 在DoctorAuthController.java中添加以下接口
