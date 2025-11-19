@@ -65,4 +65,21 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
      */
     @Query("SELECT COUNT(s) FROM Schedule s WHERE s.location.locationId = :locationId AND s.scheduleDate >= :currentDate")
     long countFutureSchedulesByLocation(@Param("locationId") Integer locationId, @Param("currentDate") LocalDate currentDate);
+
+    /**
+     * 根据医生ID和日期范围查询排班（支持分页）
+     */
+    @Query("SELECT s FROM Schedule s " +
+           "LEFT JOIN FETCH s.doctor d " +
+           "LEFT JOIN FETCH s.slot ts " +
+           "LEFT JOIN FETCH s.location l " +
+           "WHERE s.doctor.doctorId = :doctorId " +
+           "AND (:startDate IS NULL OR s.scheduleDate >= :startDate) " +
+           "AND (:endDate IS NULL OR s.scheduleDate <= :endDate) " +
+           "ORDER BY s.scheduleDate ASC, ts.startTime ASC")
+    Page<Schedule> findSchedulesByDoctorIdAndDateRange(@Param("doctorId") Integer doctorId,
+                                                        @Param("startDate") LocalDate startDate,
+                                                        @Param("endDate") LocalDate endDate,
+                                                        Pageable pageable);
+
 }

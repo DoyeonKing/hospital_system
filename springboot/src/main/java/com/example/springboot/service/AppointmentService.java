@@ -203,6 +203,13 @@ public class AppointmentService {
     }
 
     @Transactional(readOnly = true)
+    public List<AppointmentResponse> findByDoctorId(Integer doctorId) {
+        return appointmentRepository.findByScheduleDoctorDoctorId(doctorId).stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<AppointmentResponse> findUpcomingByPatientId(Long patientId) {
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id " + patientId));

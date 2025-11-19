@@ -3,24 +3,29 @@ package com.example.springboot.service;
 import com.example.springboot.dto.auth.LoginResponse;
 import com.example.springboot.dto.department.DepartmentDTO;
 import com.example.springboot.dto.doctor.DoctorActivateRequest;
+import com.example.springboot.dto.doctor.DoctorChangePasswordRequest;
 import com.example.springboot.dto.doctor.DoctorResponse;
+import com.example.springboot.dto.doctor.DoctorUpdateInfoRequest;
 import com.example.springboot.entity.Doctor;
 import com.example.springboot.entity.enums.DoctorStatus;
+import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.DoctorRepository;
 import com.example.springboot.repository.ScheduleRepository;
 import com.example.springboot.util.PasswordEncoderUtil;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
+import java.io.IOException;
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+
 import com.example.springboot.entity.Department;
 import com.example.springboot.repository.DepartmentRepository;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class DoctorService {
@@ -37,6 +42,7 @@ public class DoctorService {
         this.departmentRepository = departmentRepository;
         this.scheduleRepository = scheduleRepository;
     }
+
 
     // =========================================================================
     // 【医生登录】
@@ -373,5 +379,150 @@ public class DoctorService {
             dto.setDepartment(deptDto);
         }
         return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Doctor> findByIdentifier(String identifier) {
+        return doctorRepository.findByIdentifier(identifier);
+    }
+
+    @Transactional
+    public DoctorResponse updateDoctorInfo(DoctorUpdateInfoRequest request) throws IOException {
+        // 1. 根据工号查找医生
+        Doctor doctor = doctorRepository.findByIdentifier(request.getIdentifier())
+                .orElseThrow(() -> new ResourceNotFoundException("医生不存在"));
+
+        // 2. 更新基本信息
+        if (request.getPhoneNumber() != null) {
+            // 检查手机号是否被其他医生使用
+            if (doctorRepository.existsByPhoneNumberAndIdentifierNot(request.getPhoneNumber(), request.getIdentifier())) {
+                throw new IllegalArgumentException("手机号已被其他医生使用");
+            }
+            doctor.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getSpecialty() != null) {
+            doctor.setSpecialty(request.getSpecialty());
+        }
+        if (request.getBio() != null) {
+            doctor.setBio(request.getBio());
+        }
+
+        // 3. 处理头像上传
+        if (request.getAvatarFile() != null && !request.getAvatarFile().isEmpty()) {
+            String photoUrl = saveAvatarFile(request.getAvatarFile());
+            doctor.setPhotoUrl(photoUrl);
+        }
+
+        // 4. 保存更新并返回结果
+        Doctor updatedDoctor = doctorRepository.save(doctor);
+        return convertToResponseDto(updatedDoctor);
+    }
+
+        // 使用绝对路径，避免临时目录问题
+        @Value("${file.upload-dir:${user.dir}/images/doctors/}")
+        private String uploadDir;
+
+        // 或者明确指定一个固定路径
+        // @Value("${file.upload-dir:C:/uploads/images/doctors/}")
+        // private String uploadDir;
+
+        private String saveAvatarFile(MultipartFile avatarFile) throws IOException {
+            // 1. 验证文件类型和大小
+            validateAvatarFile(avatarFile);
+
+            // 2. 生成唯一文件名
+            String fileExtension = getFileExtension(avatarFile.getOriginalFilename());
+            String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
+
+            // 3. 创建存储目录（使用绝对路径）
+            File dir = new File(uploadDir);
+            if (!dir.exists()) {
+                boolean created = dir.mkdirs();
+                if (!created) {
+                    throw new IOException("无法创建头像存储目录: " + dir.getAbsolutePath());
+                }
+                System.out.println("目录创建成功: " + dir.getAbsolutePath());
+            }
+
+            // 4. 构建完整的文件路径
+            File dest = new File(dir, uniqueFileName);
+
+            // 5. 保存文件
+            try {
+                avatarFile.transferTo(dest);
+                System.out.println("文件保存成功: " + dest.getAbsolutePath());
+            } catch (IOException e) {
+                throw new IOException("文件保存失败: " + dest.getAbsolutePath() + ", 错误: " + e.getMessage());
+            }
+
+            // 6. 返回前端可访问的路径
+            return "/images/doctors/" + uniqueFileName;
+        }
+
+        private void validateAvatarFile(MultipartFile avatarFile) {
+            if (avatarFile == null || avatarFile.isEmpty()) {
+                throw new IllegalArgumentException("头像文件不能为空");
+            }
+
+            // 验证文件类型
+            String contentType = avatarFile.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                throw new IllegalArgumentException("只能上传图片文件");
+            }
+
+            // 验证文件大小（5MB）
+            if (avatarFile.getSize() > 5 * 1024 * 1024) {
+                throw new IllegalArgumentException("头像文件大小不能超过 5MB");
+            }
+
+            // 验证文件扩展名
+            String originalFilename = avatarFile.getOriginalFilename();
+            if (originalFilename == null || !originalFilename.contains(".")) {
+                throw new IllegalArgumentException("文件缺少扩展名");
+            }
+
+            String fileExtension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
+            if (!fileExtension.matches("\\.(jpg|jpeg|png|gif|bmp|webp)$")) {
+                throw new IllegalArgumentException("不支持的文件格式，请上传 jpg, jpeg, png, gif, bmp 或 webp 格式的图片");
+            }
+        }
+
+        private String getFileExtension(String filename) {
+            if (filename == null || !filename.contains(".")) {
+                return ".jpg"; // 默认扩展名
+            }
+            return filename.substring(filename.lastIndexOf("."));
+        }
+
+    // 在DoctorService.java中添加以下方法
+    /**
+     * 根据医生工号修改密码
+     * @param request 包含工号、旧密码、新密码和确认密码的请求对象
+     */
+    @Transactional
+    public void changePassword(DoctorChangePasswordRequest request) {
+        // 1. 校验新密码与确认密码一致性
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("新密码与确认密码不一致");
+        }
+
+        // 2. 根据工号查询医生信息
+        Doctor doctor = doctorRepository.findByIdentifier(request.getIdentifier())
+                .orElseThrow(() -> new ResourceNotFoundException("医生工号不存在"));
+
+        // 3. 验证旧密码是否正确
+        if (!passwordEncoderUtil.matches(request.getOldPassword(), doctor.getPasswordHash())) {
+            throw new IllegalArgumentException("旧密码验证失败");
+        }
+
+        // 4. 验证新密码与旧密码是否相同（可选，增强安全性）
+        if (passwordEncoderUtil.matches(request.getNewPassword(), doctor.getPasswordHash())) {
+            throw new IllegalArgumentException("新密码不能与旧密码相同");
+        }
+
+        // 5. 加密新密码并更新
+        String newPasswordHash = passwordEncoderUtil.encodePassword(request.getNewPassword());
+        doctor.setPasswordHash(newPasswordHash);
+        doctorRepository.save(doctor);
     }
 }

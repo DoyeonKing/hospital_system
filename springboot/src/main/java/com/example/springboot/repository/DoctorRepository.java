@@ -35,4 +35,6 @@ public interface DoctorRepository extends JpaRepository<Doctor, Integer>, JpaSpe
     
     // 根据科室ID和状态查找医生
     List<Doctor> findByDepartmentDepartmentIdAndStatus(Integer departmentId, DoctorStatus status);
+
+    boolean existsByPhoneNumberAndIdentifierNot(String phoneNumber, String identifier);
 }

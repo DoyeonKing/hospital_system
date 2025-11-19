@@ -294,4 +294,35 @@ public class ScheduleController {
             return ResponseEntity.status(500).build();
         }
     }
+
+    /**
+     * 根据医生ID获取排班列表
+     */
+    @GetMapping("/doctor/{doctorId}")
+    public ResponseEntity<Page<ScheduleResponse>> getSchedulesByDoctorId(
+            @PathVariable Integer doctorId,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        try {
+            System.out.println("=== 查询医生排班 ===");
+            System.out.println("doctorId: " + doctorId);
+            System.out.println("startDate: " + startDate);
+            System.out.println("endDate: " + endDate);
+            System.out.println("page: " + page + ", size: " + size);
+            System.out.println("====================");
+
+            Pageable pageable = PageRequest.of(page, size);
+            Page<ScheduleResponse> schedules = scheduleService.getSchedulesByDoctorId(
+                    doctorId, startDate, endDate, pageable);
+            
+            System.out.println("查询结果: " + schedules.getTotalElements() + " 条记录");
+            return ResponseEntity.ok(schedules);
+        } catch (Exception e) {
+            System.err.println("查询医生排班时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
 }
