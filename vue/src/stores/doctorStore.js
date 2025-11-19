@@ -221,24 +221,20 @@ export const useDoctorStore = defineStore('doctor', {
                 // 构建 FormData
                 const formData = new FormData();
                 
-                // 构建 request 部分的 JSON 数据
-                const requestData = {
-                    identifier: identifier,
-                    phoneNumber: updateData.phoneNumber || null,
-                    specialty: updateData.specialty || null,
-                    bio: updateData.bio || null
-                };
+                // 直接添加参数作为 FormData 字段（后端使用 @RequestParam 接收）
+                formData.append('identifier', identifier);
                 
-                console.log('准备上传的数据:', {
-                    requestData,
-                    hasAvatarFile: updateData.avatarFile instanceof File,
-                    avatarFileName: updateData.avatarFile instanceof File ? updateData.avatarFile.name : null,
-                    avatarFileSize: updateData.avatarFile instanceof File ? updateData.avatarFile.size : null
-                });
+                if (updateData.phoneNumber) {
+                    formData.append('phoneNumber', updateData.phoneNumber);
+                }
                 
-                // 将 request 部分作为 JSON 字符串添加到 FormData
-                const requestBlob = new Blob([JSON.stringify(requestData)], { type: 'application/json' });
-                formData.append('request', requestBlob, 'request.json');
+                if (updateData.specialty) {
+                    formData.append('specialty', updateData.specialty);
+                }
+                
+                if (updateData.bio) {
+                    formData.append('bio', updateData.bio);
+                }
                 
                 // 如果有头像文件，添加到 FormData
                 if (updateData.avatarFile instanceof File) {
@@ -251,6 +247,16 @@ export const useDoctorStore = defineStore('doctor', {
                 } else {
                     console.log('没有头像文件需要上传');
                 }
+                
+                console.log('准备上传的数据:', {
+                    identifier: identifier,
+                    phoneNumber: updateData.phoneNumber || null,
+                    specialty: updateData.specialty || null,
+                    bio: updateData.bio || null,
+                    hasAvatarFile: updateData.avatarFile instanceof File,
+                    avatarFileName: updateData.avatarFile instanceof File ? updateData.avatarFile.name : null,
+                    avatarFileSize: updateData.avatarFile instanceof File ? updateData.avatarFile.size : null
+                });
 
                 // 打印 FormData 内容（用于调试）
                 console.log('FormData entries:');
@@ -278,17 +284,20 @@ export const useDoctorStore = defineStore('doctor', {
                 }
 
                 if (doctorData) {
+                    console.log('更新医生信息返回的数据:', doctorData);
+                    console.log('photoUrl 字段:', doctorData.photoUrl);
                     // 更新本地状态（使用后端返回的最新数据）
                     this.detailedDoctorInfo = {
                         ...this.detailedDoctorInfo,
                         phone: doctorData.phoneNumber !== undefined ? doctorData.phoneNumber : this.detailedDoctorInfo.phone,
                         specialty: doctorData.specialty !== undefined ? doctorData.specialty : this.detailedDoctorInfo.specialty,
                         bio: doctorData.bio !== undefined ? doctorData.bio : this.detailedDoctorInfo.bio,
-                        photoUrl: doctorData.photoUrl !== undefined ? doctorData.photoUrl : this.detailedDoctorInfo.photoUrl,
+                        photoUrl: doctorData.photoUrl !== undefined && doctorData.photoUrl !== null ? doctorData.photoUrl : this.detailedDoctorInfo.photoUrl,
                         name: doctorData.fullName !== undefined ? doctorData.fullName : this.detailedDoctorInfo.name,
                         department: doctorData.department?.name || doctorData.departmentName || this.detailedDoctorInfo.department,
                         position: doctorData.title !== undefined ? doctorData.title : this.detailedDoctorInfo.position
                     };
+                    console.log('更新后的 photoUrl:', this.detailedDoctorInfo.photoUrl);
                     // 更新缓存
                     localStorage.setItem(DETAILED_INFO_KEY, JSON.stringify(this.detailedDoctorInfo));
                     return true;

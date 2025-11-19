@@ -10,7 +10,7 @@
         </div>
         <div class="navbar-right">
           <div class="user-info">
-            <el-avatar :size="36" src="@/assets/doctor.jpg" />
+            <el-avatar :size="36" :src="getAvatarUrl(doctorStore.detailedDoctorInfo.photoUrl)" />
             <span class="user-name">{{ doctorStore.displayName }} 医生</span>
           </div>
           <el-button type="danger" size="default" :icon="SwitchButton" @click="handleLogout">退出登录</el-button>
@@ -67,7 +67,7 @@
             </div>
             <div class="doctor-profile">
               <div class="doctor-avatar-large">
-                <el-avatar :size="100" src="@/assets/doctor.jpg" />
+                <el-avatar :size="100" :src="getAvatarUrl(doctorStore.detailedDoctorInfo.photoUrl)" />
               </div>
               <div class="doctor-details">
                 <h2>{{ doctorStore.displayName }}</h2>
@@ -443,8 +443,15 @@ const saveProfile = async () => {
   const success = await doctorStore.updateDoctorInfo(dataToUpdate)
 
   if (success) {
+    // 清除 blob URL（如果有）
+    if (editForm.photoUrl && editForm.photoUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(editForm.photoUrl);
+    }
+    
     ElMessage.success('资料更新成功')
     editDialogVisible.value = false
+    
+    // 刷新医生信息（包括头像）
     await doctorStore.fetchDetailedDoctorInfo();
   } else {
     ElMessage.error(doctorStore.error || '更新失败')
@@ -511,7 +518,10 @@ const getAvatarUrl = (url) => {
   if (!url) return defaultAvatar;
   if (url.startsWith('blob:')) return url;
   if (url.startsWith('http')) return url;
-  // 如果是相对路径，可能需要拼接完整路径
+  // 如果是相对路径（以 / 开头），拼接完整的 baseURL
+  if (url.startsWith('/')) {
+    return `http://localhost:8080${url}`;
+  }
   return url || defaultAvatar;
 }
 
