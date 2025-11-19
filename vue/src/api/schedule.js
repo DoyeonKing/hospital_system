@@ -22,3 +22,24 @@ export function getAllSchedules(params = {}) {
         }
     });
 }
+
+/**
+ * 根据医生ID获取排班列表
+ * @param {number} doctorId - 医生ID
+ * @param {Object} params - 查询参数
+ * @param {string} [params.startDate] - 开始日期 (YYYY-MM-DD)
+ * @param {string} [params.endDate] - 结束日期 (YYYY-MM-DD)
+ * @param {number} [params.page] - 页码，默认0
+ * @param {number} [params.size] - 每页数量，默认100
+ */
+export function getSchedulesByDoctorId(doctorId, params = {}) {
+    return request({
+        url: `/api/schedules/doctor/${doctorId}`,
+        method: 'get',
+        params: {
+            page: 0,
+            size: 100,
+            ...params
+        }
+    });
+}

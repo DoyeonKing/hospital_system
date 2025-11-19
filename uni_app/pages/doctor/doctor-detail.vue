@@ -92,6 +92,7 @@
 					// 调用后端API获取医生详情
 					const response = await getDoctorById(this.doctorId)
 					console.log('医生详情API响应:', response)
+					console.log('响应数据类型:', typeof response)
 					
 					// 处理不同的返回格式
 					let doctorData = null
@@ -124,6 +125,12 @@
 					}
 				} catch (error) {
 					console.error('获取医生详情失败:', error)
+					uni.showToast({
+						title: '获取医生信息失败',
+						icon: 'none',
+						duration: 2000
+					})
+					
 					// 如果后端失败，使用Mock数据作为fallback
 					const doctor = mockDoctorDetails.find(d => d.doctorId === this.doctorId)
 					if (doctor) {
@@ -136,7 +143,7 @@
 							departmentName: '未知科室',
 							specialty: '暂无专长信息',
 							photoUrl: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
-							bio: '医生详情功能开发中...'
+							bio: '暂无简介'
 						}
 					}
 				}

@@ -54,4 +54,9 @@ public interface ScheduleService {
 
     // 在原有方法基础上新增带分页参数的重载方法
     Page<ScheduleResponse> getSchedules(ScheduleListRequest request, Pageable pageable);
+
+    /**
+     * 根据医生ID和日期范围获取排班列表
+     */
+    Page<ScheduleResponse> getSchedulesByDoctorId(Integer doctorId, String startDate, String endDate, Pageable pageable);
 }

@@ -64,6 +64,8 @@ public class ScheduleServiceImpl implements ScheduleService {
 //        return schedulePage.map(ScheduleResponse::fromEntity);
 //    }
 
+
+
     @Override
     @Transactional(readOnly = true)
     public Page<ScheduleResponse> getSchedules(ScheduleListRequest request, Pageable pageable) {
@@ -208,4 +210,36 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 5. 转换为响应DTO并返回
         return ScheduleResponse.fromEntity(savedSchedule);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ScheduleResponse> getSchedulesByDoctorId(Integer doctorId, String startDate, String endDate, Pageable pageable) {
+        // 解析日期参数
+        java.time.LocalDate start = null;
+        java.time.LocalDate end = null;
+        
+        if (startDate != null && !startDate.isEmpty()) {
+            try {
+                start = java.time.LocalDate.parse(startDate);
+            } catch (Exception e) {
+                System.err.println("解析开始日期失败: " + startDate);
+            }
+        }
+        
+        if (endDate != null && !endDate.isEmpty()) {
+            try {
+                end = java.time.LocalDate.parse(endDate);
+            } catch (Exception e) {
+                System.err.println("解析结束日期失败: " + endDate);
+            }
+        }
+        
+        // 查询排班数据
+        Page<Schedule> schedulePage = scheduleRepository.findSchedulesByDoctorIdAndDateRange(
+                doctorId, start, end, pageable);
+        
+        // 转换为响应DTO
+        return schedulePage.map(ScheduleResponse::fromEntity);
+    }
 }
+
