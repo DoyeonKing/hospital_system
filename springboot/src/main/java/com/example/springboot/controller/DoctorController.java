@@ -159,7 +159,7 @@ public class DoctorController {
 
     /**
      * 医生修改密码接口
-     * URL: POST /api/doctors/change-password (注意这里是 doctors 而不是 doctor/auth，除非您移动到 AuthController)
+     * URL: POST /api/doctors/change-password
      */
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@Valid @RequestBody DoctorChangePasswordRequest request) {
@@ -172,43 +172,6 @@ public class DoctorController {
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("{\"error\": \"服务器内部错误，密码修改失败\"}");
-        }
-    }
-
-    /**
-     * 获取医生指定日期的患者列表
-     * 使用 GET /api/doctors/todays-appointments
-     *
-     * @param doctorId 医生ID (从请求参数获取)
-     * @param date     日期 (YYYY-MM-DD格式)
-     * @return 患者预约列表
-     */
-    @GetMapping("/todays-appointments")
-    public ResponseEntity<?> getTodaysAppointments(
-            @RequestParam Integer doctorId,
-            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
-        try {
-            System.out.println("=== 获取医生患者列表 ===");
-            System.out.println("doctorId: " + doctorId);
-            System.out.println("date: " + date);
-
-            // 查询预约列表 (请确保 AppointmentRepository 中有 findByDoctorIdAndDate 方法)
-            // 如果是 JPA，方法名通常需要更精确，例如 findByDoctor_DoctorIdAndAppointmentDate (取决于您的Entity字段名)
-            // 这里假设您已经在 Repository 中定义了符合 JPA 规范的方法或 @Query
-            List<Appointment> appointments = appointmentRepository.findByDoctorIdAndDate(doctorId, date);
-
-            System.out.println("查询到 " + appointments.size() + " 条预约记录");
-
-            // 转换为DTO
-            List<PatientAppointmentDTO> result = appointments.stream()
-                    .map(PatientAppointmentDTO::fromEntity)
-                    .collect(Collectors.toList());
-
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            System.err.println("获取患者列表时发生错误: " + e.getMessage());
-            e.printStackTrace();
-            return new ResponseEntity<>("获取患者列表时发生错误: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
