@@ -7,25 +7,30 @@ import { doctorLogin } from '@/api/auth';
 const DOCTOR_SESSION_KEY = 'xm-pro-doctor'; // 医生会话的localStorage key
 
 export const useDoctorStore = defineStore('doctor', {
-    state: () => ({
-        // 【已修改】如果 localStorage 中没有，默认为 null
-        loggedInDoctorBasicInfo: JSON.parse(localStorage.getItem(DOCTOR_SESSION_KEY)) || null,
+    state: () => {
+        // 从localStorage恢复登录信息
+        const savedInfo = JSON.parse(localStorage.getItem(DOCTOR_SESSION_KEY)) || null;
+        
+        return {
+            // 【已修改】如果 localStorage 中没有，默认为 null
+            loggedInDoctorBasicInfo: savedInfo,
 
-        // 【已修改】详细信息默认为空对象
-        detailedDoctorInfo: {
-            doctorId: '',
-            name: '',
-            department: '',
-            position: '',
-            phone: '',
-            username: '',
-            specialty: '', // 擅长领域
-            bio: '',       // 个人简介
-            photoUrl: '',  // 头像URL
-        },
-        isLoading: false,
-        error: null,
-    }),
+            // 【已修改】从localStorage恢复基本信息
+            detailedDoctorInfo: {
+                doctorId: savedInfo?.doctorId || '',
+                name: savedInfo?.name || '',
+                department: savedInfo?.department || '',
+                position: savedInfo?.position || '',
+                phone: savedInfo?.phone || '',
+                username: savedInfo?.identifier || '',
+                specialty: '', // 擅长领域
+                bio: '',       // 个人简介
+                photoUrl: '',  // 头像URL
+            },
+            isLoading: false,
+            error: null,
+        };
+    },
 
     getters: {
         // 【已修改】 isAuthenticated 现在会检查 token 是否存在
@@ -33,8 +38,8 @@ export const useDoctorStore = defineStore('doctor', {
 
         // 显示名称
         displayName: (state) => state.detailedDoctorInfo.name || state.loggedInDoctorBasicInfo?.name || state.loggedInDoctorBasicInfo?.identifier || '医生',
-        // 获取医生ID
-        currentDoctorId: (state) => state.detailedDoctorInfo.doctorId || state.loggedInDoctorBasicInfo?.identifier || '1',
+        // 获取医生ID - 优先使用数字ID
+        currentDoctorId: (state) => state.detailedDoctorInfo.doctorId || state.loggedInDoctorBasicInfo?.doctorId || state.loggedInDoctorBasicInfo?.identifier || '1',
         // 获取科室信息
         currentDepartment: (state) => state.detailedDoctorInfo.department,
         // 获取职位信息
@@ -44,33 +49,54 @@ export const useDoctorStore = defineStore('doctor', {
     actions: {
         // 登录成功后调用的 action
         loginSuccess(apiResponseData, basicLoginInfoFromLogin) {
+            console.log('=== DoctorStore.loginSuccess 被调用 ===');
+            console.log('apiResponseData:', apiResponseData);
+            console.log('basicLoginInfoFromLogin:', basicLoginInfoFromLogin);
+            
+            // 从API响应中提取userInfo（后端返回的是userInfo字段）
+            const userInfo = apiResponseData.userInfo || apiResponseData.doctorInfo || {};
+            console.log('提取的 userInfo:', userInfo);
+            console.log('userInfo.doctorId:', userInfo.doctorId);
+            console.log('userInfo.doctorId 类型:', typeof userInfo.doctorId);
+            
             // 保存详细医生信息
             this.detailedDoctorInfo = {
-                doctorId: apiResponseData.doctorInfo?.doctorId || '1', // 虚拟ID
-                name: apiResponseData.doctorInfo?.name || '测试医生', // 虚拟名称
-                department: apiResponseData.doctorInfo?.department || '内科',
-                position: apiResponseData.doctorInfo?.position || '主治医师',
-                phone: apiResponseData.doctorInfo?.phone || '13900139000',
-                username: basicLoginInfoFromLogin.identifier || 'D001',
+                doctorId: userInfo.doctorId || '1', // 从API获取真实的doctorId
+                name: userInfo.fullName || userInfo.name || '测试医生',
+                department: userInfo.departmentName || userInfo.department || '内科',
+                position: userInfo.title || userInfo.position || '主治医师',
+                phone: userInfo.phoneNumber || userInfo.phone || '13900139000',
+                username: userInfo.identifier || basicLoginInfoFromLogin.identifier || 'D001',
                 // --- 【新增字段】 ---
-                specialty: apiResponseData.doctorInfo?.specialty || '高血压、糖尿病',
-                bio: apiResponseData.doctorInfo?.bio || '经验丰富的内科医生。',
-                photoUrl: apiResponseData.doctorInfo?.photoUrl || '@/assets/doctor.jpg',
+                specialty: userInfo.specialty || '高血压、糖尿病',
+                bio: userInfo.bio || '经验丰富的内科医生。',
+                photoUrl: userInfo.photoUrl || '@/assets/doctor.jpg',
                 // ---------------------
             };
 
-            // 保存基本登录信息到 localStorage
+            console.log('保存到 detailedDoctorInfo.doctorId:', this.detailedDoctorInfo.doctorId);
+
+            // 保存基本登录信息到 localStorage（包含doctorId和name）
             const basicInfo = {
                 identifier: basicLoginInfoFromLogin.identifier,
-                token: basicLoginInfoFromLogin.token || 'mock-token', // 虚拟Token
+                doctorId: userInfo.doctorId, // 保存真实的doctorId
+                name: userInfo.fullName || userInfo.name, // 保存医生姓名
+                department: userInfo.departmentName || userInfo.department,
+                position: userInfo.title || userInfo.position,
+                phone: userInfo.phoneNumber || userInfo.phone,
+                token: basicLoginInfoFromLogin.token || apiResponseData.token || 'mock-token',
                 loginTime: new Date().toISOString(),
             };
+
+            console.log('保存到 localStorage 的 basicInfo:', basicInfo);
 
             localStorage.setItem(DOCTOR_SESSION_KEY, JSON.stringify(basicInfo));
             this.loggedInDoctorBasicInfo = basicInfo;
 
             // 确保状态立即更新
             console.log('DoctorStore: 登录状态已更新', this.loggedInDoctorBasicInfo);
+            console.log('DoctorStore: 医生ID =', this.detailedDoctorInfo.doctorId);
+            console.log('==========================================');
 
             // 清除错误状态
             this.error = null;

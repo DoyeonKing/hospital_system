@@ -12,7 +12,7 @@
         <div class="navbar-right">
           <div class="user-info">
             <el-avatar :size="36" src="@/assets/doctor.jpg" />
-            <span class="user-name">{{ doctorStore.displayName }} 医生</span>
+            <span class="user-name">{{ doctorDisplayName }} 医生</span>
           </div>
         </div>
       </div>
@@ -23,7 +23,7 @@
         <template #header>
           <div class="card-header">
             <div class="header-title-row">
-              <span class="department-title">{{ doctorStore.displayName }} - 排班查看</span>
+              <span class="department-title">{{ doctorDisplayName }} - 排班查看</span>
             </div>
 
             <div class="header-controls">
@@ -156,15 +156,19 @@
                   @click="selectDay(day)"
               >
                 <div class="day-number">{{ day.date }}</div>
-                <div class="day-schedules">
+                <div class="day-schedules-list">
                   <div
                       v-for="(schedule, idx) in (day.schedules || []).slice(0, 3)"
                       :key="idx"
-                      class="schedule-dot"
-                      :class="getScheduleStatusClass(schedule)"
-                      :title="`${schedule.slotName || '时间段'} - ${schedule.location || '未分配地点'}`"
-                  ></div>
-                  <div v-if="day.schedules && day.schedules.length > 3" class="more-schedules">
+                      class="schedule-item-mini"
+                      :class="[
+                        getScheduleStatusClass(schedule),
+                        schedule.startTime && schedule.startTime < '12:00' ? 'morning-schedule' : 'afternoon-schedule'
+                      ]"
+                  >
+                    {{ schedule.location || '未分配地点' }}
+                  </div>
+                  <div v-if="day.schedules && day.schedules.length > 3" class="more-schedules-text">
                     +{{ day.schedules.length - 3 }}
                   </div>
                 </div>
@@ -238,9 +242,22 @@ import { useDoctorStore } from '@/stores/doctorStore'
 import request from '@/utils/request'
 // 【新增】导入 BackButton
 import BackButton from '@/components/BackButton.vue'
+// 【新增】导入排班API
+import { getSchedulesByDoctorId } from '@/api/schedule'
 
 const router = useRouter()
 const doctorStore = useDoctorStore()
+
+// 【新增】计算属性：获取医生显示名称
+const doctorDisplayName = computed(() => {
+  // 优先从localStorage获取
+  const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'))
+  if (savedInfo?.name) {
+    return savedInfo.name
+  }
+  // 其次从store获取
+  return doctorStore.detailedDoctorInfo?.name || doctorStore.displayName || '医生'
+})
 
 // 状态
 const currentView = ref('week')
@@ -258,13 +275,14 @@ const currentMonday = ref(new Date())
 
 // 计算当前周的日期数组
 const weekDates = computed(() => {
-  const monday = new Date(currentMonday.value)
+  const monday = new Date(currentMonday.value.getTime()) // 使用getTime()创建新日期对象
   const dates = []
   for (let i = 0; i < 7; i++) {
-    const date = new Date(monday)
-    date.setDate(monday.getDate() + i)
+    const date = new Date(monday.getTime()) // 使用getTime()创建新日期对象
+    date.setDate(date.getDate() + i) // 修改为date.getDate()
     dates.push(date.toISOString().split('T')[0])
   }
+  console.log('weekDates computed:', dates) // 添加日志
   return dates
 })
 
@@ -289,15 +307,11 @@ const scheduleStats = computed(() => {
   return { total, available } // 已移除 booked
 })
 
-
 // 【新增】获取本周所有不重复的时间段 (用于生成表格行)
 const uniqueTimeSlots = computed(() => {
   const slots = new Map();
-  // 我们从 *所有* 虚拟数据中提取时间段，以确保周/月切换时时间段一致
-  // 真实场景下，您可能需要一个专门的 "获取时间段" 接口
-  const allMockSchedules = generateMockSchedules('2025-01-01', '2025-12-31');
-
-  for (const s of allMockSchedules) {
+  // 从当前排班数据中提取时间段
+  for (const s of schedules.value) {
     if (s.slotName && !slots.has(s.slotName)) {
       slots.set(s.slotName, {
         name: s.slotName,
@@ -307,6 +321,15 @@ const uniqueTimeSlots = computed(() => {
       });
     }
   }
+  
+  // 如果没有排班数据，返回默认时间段
+  if (slots.size === 0) {
+    return [
+      { name: '上午 (08:00-12:00)', startTime: '08:00', endTime: '12:00', shift: '上午' },
+      { name: '下午 (14:00-17:00)', startTime: '14:00', endTime: '17:00', shift: '下午' }
+    ];
+  }
+  
   return Array.from(slots.values()).sort((a, b) => a.startTime.localeCompare(b.startTime));
 });
 
@@ -461,6 +484,10 @@ const selectDay = (day) => {
 
 // 切换周
 const changeWeek = (offset) => {
+  console.log('=== 切换周 ===')
+  console.log('offset:', offset)
+  console.log('当前 currentMonday:', currentMonday.value)
+  
   if (offset === 0) {
     const today = new Date()
     const dayOfWeek = today.getDay()
@@ -472,13 +499,26 @@ const changeWeek = (offset) => {
     newMonday.setDate(newMonday.getDate() + (offset * 7))
     currentMonday.value = newMonday
   }
+  
+  console.log('新的 currentMonday:', currentMonday.value)
+  console.log('即将加载排班数据...')
   loadSchedules()
 }
 
-// 【已修改】加载排班数据 - 强制使用虚拟数据
+// 【已修改】加载排班数据 - 使用真实API
 const loadSchedules = async () => {
-  // 1. 确保有医生ID (用于虚拟数据)
-  const doctorId = doctorStore.currentDoctorId || doctorStore.detailedDoctorInfo.doctorId || doctorStore.doctorInfo?.doctorId
+  // 1. 【修复】直接从localStorage获取doctorId，确保最新
+  const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'))
+  const doctorId = savedInfo?.doctorId || doctorStore.currentDoctorId || doctorStore.detailedDoctorInfo?.doctorId
+  
+  console.log('=== 加载排班数据 ===')
+  console.log('localStorage中的doctorId:', savedInfo?.doctorId)
+  console.log('doctorStore.currentDoctorId:', doctorStore.currentDoctorId)
+  console.log('doctorStore.detailedDoctorInfo:', doctorStore.detailedDoctorInfo)
+  console.log('doctorStore.loggedInDoctorBasicInfo:', doctorStore.loggedInDoctorBasicInfo)
+  console.log('最终使用的 doctorId:', doctorId)
+  console.log('doctorId 类型:', typeof doctorId)
+  
   if (!doctorId) {
     ElMessage.warning('未获取到医生ID，请重新登录')
     return
@@ -499,14 +539,43 @@ const loadSchedules = async () => {
     endDate = lastDay.toISOString().split('T')[0]
   }
 
-  // 3. 模拟网络延迟
-  await new Promise(resolve => setTimeout(resolve, 500));
+  console.log('查询日期范围:', startDate, '到', endDate)
 
-  // 4. 【修改】直接调用虚拟数据
+  // 3. 【修改】调用真实API
   try {
-    // 虚拟数据现在只返回 *指定日期范围内* 的数据
-    schedules.value = generateMockSchedules(startDate, endDate)
-    ElMessage.info('已加载模拟排班数据')
+    const response = await getSchedulesByDoctorId(doctorId, {
+      startDate,
+      endDate
+    })
+    
+    console.log('API 响应:', response)
+    console.log('响应中的 content:', response?.content)
+    console.log('content 长度:', response?.content?.length)
+    
+    // 处理返回的数据
+    if (response && response.content) {
+      schedules.value = response.content.map(schedule => ({
+        scheduleId: schedule.scheduleId,
+        doctorId: schedule.doctorId,
+        scheduleDate: schedule.scheduleDate,
+        slotId: schedule.slotId,
+        slotName: schedule.slotName,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        locationId: schedule.locationId,
+        location: schedule.location,
+        totalSlots: schedule.totalSlots,
+        bookedSlots: schedule.bookedSlots,
+        fee: schedule.fee,
+        status: schedule.status,
+        remarks: schedule.remarks
+      }))
+      console.log('处理后的排班数据:', schedules.value)
+      ElMessage.success(`排班数据加载成功，共 ${schedules.value.length} 条`)
+    } else {
+      schedules.value = []
+      ElMessage.info('暂无排班数据')
+    }
 
     // 如果是月视图，自动选中今天
     if(currentView.value === 'month' && !selectedDayDate.value) {
@@ -514,13 +583,13 @@ const loadSchedules = async () => {
     }
 
   } catch(e) {
-    console.error("生成虚拟数据时出错:", e)
-    ElMessage.error("加载模拟数据失败")
+    console.error("加载排班数据时出错:", e)
+    ElMessage.error("加载排班数据失败: " + e.message)
+    schedules.value = []
   } finally {
     loading.value = false
   }
 }
-
 
 // 返回
 const goBack = () => {
@@ -1008,37 +1077,74 @@ onMounted(() => {
   margin-bottom: 4px;
 }
 
-.day-schedules {
+.day-schedules-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 4px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
-.schedule-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #67c23a;
-  cursor: pointer;
+.schedule-item-mini {
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid #e8e8e8;
+  border-left: 3px solid #67c23a;
+  background: #fff;
+  font-size: 12px;
+  color: #333;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.schedule-dot.status-available {
-  background-color: #67c23a;
+.schedule-item-mini:hover {
+  transform: translateX(2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
-.schedule-dot.status-full {
-  background-color: #f56c6c;
+.schedule-item-mini.morning-schedule {
+  border-left-color: #67c23a;
 }
 
-.schedule-dot.status-cancelled {
-  background-color: #909399;
+.schedule-item-mini.afternoon-schedule {
+  border-left-color: #409eff;
 }
 
-.more-schedules {
-  font-size: 10px;
+.schedule-item-mini.status-cancelled {
+  border-left-color: #909399;
   color: #909399;
-  margin-left: 2px;
+  text-decoration: line-through;
+}
+
+.schedule-time-mini,
+.schedule-location-mini {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: #606266;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.schedule-time-mini {
+  font-weight: 600;
+  color: #409eff;
+}
+
+.schedule-location-mini {
+  color: #67c23a;
+}
+
+.more-schedules-text {
+  font-size: 11px;
+  color: #909399;
+  text-align: center;
+  padding: 2px 0;
+  font-weight: 500;
 }
 
 .selected-day-details {

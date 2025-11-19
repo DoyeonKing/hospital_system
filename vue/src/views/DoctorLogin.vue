@@ -347,6 +347,13 @@ const handleLogin = async () => {
     })
 
     if (response.code === '200' || response.code === 200) {
+      // 【调试】打印登录响应数据
+      console.log('=== 登录响应数据 ===')
+      console.log('response:', response)
+      console.log('response.data:', response.data)
+      console.log('response.data.userInfo:', response.data?.userInfo)
+      console.log('====================')
+
       // 保存登录信息到store
       // 这里需要确保 response.data 的结构和您 store 中的 loginSuccess 方法匹配
       doctorStore.loginSuccess(response.data, {

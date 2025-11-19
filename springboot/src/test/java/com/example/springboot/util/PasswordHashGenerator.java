@@ -8,7 +8,7 @@ public class PasswordHashGenerator {
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
         // 这是我们要测试的初始密码
-        String password = "InitPass123";
+        String password = "Xmr@6511";
 
         // 生成哈希值
         String hashedPassword = encoder.encode(password);
