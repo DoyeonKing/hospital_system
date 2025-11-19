@@ -432,7 +432,44 @@ onMounted(() => {
   color: var(--el-color-success);
   font-weight: bold;
 }
+
+/* 排班区域样式 */
+.schedule-section {
+  margin-top: 24px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+.morning-header {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  color: #2c3e50;
+}
+
+.afternoon-header {
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+  color: #2c3e50;
+}
+
+.section-title {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.patient-count {
+  font-size: 14px;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  color: #606266;
+}
 </style>
-
-
-
