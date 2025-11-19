@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -179,7 +180,7 @@ public class WaitlistService {
             Appointment newAppointment = new Appointment();
             newAppointment.setPatient(patient);
             newAppointment.setSchedule(schedule);
-            newAppointment.setAppointmentNumber(schedule.getBookedSlots() + 1);
+            newAppointment.setAppointmentNumber(getNextAppointmentNumber(schedule, patient));
             newAppointment.setStatus(AppointmentStatus.PENDING_PAYMENT); // 初始状态待支付
             newAppointment.setPaymentStatus(PaymentStatus.unpaid);
             newAppointment.setCreatedAt(LocalDateTime.now());
@@ -294,7 +295,7 @@ public class WaitlistService {
         Appointment appointment = new Appointment();
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
-        appointment.setAppointmentNumber(schedule.getBookedSlots() + 1);
+        appointment.setAppointmentNumber(getNextAppointmentNumber(schedule, patient));
         appointment.setStatus(AppointmentStatus.scheduled);  // 已预约状态
         appointment.setPaymentStatus(PaymentStatus.paid);    // 已支付
         appointment.setPaymentMethod(paymentData.getPaymentMethod());
@@ -353,5 +354,20 @@ public class WaitlistService {
         }
         
         return appointmentService.findAppointmentById(savedAppointment.getAppointmentId());
+    }
+
+    private int getNextAppointmentNumber(Schedule schedule, Patient patient) {
+        Appointment lastAppointment = appointmentRepository.findTopByScheduleOrderByAppointmentNumberDesc(schedule);
+        int baseNumber = (lastAppointment == null || lastAppointment.getAppointmentNumber() == null)
+                ? 0
+                : lastAppointment.getAppointmentNumber();
+
+        if (lastAppointment != null && lastAppointment.getPatient() != null
+                && patient != null
+                && Objects.equals(lastAppointment.getPatient().getPatientId(), patient.getPatientId())) {
+            return baseNumber + 1;
+        }
+
+        return baseNumber + 1;
     }
 }

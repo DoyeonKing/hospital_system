@@ -51,4 +51,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     List<Appointment> findByDoctorIdAndDate(
             @Param("doctorId") Integer doctorId,
             @Param("scheduleDate") LocalDate scheduleDate);
+
+    @Query("SELECT MAX(a.appointmentNumber) FROM Appointment a WHERE a.schedule = :schedule")
+    Integer findMaxAppointmentNumberBySchedule(@Param("schedule") Schedule schedule);
+
+    Appointment findTopByScheduleOrderByAppointmentNumberDesc(Schedule schedule);
 }

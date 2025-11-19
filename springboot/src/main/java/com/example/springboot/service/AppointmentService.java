@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -111,7 +112,7 @@ public class AppointmentService {
         Appointment appointment = new Appointment();
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
-        appointment.setAppointmentNumber(schedule.getBookedSlots() + 1); // 自动分配就诊序号
+        appointment.setAppointmentNumber(getNextAppointmentNumberForRebooking(schedule, patient)); // 自动分配就诊序号
         appointment.setStatus(AppointmentStatus.scheduled); // 初始状态为待支付
         appointment.setPaymentStatus(PaymentStatus.unpaid);
         appointment.setCreatedAt(LocalDateTime.now());
@@ -128,18 +129,23 @@ public class AppointmentService {
         Appointment existingAppointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id " + id));
 
+        AppointmentStatus originalStatus = existingAppointment.getStatus();
+        boolean shouldRestoreSlots = false;
+        boolean shouldAssignNewNumber = false;
+
         // Update fields if provided in request
         if (request.getAppointmentNumber() != null) existingAppointment.setAppointmentNumber(request.getAppointmentNumber());
         if (request.getStatus() != null) {
+            AppointmentStatus newStatus = request.getStatus();
             // Handle specific status transitions and logic
-            if (request.getStatus() == AppointmentStatus.cancelled && existingAppointment.getStatus() != AppointmentStatus.cancelled) {
+            if (newStatus == AppointmentStatus.cancelled && originalStatus != AppointmentStatus.cancelled) {
                 // 如果是取消预约，需要减少排班的已预约数
                 Schedule schedule = existingAppointment.getSchedule();
                 if (schedule.getBookedSlots() > 0) {
                     schedule.setBookedSlots(schedule.getBookedSlots() - 1);
                     scheduleRepository.save(schedule);
                 }
-            } else if (request.getStatus() == AppointmentStatus.NO_SHOW && existingAppointment.getStatus() != AppointmentStatus.NO_SHOW) {
+            } else if (newStatus == AppointmentStatus.NO_SHOW && originalStatus != AppointmentStatus.NO_SHOW) {
                 // 如果是爽约，增加患者爽约次数并检查是否加入黑名单
                 Patient patient = existingAppointment.getPatient();
                 if (patient.getPatientProfile() != null) {
@@ -155,13 +161,27 @@ public class AppointmentService {
                     schedule.setBookedSlots(schedule.getBookedSlots() - 1);
                     scheduleRepository.save(schedule);
                 }
+            } else if (originalStatus == AppointmentStatus.cancelled && isActiveStatus(newStatus)) {
+                shouldRestoreSlots = true;
+                shouldAssignNewNumber = true;
             }
-            existingAppointment.setStatus(request.getStatus());
+            existingAppointment.setStatus(newStatus);
         }
         if (request.getPaymentStatus() != null) existingAppointment.setPaymentStatus(request.getPaymentStatus());
         if (request.getPaymentMethod() != null) existingAppointment.setPaymentMethod(request.getPaymentMethod());
         if (request.getTransactionId() != null) existingAppointment.setTransactionId(request.getTransactionId());
         if (request.getCheckInTime() != null) existingAppointment.setCheckInTime(request.getCheckInTime());
+
+        if (shouldAssignNewNumber) {
+            existingAppointment.setAppointmentNumber(
+                    getNextAppointmentNumberForRebooking(existingAppointment.getSchedule(), existingAppointment.getPatient()));
+        }
+
+        if (shouldRestoreSlots) {
+            Schedule schedule = existingAppointment.getSchedule();
+            schedule.setBookedSlots(schedule.getBookedSlots() + 1);
+            scheduleRepository.save(schedule);
+        }
 
         return convertToResponseDto(appointmentRepository.save(existingAppointment));
     }
@@ -335,5 +355,23 @@ public class AppointmentService {
         }
         
         return response;
+    }
+
+    private int getNextAppointmentNumberForRebooking(Schedule schedule, Patient patient) {
+        Appointment lastAppointment = appointmentRepository.findTopByScheduleOrderByAppointmentNumberDesc(schedule);
+        int baseNumber = (lastAppointment == null || lastAppointment.getAppointmentNumber() == null)
+                ? 0
+                : lastAppointment.getAppointmentNumber();
+
+        if (lastAppointment != null && lastAppointment.getPatient() != null
+                && Objects.equals(lastAppointment.getPatient().getPatientId(), patient.getPatientId())) {
+            return baseNumber + 1;
+        }
+
+        return baseNumber + 1;
+    }
+
+    private boolean isActiveStatus(AppointmentStatus status) {
+        return status == AppointmentStatus.scheduled || status == AppointmentStatus.PENDING_PAYMENT;
     }
 }
