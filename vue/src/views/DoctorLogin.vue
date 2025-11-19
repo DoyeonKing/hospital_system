@@ -378,22 +378,52 @@ const handleLogin = async () => {
       }
 
       if (doctorData) {
-        // 3. 第三步：构造完整的医生信息对象
+        // 3. 第三步：如果有 doctorId，尝试获取完整信息（包含 specialty 和 bio）
+        let fullDoctorData = doctorData;
+        const doctorId = doctorData.doctorId || loginDoctorInfo.doctorId;
+        
+        if (doctorId) {
+          try {
+            console.log('登录后尝试获取完整医生信息，doctorId:', doctorId);
+            const fullInfoRes = await request({
+              url: `/api/doctors/${doctorId}`,
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            // 处理完整信息的响应格式
+            if (fullInfoRes.code === '200' || fullInfoRes.code === 200) {
+              fullDoctorData = fullInfoRes.data || fullDoctorData;
+            } else if (fullInfoRes.fullName || fullInfoRes.doctorId) {
+              fullDoctorData = fullInfoRes;
+            }
+            console.log('获取到完整医生信息:', fullDoctorData);
+          } catch (error) {
+            console.warn('获取完整医生信息失败，使用部分信息:', error);
+            // 如果获取完整信息失败，继续使用部分信息
+          }
+        }
+
+        // 4. 构造完整的医生信息对象
         const fullDoctorInfo = {
-          doctorId: String(doctorData.doctorId || loginDoctorInfo.doctorId || ''),
-          name: doctorData.fullName || doctorData.name || loginDoctorInfo.fullName || '医生',
-          department: doctorData.departmentName
-              || (doctorData.department ? doctorData.department.name : '')
+          doctorId: String(fullDoctorData.doctorId || doctorId || ''),
+          name: fullDoctorData.fullName || fullDoctorData.name || loginDoctorInfo.fullName || '医生',
+          department: fullDoctorData.department?.name 
+              || fullDoctorData.departmentName
+              || (fullDoctorData.department ? fullDoctorData.department.name : '')
               || loginDoctorInfo.departmentName
               || '未知科室',
-          position: doctorData.title || loginDoctorInfo.title || '职称未知',
-          phone: doctorData.phoneNumber || loginDoctorInfo.phoneNumber || '',
-          specialty: doctorData.specialty || loginDoctorInfo.specialty || '',
-          bio: doctorData.bio || loginDoctorInfo.bio || '',
-          photoUrl: doctorData.photoUrl || loginDoctorInfo.photoUrl || defaultAvatar
+          position: fullDoctorData.title || loginDoctorInfo.title || '职称未知',
+          phone: fullDoctorData.phoneNumber || loginDoctorInfo.phoneNumber || '',
+          specialty: fullDoctorData.specialty || loginDoctorInfo.specialty || '',
+          bio: fullDoctorData.bio || loginDoctorInfo.bio || '',
+          photoUrl: fullDoctorData.photoUrl || loginDoctorInfo.photoUrl || defaultAvatar,
+          username: loginForm.identifier
         };
 
-        // 4. 保存到 Store
+        // 5. 保存到 Store
         doctorStore.loginSuccess({ doctorInfo: fullDoctorInfo }, {
           identifier: loginForm.identifier,
           token: token

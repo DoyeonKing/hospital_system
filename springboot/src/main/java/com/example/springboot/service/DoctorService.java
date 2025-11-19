@@ -417,19 +417,23 @@ public class DoctorService {
                 String fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
                 String fileName = "doctor_avatar_" + System.currentTimeMillis() + fileExtension;
 
-                // 定义存储路径（实际项目中建议使用配置文件配置）
-                String uploadDir = "uploads/doctor_avatars/";
+                // 定义存储路径（使用项目根目录的绝对路径）
+                String projectRoot = System.getProperty("user.dir");
+                String uploadDir = projectRoot + File.separator + "uploads" + File.separator + "doctor_avatars" + File.separator;
                 File dir = new File(uploadDir);
                 if (!dir.exists()) {
-                    dir.mkdirs();
+                    boolean created = dir.mkdirs();
+                    if (!created) {
+                        throw new RuntimeException("无法创建上传目录: " + uploadDir);
+                    }
                 }
 
                 // 保存文件
                 File dest = new File(uploadDir + fileName);
                 request.getAvatarFile().transferTo(dest);
 
-                // 更新数据库中的图片路径
-                doctor.setPhotoUrl(uploadDir + fileName);
+                // 更新数据库中的图片路径（使用相对路径，便于前端访问）
+                doctor.setPhotoUrl("uploads/doctor_avatars/" + fileName);
             } catch (IOException e) {
                 throw new RuntimeException("头像上传失败: " + e.getMessage());
             }

@@ -183,13 +183,13 @@
             <el-form-item label="头像" prop="photoUrl">
               <el-upload
                   class="avatar-uploader"
-                  action="/api/upload/avatar"
-                  :headers="{ Authorization: `Bearer ${doctorStore.loggedInDoctorBasicInfo.token}` }"
+                  :auto-upload="false"
                   :show-file-list="false"
-                  :on-success="handleAvatarSuccess"
+                  :on-change="handleAvatarChange"
                   :before-upload="beforeAvatarUpload"
+                  accept="image/jpeg,image/png"
               >
-                <img v-if="editForm.photoUrl" :src="editForm.photoUrl.startsWith('http') ? editForm.photoUrl : defaultAvatar" class="avatar-image" />
+                <img v-if="editForm.photoUrl" :src="getAvatarUrl(editForm.photoUrl)" class="avatar-image" />
                 <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
               </el-upload>
             </el-form-item>
@@ -286,7 +286,8 @@ const editForm = reactive({
   phoneNumber: '',
   specialty: '',
   bio: '',
-  photoUrl: ''
+  photoUrl: '',
+  avatarFile: null // 保存头像文件对象
 })
 
 // --- 密码表单 ---
@@ -394,6 +395,11 @@ const handleLogout = async () => {
 
 // --- 编辑资料 ---
 const editProfile = () => {
+  // 如果之前有 blob URL，先释放
+  if (editForm.photoUrl && editForm.photoUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(editForm.photoUrl);
+  }
+  
   // 填充当前信息
   const info = doctorStore.detailedDoctorInfo;
   editForm.name = info.name || doctorStore.displayName;
@@ -401,6 +407,7 @@ const editProfile = () => {
   editForm.specialty = info.specialty || '';
   editForm.bio = info.bio || '';
   editForm.photoUrl = info.photoUrl || defaultAvatar;
+  editForm.avatarFile = null; // 重置头像文件
 
   editDialogVisible.value = true;
 }
@@ -416,11 +423,21 @@ const saveProfile = async () => {
     return
   }
 
+  // 检查头像文件
+  console.log('保存前的表单数据:', {
+    phoneNumber: editForm.phoneNumber,
+    specialty: editForm.specialty,
+    bio: editForm.bio,
+    avatarFile: editForm.avatarFile,
+    isFile: editForm.avatarFile instanceof File,
+    fileName: editForm.avatarFile instanceof File ? editForm.avatarFile.name : null
+  });
+
   const dataToUpdate = {
     phoneNumber: editForm.phoneNumber,
     specialty: editForm.specialty,
     bio: editForm.bio,
-    photoUrl: editForm.photoUrl === defaultAvatar ? null : editForm.photoUrl
+    avatarFile: editForm.avatarFile // 传递文件对象（可能是 null 或 File）
   };
 
   const success = await doctorStore.updateDoctorInfo(dataToUpdate)
@@ -451,7 +468,7 @@ const savePassword = async () => {
     return
   }
 
-  const success = await doctorStore.changePassword(passwordForm.oldPassword, passwordForm.newPassword)
+  const success = await doctorStore.changePassword(passwordForm.oldPassword, passwordForm.newPassword, passwordForm.confirmPassword)
 
   if (success) {
     ElMessage.success('密码修改成功，请重新登录')
@@ -464,14 +481,17 @@ const savePassword = async () => {
 }
 
 // --- 头像上传处理 ---
-const handleAvatarSuccess = (response) => {
-  if (response && response.data && response.data.url) {
-    editForm.photoUrl = response.data.url;
-    ElMessage.success('头像上传成功');
-  } else {
-    const mockUrl = `https://picsum.photos/100?random=${Math.random()}`;
-    editForm.photoUrl = mockUrl;
-    ElMessage.success('头像上传成功 (模拟)');
+const handleAvatarChange = (file) => {
+  // 如果之前有 blob URL，先释放
+  if (editForm.photoUrl && editForm.photoUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(editForm.photoUrl);
+  }
+  
+  // 保存文件对象
+  editForm.avatarFile = file.raw;
+  // 创建预览 URL
+  if (file.raw) {
+    editForm.photoUrl = URL.createObjectURL(file.raw);
   }
 }
 
@@ -479,11 +499,20 @@ const beforeAvatarUpload = (rawFile) => {
   if (rawFile.type !== 'image/jpeg' && rawFile.type !== 'image/png') {
     ElMessage.error('头像必须是 JPG 或 PNG 格式!');
     return false;
-  } else if (rawFile.size / 1024 / 1024 > 2) {
-    ElMessage.error('头像大小不能超过 2MB!');
+  } else if (rawFile.size / 1024 / 1024 > 1) {
+    ElMessage.error('头像大小不能超过 1MB!');
     return false;
   }
   return true;
+}
+
+// 获取头像 URL（处理 blob URL 和普通 URL）
+const getAvatarUrl = (url) => {
+  if (!url) return defaultAvatar;
+  if (url.startsWith('blob:')) return url;
+  if (url.startsWith('http')) return url;
+  // 如果是相对路径，可能需要拼接完整路径
+  return url || defaultAvatar;
 }
 
 // --- 功能导航方法 ---
