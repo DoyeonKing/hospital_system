@@ -31,14 +31,14 @@ public class DoctorController {
 
     @Autowired
     private DoctorService doctorService;
-    
+
     @Autowired
     private AppointmentRepository appointmentRepository;
 
     /**
      * 获取单个医生详细信息
      * 使用 GET /api/doctors/{doctorId}
-     * 
+     *
      * @param doctorId 医生ID
      * @return 医生详细信息
      */
@@ -105,10 +105,15 @@ public class DoctorController {
 
             // 构建响应数据
             Map<String, Object> doctorInfo = new HashMap<>();
+            doctorInfo.put("doctorId", doctor.getDoctorId()); // 建议加上ID，前端可能需要
             doctorInfo.put("fullName", doctor.getFullName());
             doctorInfo.put("departmentName", doctor.getDepartment() != null ? doctor.getDepartment().getName() : null);
             doctorInfo.put("title", doctor.getTitle());
             doctorInfo.put("phoneNumber", doctor.getPhoneNumber());
+            // 补充前端可能需要的其他字段
+            doctorInfo.put("specialty", doctor.getSpecialty());
+            doctorInfo.put("bio", doctor.getBio());
+            doctorInfo.put("photoUrl", doctor.getPhotoUrl());
 
             return new ResponseEntity<>(doctorInfo, HttpStatus.OK);
         } catch (Exception e) {
@@ -116,7 +121,10 @@ public class DoctorController {
         }
     }
 
-    // DoctorController.java 中添加接口
+    /**
+     * 更新医生信息 (包含头像上传)
+     * 使用 PUT /api/doctors/info
+     */
     @PutMapping(value = "/info", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> updateDoctorInfo(
             @RequestParam("identifier") String identifier,
@@ -149,10 +157,9 @@ public class DoctorController {
         }
     }
 
-    // 在DoctorAuthController.java中添加以下接口
     /**
      * 医生修改密码接口
-     * URL: POST /api/doctor/auth/change-password
+     * URL: POST /api/doctors/change-password
      */
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@Valid @RequestBody DoctorChangePasswordRequest request) {
@@ -168,4 +175,3 @@ public class DoctorController {
         }
     }
 }
-
