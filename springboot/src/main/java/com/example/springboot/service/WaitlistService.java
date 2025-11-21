@@ -2,11 +2,10 @@ package com.example.springboot.service;
 
 import com.example.springboot.dto.appointment.AppointmentResponse;
 import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
+import com.example.springboot.dto.common.PageResponse;
+import com.example.springboot.dto.patient.PatientSimpleResponse;
 import com.example.springboot.dto.payment.PaymentRequest;
-import com.example.springboot.dto.waitlist.WaitlistCreateRequest;
-import com.example.springboot.dto.waitlist.WaitlistPositionResponse;
-import com.example.springboot.dto.waitlist.WaitlistResponse;
-import com.example.springboot.dto.waitlist.WaitlistUpdateRequest;
+import com.example.springboot.dto.waitlist.*;
 import com.example.springboot.dto.schedule.ScheduleResponse;
 import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Patient;
@@ -27,6 +26,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -409,6 +409,72 @@ public class WaitlistService {
         }
 
         return response;
+    }
+
+    // 在WaitlistService中修改方法返回类型
+    @Transactional(readOnly = true)
+    public PageResponse<WaitlistManagementResponse> getWaitlistsByScheduleForManagement(
+            Integer scheduleId, String status, Integer page, Integer size) {
+
+        // 验证排班是否存在
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + scheduleId));
+
+        // 处理分页参数（1基页码转0基索引）
+        int pageNum = (page != null && page > 0) ? page - 1 : 0;
+        int pageSize = (size != null && size > 0) ? size : 10;
+        Pageable pageable = PageRequest.of(pageNum, pageSize);
+
+        // 根据状态筛选查询
+        Page<Waitlist> waitlistPage;
+        if (status != null && !status.isEmpty()) {
+            try {
+                WaitlistStatus waitlistStatus = WaitlistStatus.valueOf(status);
+                waitlistPage = waitlistRepository.findByScheduleAndStatusOrderByCreatedAtAsc(schedule, waitlistStatus, pageable);
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException("Invalid waitlist status: " + status);
+            }
+        } else {
+            waitlistPage = waitlistRepository.findByScheduleOrderByCreatedAtAsc(schedule, pageable);
+        }
+
+        // 转换为响应DTO并计算位置
+        List<WaitlistManagementResponse> responses = waitlistPage.getContent().stream()
+                .map(waitlist -> {
+                    WaitlistManagementResponse response = new WaitlistManagementResponse();
+                    response.setWaitlistId(waitlist.getWaitlistId());
+                    response.setPatientId(waitlist.getPatient().getPatientId());
+                    response.setScheduleId(waitlist.getSchedule().getScheduleId());
+                    response.setStatus(waitlist.getStatus());
+                    response.setCreatedAt(waitlist.getCreatedAt());
+
+                    // 设置患者信息
+                    PatientSimpleResponse patientResp = new PatientSimpleResponse();
+                    patientResp.setPatientId(waitlist.getPatient().getPatientId());
+                    patientResp.setName(waitlist.getPatient().getFullName()); // 注意字段名与实体类匹配
+                    patientResp.setPhone(waitlist.getPatient().getPhoneNumber());
+                    response.setPatient(patientResp);
+
+                    // 计算候补位置（仅waiting状态有效）
+                    if (waitlist.getStatus() == WaitlistStatus.waiting) {
+                        long position = waitlistRepository.countByScheduleAndStatusAndCreatedAtBefore(
+                                schedule, WaitlistStatus.waiting, waitlist.getCreatedAt()) + 1;
+                        response.setPosition((int) position);
+                    } else {
+                        response.setPosition(null);
+                    }
+                    return response;
+                })
+                .collect(Collectors.toList());
+
+        // 构建符合PageResponse结构的返回对象
+        return new PageResponse<>(
+                responses,
+                waitlistPage.getTotalElements(),
+                waitlistPage.getTotalPages(),
+                pageNum + 1, // 转回1基页码
+                pageSize
+        );
     }
 
 }
