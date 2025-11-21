@@ -3,9 +3,15 @@ package com.example.springboot.controller;
 import com.example.springboot.dto.appointment.AppointmentResponse;
 import com.example.springboot.dto.payment.PaymentRequest;
 import com.example.springboot.dto.waitlist.WaitlistCreateRequest;
+import com.example.springboot.dto.waitlist.WaitlistPageResponse;
+import com.example.springboot.dto.waitlist.WaitlistPositionResponse;
 import com.example.springboot.dto.waitlist.WaitlistResponse;
+import com.example.springboot.entity.enums.WaitlistStatus;
 import com.example.springboot.service.WaitlistService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -63,4 +69,13 @@ public class WaitlistController {
             @RequestBody PaymentRequest paymentData) {
         return ResponseEntity.ok(waitlistService.processWaitlistPayment(waitlistId, paymentData));
     }
+
+    /**
+     * 查询排队位置
+     */
+    @GetMapping("/{waitlistId}/position")
+    public ResponseEntity<WaitlistPositionResponse> getWaitlistPosition(@PathVariable Integer waitlistId) {
+        return ResponseEntity.ok(waitlistService.getWaitlistPosition(waitlistId));
+    }
+
 }

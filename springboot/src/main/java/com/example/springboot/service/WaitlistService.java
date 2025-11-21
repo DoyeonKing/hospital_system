@@ -4,6 +4,7 @@ import com.example.springboot.dto.appointment.AppointmentResponse;
 import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
 import com.example.springboot.dto.payment.PaymentRequest;
 import com.example.springboot.dto.waitlist.WaitlistCreateRequest;
+import com.example.springboot.dto.waitlist.WaitlistPositionResponse;
 import com.example.springboot.dto.waitlist.WaitlistResponse;
 import com.example.springboot.dto.waitlist.WaitlistUpdateRequest;
 import com.example.springboot.dto.schedule.ScheduleResponse;
@@ -24,6 +25,9 @@ import com.example.springboot.repository.ScheduleRepository;
 import com.example.springboot.repository.WaitlistRepository;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -243,7 +247,6 @@ public class WaitlistService {
         return response;
     }
 
-    // 在WaitlistService中添加以下方法
     @Transactional(readOnly = true)
     public List<WaitlistResponse> findByPatientId(Long patientId) {
         Patient patient = patientRepository.findById(patientId)
@@ -370,4 +373,42 @@ public class WaitlistService {
 
         return baseNumber + 1;
     }
+
+    @Transactional(readOnly = true)
+    public WaitlistPositionResponse getWaitlistPosition(Integer waitlistId) {
+        // 获取候补记录
+        Waitlist waitlist = waitlistRepository.findById(waitlistId)
+                .orElseThrow(() -> new ResourceNotFoundException("Waitlist entry not found with id " + waitlistId));
+
+        // 获取同一排班下状态为waiting的所有候补记录（按创建时间升序）
+        List<Waitlist> waitingList = waitlistRepository
+                .findByScheduleAndStatusOrderByCreatedAtAsc(waitlist.getSchedule(), WaitlistStatus.waiting);
+
+        // 计算当前位置
+        int position = 0;
+        for (int i = 0; i < waitingList.size(); i++) {
+            if (waitingList.get(i).getWaitlistId().equals(waitlistId)) {
+                position = i + 1; // 位置从1开始
+                break;
+            }
+        }
+
+        // 构建响应对象
+        WaitlistPositionResponse response = new WaitlistPositionResponse();
+        response.setWaitlistId(waitlistId);
+        response.setScheduleId(waitlist.getSchedule().getScheduleId());
+        response.setStatus(waitlist.getStatus());
+        response.setPosition(position);
+        response.setTotalWaiting(waitingList.size());
+
+        // 简单估算等待时间（实际项目中可根据历史数据进行更精确的估算）
+        if (position > 0) {
+            response.setEstimatedTime("预计还需等待约" + (position * 10) + "分钟");
+        } else {
+            response.setEstimatedTime(null);
+        }
+
+        return response;
+    }
+
 }
