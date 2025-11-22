@@ -25,6 +25,17 @@
 
     <!-- 功能区 -->
     <div class="feature-grid">
+      <!-- 数据大屏入口 -->
+      <router-link to="/dashboard/stats" class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #9f7aea;">
+            <el-icon :size="32" color="#fff"><DataLine /></el-icon>
+          </div>
+          <h3>数据大屏</h3>
+          <p>实时监控医院核心运营指标</p>
+        </div>
+      </router-link>
+
       <!-- 科室管理入口 -->
       <router-link to="/departments" class="feature-card-link">
         <div class="feature-card">
@@ -106,7 +117,7 @@
 </template>
 
 <script setup>
-import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis } from '@element-plus/icons-vue';
+import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import doctorImage from '@/assets/doctor.jpg';
