@@ -7,10 +7,10 @@
 		<view class="content">
 			<!-- 状态卡片 -->
 			<view class="status-card">
-				<view class="status-icon" :class="appointment.status">
-					<text>{{ getStatusIcon(appointment.status) }}</text>
+				<view class="status-icon" :class="isExpiredStatus(appointment) ? 'expired' : appointment.status">
+					<text>{{ getStatusIcon(appointment) }}</text>
 				</view>
-				<text class="status-text">{{ getStatusText(appointment.status) }}</text>
+				<text class="status-text">{{ getStatusText(appointment) }}</text>
 			</view>
 			
 			<!-- 患者信息 -->
@@ -51,22 +51,40 @@
 				</view>
 			</view>
 			
-			<!-- 签到二维码（仅已确认状态显示） -->
-			<view class="qr-code-card" v-if="isConfirmedStatus(appointment.status)">
+			<!-- 签到二维码（仅已确认且未过期状态显示） -->
+			<view class="qr-code-card" v-if="isConfirmedStatus(appointment.status) && !isExpiredStatus(appointment)">
 				<view class="qr-title">
 					<text class="qr-icon">📱</text>
 					<text class="qr-text">签到二维码</text>
+					<text class="qr-refresh-tip" v-if="refreshCountdown > 0">
+						{{ refreshCountdown }}秒后自动刷新
+					</text>
 				</view>
 				<view class="qr-container">
-					<image class="qr-code" :src="qrCodeUrl" mode="aspectFit"></image>
+					<image class="qr-code" :src="qrCodeUrl" mode="aspectFit" v-if="qrCodeUrl"></image>
+					<view class="qr-loading" v-else>
+						<text>生成二维码中...</text>
+					</view>
 				</view>
 				<text class="qr-desc">就诊时出示此二维码进行签到</text>
+				<text class="qr-tip">⚠️ 二维码每{{ refreshInterval }}秒自动刷新，请勿截图保存</text>
+				<view class="qr-refresh-btn" @click="refreshQRCode">
+					<text>手动刷新</text>
+				</view>
+			</view>
+			
+			<!-- 导航按钮（仅已确认且未过期状态显示） -->
+			<view class="navigation-section" v-if="isConfirmedStatus(appointment.status) && !isExpiredStatus(appointment)">
+				<button class="navigation-btn" @click="handleNavigation">
+					<text class="nav-icon">🧭</text>
+					<text>导航到诊室</text>
+				</button>
 			</view>
 			
 			<!-- 操作按钮 -->
 			<view class="action-section" v-if="!isCancelledStatus(appointment.status)">
 				<button class="home-btn" @click="handleBackToHome">返回主页</button>
-				<!-- 所有非取消状态都可以取消预约 -->
+				<!-- 已预约/待支付状态且未过期：显示取消预约按钮 -->
 				<button class="cancel-btn" v-if="canCancelAppointment(appointment.status)" @click="handleCancel">取消预约</button>
 				<button class="view-btn" v-if="isCompletedStatus(appointment.status) && !isConfirmedStatus(appointment.status)" @click="handleBackToHome">查看其他预约</button>
 			</view>
@@ -75,7 +93,7 @@
 </template>
 
 <script>
-	import { getAppointmentDetail, cancelAppointment } from '../../api/appointment.js'
+	import { getAppointmentDetail, cancelAppointment, getAppointmentQrCode } from '../../api/appointment.js'
 	import { mockPatientInfo } from '../../api/mockData.js'
 	
 	export default {
@@ -85,6 +103,11 @@
 			appointment: {},
 			patientInfo: {},
 			qrCodeUrl: '',
+			qrToken: '',
+			refreshTimer: null,      // 刷新定时器
+			countdownTimer: null,    // 倒计时定时器
+			refreshCountdown: 0,     // 刷新倒计时
+			refreshInterval: 60,     // 刷新间隔（秒）
 			urlParams: {}, // 存储URL传递的参数
 			loading: false
 		}
@@ -102,7 +125,20 @@ onLoad(options) {
 	// 先加载患者信息，因为 loadAppointmentDetail 可能用到
 	this.loadPatientInfo()
 	this.loadAppointmentDetail()
-	this.generateQRCode()
+},
+onShow() {
+	// 页面显示时启动自动刷新（如果预约已加载）
+	if (this.appointment && this.appointment.status) {
+		this.startAutoRefresh()
+	}
+},
+onHide() {
+	// 页面隐藏时停止刷新
+	this.stopAutoRefresh()
+},
+onUnload() {
+	// 页面卸载时清除定时器
+	this.stopAutoRefresh()
 },
 		methods: {
 	async loadAppointmentDetail() {
@@ -136,40 +172,213 @@ onLoad(options) {
 			return
 		}
 		
+		console.log('[前端] ========== 开始加载预约详情 ==========')
+		console.log('[前端] 预约ID:', this.appointmentId)
+		const loadStartTime = new Date().toISOString()
+		console.log('[前端] 加载开始时间:', loadStartTime)
+		
 		this.loading = true
 		try {
 			const response = await getAppointmentDetail(this.appointmentId)
-			console.log('预约详情响应:', response)
+			console.log('[前端] 预约详情API响应:', JSON.stringify(response, null, 2))
 			
 			if (response && response.code === '200' && response.data) {
 				this.appointment = response.data
-				console.log('[detail] 预约详情数据:', JSON.stringify(this.appointment, null, 2))
-				console.log('[detail] 预约状态:', this.appointment.status)
-				console.log('[detail] 就诊序号:', this.appointment.queueNumber || this.appointment.appointmentNumber)
-				console.log('[detail] isConfirmedStatus:', this.isConfirmedStatus(this.appointment.status))
-				console.log('[detail] isCompletedStatus:', this.isCompletedStatus(this.appointment.status))
-				console.log('[detail] isCancelledStatus:', this.isCancelledStatus(this.appointment.status))
-				console.log('[detail] 应该显示取消按钮:', this.isConfirmedStatus(this.appointment.status) || this.isCompletedStatus(this.appointment.status))
+				console.log('[前端] 预约详情数据加载成功:', {
+					appointmentId: this.appointment.appointmentId,
+					status: this.appointment.status,
+					scheduleTime: this.appointment.scheduleTime,
+					scheduleEndTime: this.appointment.scheduleEndTime,
+					appointmentTime: this.appointment.appointmentTime,
+					appointmentNumber: this.appointment.appointmentNumber || this.appointment.queueNumber,
+					patientName: this.appointment.patientName
+				})
+				console.log('[前端] 预约状态检查:', {
+					isConfirmedStatus: this.isConfirmedStatus(this.appointment.status),
+					isCompletedStatus: this.isCompletedStatus(this.appointment.status),
+					isCancelledStatus: this.isCancelledStatus(this.appointment.status),
+					isExpiredStatus: this.isExpiredStatus(this.appointment)
+				})
+				
+				// 加载预约详情后，生成二维码并启动自动刷新
+				console.log('[前端] 准备生成二维码并启动自动刷新')
+				this.generateQRCode().then(() => {
+					console.log('[前端] 二维码生成完成，启动自动刷新')
+					this.startAutoRefresh()
+				}).catch(error => {
+					console.error('[前端] 二维码生成失败:', error)
+				})
 			} else {
+				console.error('[前端] 预约详情加载失败 - 响应码:', response?.code, ', 响应消息:', response?.msg)
 				throw new Error(response?.msg || '加载预约详情失败')
 			}
 		} catch (error) {
-			console.error('加载预约详情失败:', error)
+			console.error('[前端] 加载预约详情异常:', error)
+			console.error('[前端] 错误详情:', {
+				message: error.message,
+				stack: error.stack,
+				appointmentId: this.appointmentId
+			})
 			uni.showToast({
 				title: error.message || '加载失败，请重试',
 				icon: 'none'
 			})
 		} finally {
 			this.loading = false
+			const loadEndTime = new Date().toISOString()
+			console.log('[前端] 预约详情加载完成 - 结束时间:', loadEndTime)
+			console.log('[前端] ========== 预约详情加载结束 ==========')
 		}
 	},
 			
-			generateQRCode() {
-				// 生成二维码 - 使用在线二维码API
-				// 实际项目中应该调用后端API生成二维码
-				if (this.appointmentId) {
-					this.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=APPOINTMENT${this.appointmentId}_${Date.now()}`
+			// 生成二维码
+			async generateQRCode() {
+				console.log('========== [前端] 开始生成二维码 ==========')
+				const requestTime = new Date().toISOString()
+				console.log('[前端] 请求时间:', requestTime)
+				console.log('[前端] 预约ID:', this.appointmentId)
+				
+				if (!this.appointmentId) {
+					console.warn('[前端] 预约ID为空，无法生成二维码')
+					return
 				}
+				
+				// 检查预约状态，已确认或已签到的预约都可以生成二维码
+				const statusLower = (this.appointment.status || '').toLowerCase()
+				const canGenerate = this.isConfirmedStatus(this.appointment.status) || 
+									statusLower === 'checked_in'
+				const isExpired = this.isExpiredStatus(this.appointment)
+				
+				console.log('[前端] 预约状态检查:', {
+					status: this.appointment.status,
+					statusLower: statusLower,
+					isConfirmed: this.isConfirmedStatus(this.appointment.status),
+					isCheckedIn: statusLower === 'checked_in',
+					canGenerate: canGenerate,
+					isExpired: isExpired,
+					scheduleTime: this.appointment.scheduleTime,
+					scheduleEndTime: this.appointment.scheduleEndTime
+				})
+				
+				if (!canGenerate || isExpired) {
+					console.warn('[前端] 无法生成二维码 - canGenerate:', canGenerate, ', isExpired:', isExpired)
+					return
+				}
+				
+				try {
+					console.log('[前端] 调用API生成二维码 - 预约ID:', this.appointmentId)
+					const response = await getAppointmentQrCode(this.appointmentId)
+					console.log('[前端] API响应:', JSON.stringify(response, null, 2))
+					
+					if (response && response.code === '200' && response.data) {
+						this.qrToken = response.data.qrToken
+						this.refreshInterval = response.data.refreshInterval || 60
+						const expiresIn = response.data.expiresIn || 0
+						const expiresInMinutes = Math.floor(expiresIn / 60)
+						
+						console.log('[前端] 二维码Token获取成功:', {
+							qrToken: this.qrToken,
+							refreshInterval: this.refreshInterval,
+							expiresIn: expiresIn,
+							expiresInMinutes: expiresInMinutes,
+							expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString()
+						})
+						
+						// 使用在线API生成二维码图片（Token作为内容）
+						// 注意：这里使用在线API生成图片，Token是从后端获取的
+						this.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(this.qrToken)}`
+						console.log('[前端] 二维码图片URL已生成')
+						
+						// 重置倒计时
+						this.refreshCountdown = this.refreshInterval
+						console.log('[前端] 倒计时已重置:', this.refreshCountdown, '秒')
+						console.log('[前端] 二维码将在', expiresInMinutes, '分钟后过期')
+						console.log('========== [前端] 二维码生成成功 ==========')
+					} else {
+						console.error('[前端] 生成二维码失败 - 响应码:', response?.code, ', 响应数据:', response)
+						uni.showToast({
+							title: '生成二维码失败，请重试',
+							icon: 'none'
+						})
+						// 不提供降级方案，要求用户重试
+					}
+				} catch (error) {
+					console.error('[前端] 生成二维码异常:', error)
+					console.error('[前端] 错误详情:', {
+						message: error.message,
+						stack: error.stack,
+						appointmentId: this.appointmentId
+					})
+					uni.showToast({
+						title: '生成二维码失败，请重试',
+						icon: 'none'
+					})
+					// 不提供降级方案，要求用户重试
+				}
+			},
+			
+			// 手动刷新二维码
+			refreshQRCode() {
+				console.log('[前端] 手动刷新二维码 - 当前Token:', this.qrToken, ', 刷新间隔:', this.refreshInterval)
+				const oldToken = this.qrToken
+				this.qrCodeUrl = ''  // 清空旧二维码
+				console.log('[前端] 旧二维码已清空，旧Token:', oldToken)
+				this.generateQRCode()
+			},
+			
+			// 启动自动刷新
+			startAutoRefresh() {
+				console.log('[前端] ========== 启动自动刷新 ==========')
+				const isConfirmed = this.isConfirmedStatus(this.appointment.status)
+				const isExpired = this.isExpiredStatus(this.appointment)
+				console.log('[前端] 自动刷新检查 - 预约状态:', this.appointment.status, ', isConfirmed:', isConfirmed, ', isExpired:', isExpired)
+				
+				// 只有已确认且未过期的预约才启动刷新
+				if (!isConfirmed || isExpired) {
+					console.warn('[前端] 不满足自动刷新条件，取消启动')
+					return
+				}
+				
+				this.stopAutoRefresh()  // 先清除旧的定时器
+				console.log('[前端] 旧定时器已清除')
+				
+				// 倒计时定时器（每秒更新）
+				this.countdownTimer = setInterval(() => {
+					if (this.refreshCountdown > 0) {
+						this.refreshCountdown--
+					} else {
+						this.refreshCountdown = this.refreshInterval
+					}
+				}, 1000)
+				console.log('[前端] 倒计时定时器已启动 - 间隔: 1秒')
+				
+				// 刷新定时器（每refreshInterval秒刷新一次）
+				this.refreshTimer = setInterval(() => {
+					console.log('[前端] ========== 自动刷新二维码 ==========')
+					console.log('[前端] 自动刷新触发 - 当前时间:', new Date().toISOString(), ', 刷新间隔:', this.refreshInterval, '秒')
+					this.refreshQRCode()
+				}, this.refreshInterval * 1000)
+				console.log('[前端] 刷新定时器已启动 - 间隔:', this.refreshInterval, '秒 (', this.refreshInterval * 1000, '毫秒)')
+				console.log('[前端] ========== 自动刷新已启动 ==========')
+			},
+			
+			// 停止自动刷新
+			stopAutoRefresh() {
+				console.log('[前端] ========== 停止自动刷新 ==========')
+				console.log('[前端] 当前定时器状态 - refreshTimer:', this.refreshTimer, ', countdownTimer:', this.countdownTimer)
+				
+				if (this.refreshTimer) {
+					clearInterval(this.refreshTimer)
+					this.refreshTimer = null
+					console.log('[前端] 刷新定时器已清除')
+				}
+				if (this.countdownTimer) {
+					clearInterval(this.countdownTimer)
+					this.countdownTimer = null
+					console.log('[前端] 倒计时定时器已清除')
+				}
+				
+				console.log('[前端] ========== 自动刷新已停止 ==========')
 			},
 			
 			loadPatientInfo() {
@@ -177,34 +386,117 @@ onLoad(options) {
 				this.patientInfo = stored || mockPatientInfo
 			},
 			
-			getStatusText(status) {
-				if (!status) return '未知'
+			// 判断预约时间是否已过去（检查排班结束时间，而不是开始时间）
+			isAppointmentTimePassed(appointment) {
+				if (!appointment) return false
+				
+				// 优先使用排班结束时间，如果没有则使用开始时间
+				const timeToCheck = appointment.scheduleEndTime || appointment.scheduleTime
+				if (!timeToCheck) return false
+				
+				const endTime = new Date(timeToCheck)
+				const now = new Date()
+				
+				// 检查日期是否有效
+				if (isNaN(endTime.getTime())) {
+					console.warn('[detail isAppointmentTimePassed] 无效的时间格式:', timeToCheck)
+					return false
+				}
+				
+				// 如果排班结束时间已经过去（至少1分钟），则认为已过去
+				return endTime.getTime() < (now.getTime() - 60 * 1000)
+			},
+			
+			// 判断是否为已过期状态（时间已过去但不是已完成状态）
+			isExpiredStatus(appointment) {
+				if (!appointment) return false
+				// 已完成状态不算过期
+				if (this.isCompletedStatus(appointment.status)) {
+					return false
+				}
+				// 已取消状态不算过期
+				if (this.isCancelledStatus(appointment.status)) {
+					return false
+				}
+				// 检查时间是否已过去（至少1分钟）
+				if (!this.isAppointmentTimePassed(appointment)) {
+					return false
+				}
+				// 如果预约是今天创建的，且就诊时间也是今天，不显示为过期（可能是刚创建的预约）
+				if (appointment.appointmentTime) {
+					const appointmentDate = new Date(appointment.appointmentTime)
+					const scheduleDate = appointment.scheduleTime ? new Date(appointment.scheduleTime) : null
+					const now = new Date()
+					
+					// 如果预约是今天创建的，且就诊时间也是今天，不显示为过期
+					if (scheduleDate && 
+						appointmentDate.toDateString() === now.toDateString() &&
+						scheduleDate.toDateString() === now.toDateString()) {
+						// 检查预约创建时间和就诊时间的间隔
+						const timeDiff = scheduleDate.getTime() - appointmentDate.getTime()
+						// 如果预约创建时间在就诊时间之后，说明是刚创建的预约，不显示为过期
+						if (timeDiff < 0) {
+							return false
+						}
+					}
+				}
+				return true
+			},
+			
+			getStatusText(appointment) {
+				if (!appointment || !appointment.status) return '未知'
+				
+				// 如果已过期，返回"已过期"
+				if (this.isExpiredStatus(appointment)) {
+					return '已过期'
+				}
+				
+				const status = appointment.status
 				const statusLower = status.toLowerCase()
 				const statusMap = {
-					'confirmed': '已确认',
-					'scheduled': '已确认',
+					'confirmed': '已预约',
+					'scheduled': '已预约',
+					'checked_in': '已签到',
+					'CHECKED_IN': '已签到',
 					'completed': '已完成',
 					'cancelled': '已取消',
-					'pending': '待支付'
+					'pending': '待支付',
+					'pending_payment': '待支付',
+					'no_show': '爽约',
+					'NO_SHOW': '爽约'
 				}
 				return statusMap[statusLower] || statusMap[status] || '未知'
 			},
 			
-			getStatusIcon(status) {
+			getStatusIcon(appointment) {
+				if (!appointment) return '❓'
+				
+				// 如果已过期，返回过期图标
+				if (this.isExpiredStatus(appointment)) {
+					return '⏰'
+				}
+				
+				const status = appointment.status
 				if (!status) return '❓'
 				const statusLower = status.toLowerCase()
 				const iconMap = {
 					'confirmed': '✅',
 					'scheduled': '✅',
+					'checked_in': '📝',
+					'CHECKED_IN': '📝',
 					'completed': '✔️',
 					'cancelled': '❌',
-					'pending': '⏳'
+					'pending': '⏳',
+					'pending_payment': '⏳',
+					'no_show': '⚠️',
+					'NO_SHOW': '⚠️'
 				}
 				return iconMap[statusLower] || iconMap[status] || '❓'
 			},
 			
 			// 判断是否为已确认状态（兼容大小写）
 			// 包括：confirmed, scheduled, pending_payment（待支付状态也可以取消）
+			// 注意：CHECKED_IN（已签到）不算已确认状态，因为已签到不能取消
 			isConfirmedStatus(status) {
 				if (!status) {
 					console.log('[detail isConfirmedStatus] status 为空')
@@ -238,12 +530,39 @@ onLoad(options) {
 				return statusLower === 'pending' || statusLower === 'pending_payment'
 			},
 			
-			// 判断是否可以取消预约（所有非取消状态都可以取消）
+			// 判断是否可以取消预约（已取消状态、已签到状态和已过期的预约不能取消）
 			canCancelAppointment(status) {
-				if (!status) return false
-				const statusLower = status.toLowerCase()
-				// 已取消状态不能再次取消，其他状态都可以取消
-				const canCancel = statusLower !== 'cancelled'
+				if (!status || !this.appointment) return false
+				
+				const statusLower = (status || '').toLowerCase()
+				
+				// 已签到状态不能取消
+				if (statusLower === 'checked_in') {
+					return false
+				}
+				// // 已取消状态不能再次取消
+				// if (statusLower === 'cancelled') {
+				// 	return false
+				// }
+				// 已完成状态不能取消
+				if (statusLower === 'completed') {
+					return false
+				}
+				// 检查预约时间是否已过去（至少1分钟）
+				if (this.appointment && this.appointment.scheduleTime) {
+					const scheduleTime = new Date(this.appointment.scheduleTime)
+					const now = new Date()
+					// 如果就诊时间已经过去（至少1分钟），不能取消
+					if (scheduleTime.getTime() < (now.getTime() - 60 * 1000)) {
+						console.log('[detail canCancelAppointment] 预约时间已过去，不能取消')
+						return false
+					}
+				}
+				// 只有已预约或待支付状态可以取消
+				const canCancel = statusLower === 'confirmed' || 
+								  statusLower === 'scheduled' || 
+								  statusLower === 'pending_payment' ||
+								  statusLower === 'pending'
 				console.log('[detail canCancelAppointment] 状态:', status, '可以取消:', canCancel)
 				return canCancel
 			},
@@ -259,6 +578,29 @@ onLoad(options) {
 			},
 			
 			async handleCancel() {
+				// 检查是否可以取消
+				if (!this.canCancelAppointment(this.appointment.status)) {
+					// 检查是否是时间已过去
+					if (this.appointment && this.appointment.scheduleTime) {
+						const scheduleTime = new Date(this.appointment.scheduleTime)
+						const now = new Date()
+						if (scheduleTime <= now) {
+							uni.showToast({
+								title: '预约时间已过，无法取消',
+								icon: 'none',
+								duration: 2000
+							})
+							return
+						}
+					}
+					uni.showToast({
+						title: '该预约无法取消',
+						icon: 'none',
+						duration: 2000
+					})
+					return
+				}
+				
 				uni.showModal({
 					title: '确认取消',
 					content: '确定要取消这个预约吗？',
@@ -298,9 +640,30 @@ onLoad(options) {
 				})
 			},
 			
+			// 导航到诊室
+			handleNavigation() {
+				if (!this.appointmentId) {
+					uni.showToast({
+						title: '预约信息不完整',
+						icon: 'none'
+					})
+					return
+				}
+				
+				// 跳转到简化版导航页面，传递预约ID
+				uni.navigateTo({
+					url: `/pages/navigation/navigation-simple?appointmentId=${this.appointmentId}`
+				})
+			},
+			
 			handleBackToHome() {
+				// 返回主页，并触发列表页刷新
 				uni.switchTab({
-					url: '/pages/index/index'
+					url: '/pages/index/index',
+					success: () => {
+						// 通过事件通知列表页刷新
+						uni.$emit('refreshAppointmentList')
+					}
 				})
 			}
 		}
@@ -336,6 +699,10 @@ onLoad(options) {
 		margin-bottom: 20rpx;
 		text-align: center;
 		box-shadow: 0 4rpx 20rpx rgba(79, 209, 197, 0.3);
+	}
+	
+	.status-card .status-icon.expired {
+		color: #C2410C;
 	}
 
 	.status-icon {
@@ -402,8 +769,14 @@ onLoad(options) {
 	.qr-title {
 		display: flex;
 		align-items: center;
-		justify-content: center;
+		justify-content: space-between;
 		margin-bottom: 20rpx;
+	}
+	
+	.qr-refresh-tip {
+		font-size: 24rpx;
+		color: #FFA500;
+		font-weight: 600;
 	}
 
 	.qr-icon {
@@ -432,13 +805,66 @@ onLoad(options) {
 		height: 400rpx;
 	}
 
+	.qr-loading {
+		padding: 60rpx;
+		color: #718096;
+		text-align: center;
+	}
+	
 	.qr-desc {
 		display: block;
 		text-align: center;
 		font-size: 24rpx;
 		color: #718096;
+		margin-top: 20rpx;
+	}
+	
+	.qr-tip {
+		display: block;
+		text-align: center;
+		font-size: 24rpx;
+		color: #FF4D4F;
+		font-weight: 600;
+		margin-top: 12rpx;
+	}
+	
+	.qr-refresh-btn {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		padding: 16rpx 32rpx;
+		background: #E6F7FF;
+		border-radius: 50rpx;
+		color: #1890FF;
+		font-size: 26rpx;
+		font-weight: 600;
+		margin-top: 20rpx;
 	}
 
+	.navigation-section {
+		margin: 20rpx 0;
+		padding: 0 30rpx;
+	}
+	
+	.navigation-btn {
+		width: 100%;
+		height: 96rpx;
+		background: linear-gradient(135deg, #52C41A 0%, #73D13D 100%);
+		border: none;
+		border-radius: 50rpx;
+		color: #ffffff;
+		font-size: 32rpx;
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 12rpx;
+	}
+	
+	.nav-icon {
+		font-size: 36rpx;
+	}
+	
 	.action-section {
 		position: fixed;
 		bottom: 0;

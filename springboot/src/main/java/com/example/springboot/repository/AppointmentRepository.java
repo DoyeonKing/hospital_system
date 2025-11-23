@@ -18,13 +18,29 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     List<Appointment> findByPatient(Patient patient);
     List<Appointment> findBySchedule(Schedule schedule);
     boolean existsByPatientAndSchedule(Patient patient, Schedule schedule);
+    
+    /**
+     * 检查患者是否有该排班的有效预约（排除已取消的预约）
+     */
+    @Query("SELECT COUNT(a) > 0 FROM Appointment a WHERE a.patient = :patient AND a.schedule = :schedule AND a.status != com.example.springboot.entity.enums.AppointmentStatus.cancelled")
+    boolean existsByPatientAndScheduleAndStatusNotCancelled(@Param("patient") Patient patient, @Param("schedule") Schedule schedule);
+    
+    /**
+     * 统计排班的有效预约数（排除已取消的预约）
+     */
+    @Query("SELECT COUNT(a) FROM Appointment a WHERE a.schedule = :schedule AND a.status != com.example.springboot.entity.enums.AppointmentStatus.cancelled")
+    long countByScheduleAndStatusNotCancelled(@Param("schedule") Schedule schedule);
     long countBySchedule(Schedule schedule);
     List<Appointment> findByScheduleScheduleDateAndScheduleSlotStartTimeBeforeAndStatus(
             java.time.LocalDate scheduleDate, java.time.LocalTime checkInTime, com.example.springboot.entity.enums.AppointmentStatus status);
-    // 添加复杂查询方法
+    // 添加复杂查询方法 - 查询患者所有未完成、未取消的预约（排班结束时间还没到的）
+    // 判断逻辑：排班日期在今天之后，或者排班日期是今天但结束时间在今天之后
     @Query("SELECT a FROM Appointment a WHERE a.patient = :patient " +
+            "AND a.status != com.example.springboot.entity.enums.AppointmentStatus.cancelled " +
+            "AND a.status != com.example.springboot.entity.enums.AppointmentStatus.completed " +
             "AND (a.schedule.scheduleDate > :today " +
-            "OR (a.schedule.scheduleDate = :today2 AND a.schedule.slot.startTime > :now))")
+            "OR (a.schedule.scheduleDate = :today2 AND a.schedule.slot.endTime > :now)) " +
+            "ORDER BY a.schedule.scheduleDate ASC, a.schedule.slot.startTime ASC")
     List<Appointment> findByPatientAndScheduleScheduleDateAfterOrScheduleScheduleDateEqualAndScheduleSlotStartTimeAfter(
             @Param("patient") Patient patient,
             @Param("today") LocalDate today,
@@ -56,4 +72,25 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     Integer findMaxAppointmentNumberBySchedule(@Param("schedule") Schedule schedule);
 
     Appointment findTopByScheduleOrderByAppointmentNumberDesc(Schedule schedule);
+
+    @Query("""
+            SELECT a FROM Appointment a
+            JOIN FETCH a.schedule s
+            JOIN FETCH s.doctor d
+            JOIN FETCH d.department dept
+            LEFT JOIN FETCH dept.parentDepartment parent
+            LEFT JOIN FETCH s.slot slot
+            LEFT JOIN FETCH s.location loc
+            WHERE s.scheduleDate BETWEEN :startDate AND :endDate
+              AND (:departmentId IS NULL OR dept.departmentId = :departmentId)
+              AND (:doctorId IS NULL OR d.doctorId = :doctorId)
+              AND a.status = :status
+              AND a.checkInTime IS NOT NULL
+            """)
+    List<Appointment> findAppointmentsForRegistrationHours(
+            @Param("departmentId") Integer departmentId,
+            @Param("doctorId") Integer doctorId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("status") com.example.springboot.entity.enums.AppointmentStatus status);
 }

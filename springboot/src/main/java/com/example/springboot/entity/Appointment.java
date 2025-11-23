@@ -50,4 +50,7 @@ public class Appointment {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt; // 预约生成时间
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt; // 最后更新时间（status变为completed时由触发器自动更新）
 }

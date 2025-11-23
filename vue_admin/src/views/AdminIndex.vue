@@ -101,6 +101,17 @@
           <p>统计医生排班时长与出诊次数</p>
         </div>
       </router-link>
+
+      <!-- 患者签到入口 -->
+      <router-link to="/check-in" class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #F0FDF4;">
+            <el-icon :size="32" color="#22C55E"><Document /></el-icon>
+          </div>
+          <h3>患者签到</h3>
+          <p>扫描患者二维码进行签到</p>
+        </div>
+      </router-link>
     </div>
   </div>
 </template>
