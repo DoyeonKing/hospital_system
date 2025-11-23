@@ -40,6 +40,8 @@ import FeeManagement from '@/views/fees/FeeManagement.vue';
 // ===== 新增：导入签到管理页面组件 =====
 // import CheckIn from '@/views/CheckIn.vue';
 const CheckIn = () => import('@/views/CheckIn.vue');
+// ===== 新增：导入数据大屏页面组件 =====
+import StatsCanvas from '@/views/dashboard/StatsCanvas.vue';
 
 // 通用视图组件导入
 const NotFoundView = () => import('../views/404.vue');
@@ -204,12 +206,12 @@ const routes = [
     },
     // =======================================================
 
-    // ===== 患者签到管理路由 =====
+    // ===== 数据大屏路由 =====
     {
-        path: '/check-in',
-        name: 'CheckIn',
-        meta: { title: '患者签到', requiresAuth: true },
-        component: CheckIn
+        path: '/dashboard/stats',
+        name: 'DashboardStats',
+        meta: { title: '运营数据大屏', requiresAuth: true },
+        component: StatsCanvas
     },
     // =======================================================
 
