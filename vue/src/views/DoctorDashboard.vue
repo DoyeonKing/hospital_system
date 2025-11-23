@@ -26,14 +26,14 @@
         </div>
       </div>
 
-      <div class="stats-row">
+      <div class="stats-row" v-loading="statsLoading">
         <div class="stat-card">
           <div class="stat-icon patients">
             <el-icon :size="32"><User /></el-icon>
           </div>
           <div class="stat-info">
-            <p class="stat-label">今日总接诊 (虚拟)</p>
-            <h3 class="stat-value">23</h3>
+            <p class="stat-label">今日总接诊</p>
+            <h3 class="stat-value">{{ todayStats.total }}</h3>
           </div>
         </div>
 
@@ -42,8 +42,8 @@
             <el-icon :size="32"><Sunrise /></el-icon>
           </div>
           <div class="stat-info">
-            <p class="stat-label">上午班患者 (虚拟)</p>
-            <h3 class="stat-value">12</h3>
+            <p class="stat-label">上午班患者</p>
+            <h3 class="stat-value">{{ todayStats.morning }}</h3>
           </div>
         </div>
 
@@ -52,8 +52,8 @@
             <el-icon :size="32"><Sunny /></el-icon>
           </div>
           <div class="stat-info">
-            <p class="stat-label">下午班患者 (虚拟)</p>
-            <h3 class="stat-value">11</h3>
+            <p class="stat-label">下午班患者</p>
+            <h3 class="stat-value">{{ todayStats.afternoon }}</h3>
           </div>
         </div>
 
@@ -267,10 +267,19 @@ import {
 } from '@element-plus/icons-vue'
 import { useDoctorStore } from '@/stores/doctorStore'
 import { getSchedulesByDoctorId } from '@/api/schedule'
+import { getTodaysPatients } from '@/api/patient'
 import defaultAvatar from '@/assets/doctor.jpg';
 
 const router = useRouter()
 const doctorStore = useDoctorStore()
+
+// --- 统计数据状态 ---
+const statsLoading = ref(false)
+const todayStats = reactive({
+  total: 0,
+  morning: 0,
+  afternoon: 0
+})
 
 // --- 对话框状态 ---
 const editDialogVisible = ref(false)
@@ -543,6 +552,58 @@ const getAvatarUrl = (url) => {
   return url || defaultAvatar;
 }
 
+// --- 加载今日统计数据 ---
+const loadTodayStats = async () => {
+  const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'));
+  const doctorId = savedInfo?.doctorId || currentDoctorId.value;
+  
+  if (!doctorId) {
+    console.error('无法获取医生ID');
+    return;
+  }
+  
+  statsLoading.value = true;
+  
+  try {
+    const today = formatDateForAPI(new Date());
+    console.log('=== 加载今日统计 ===');
+    console.log('doctorId:', doctorId);
+    console.log('today:', today);
+    
+    // 调用API获取今日患者列表
+    const response = await getTodaysPatients(doctorId, today);
+    console.log('统计API响应:', response);
+    
+    const patients = Array.isArray(response) ? response : [];
+    
+    // 计算总数
+    todayStats.total = patients.length;
+    
+    // 计算上午患者数（开始时间 < 12:00）
+    todayStats.morning = patients.filter(p => {
+      if (!p.startTime) return false;
+      const hour = parseInt(p.startTime.split(':')[0]);
+      return hour < 12;
+    }).length;
+    
+    // 计算下午患者数（开始时间 >= 12:00）
+    todayStats.afternoon = patients.filter(p => {
+      if (!p.startTime) return false;
+      const hour = parseInt(p.startTime.split(':')[0]);
+      return hour >= 12;
+    }).length;
+    
+    console.log('统计结果:', todayStats);
+  } catch (error) {
+    console.error('加载统计数据失败:', error);
+    todayStats.total = 0;
+    todayStats.morning = 0;
+    todayStats.afternoon = 0;
+  } finally {
+    statsLoading.value = false;
+  }
+};
+
 // --- 功能导航方法 ---
 const goToPatientInfo = () => {
   router.push('/patient-info')
@@ -566,6 +627,7 @@ onMounted(() => {
     doctorStore.fetchDetailedDoctorInfo();
   }
   loadTodaySchedule();
+  loadTodayStats();
 })
 </script>
 
