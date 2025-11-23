@@ -697,13 +697,25 @@ public class AppointmentService {
         // 允许提前签到：在排班开始时间之前也可以签到（随到随签）
         // 只要在排班结束时间之前都可以签到，不做其他时间限制
 
-        // 6. 更新签到时间和状态
+        // 6. 判断是否按时签到（预约时段开始后20分钟内签到算按时）
+        LocalDateTime scheduleStartTime = LocalDateTime.of(schedule.getScheduleDate(), schedule.getSlot().getStartTime());
+        Duration timeUntilStart = Duration.between(now, scheduleStartTime);
+        long minutesUntilStart = timeUntilStart.toMinutes();
+        
+        // 按时签到：预约时段开始时间前后20分钟内签到（包括提前20分钟和延后20分钟）
+        boolean isOnTimeCheckIn = minutesUntilStart >= -20 && minutesUntilStart <= 20;
+        
+        logger.info("按时签到判断 - 预约时段开始时间: {}, 当前时间: {}, 时间差: {}分钟, 是否按时: {}", 
+                scheduleStartTime, now, minutesUntilStart, isOnTimeCheckIn);
+
+        // 7. 更新签到时间和状态
         appointment.setCheckInTime(now);
+        appointment.setIsOnTime(isOnTimeCheckIn); // 记录是否按时签到
         appointment.setStatus(AppointmentStatus.CHECKED_IN); // 设置状态为已签到
         try {
             appointmentRepository.save(appointment);
-            logger.info("签到信息已保存 - 预约ID: {}, 签到时间: {}, 新状态: CHECKED_IN", 
-                    appointmentId, now, appointment.getStatus());
+            logger.info("签到信息已保存 - 预约ID: {}, 签到时间: {}, 是否按时: {}, 新状态: CHECKED_IN", 
+                    appointmentId, now, isOnTimeCheckIn, appointment.getStatus());
         } catch (Exception e) {
             logger.error("保存签到信息失败 - 预约ID: {}, 错误信息: {}", appointmentId, e.getMessage(), e);
             throw new BadRequestException("签到失败，请重试");
@@ -721,6 +733,7 @@ public class AppointmentService {
         // 8. 返回签到信息
         CheckInResponse response = new CheckInResponse();
         response.setAppointmentId(appointmentId);
+        response.setScheduleId(schedule.getScheduleId()); // 添加排班ID
         response.setPatientName(appointment.getPatient().getFullName());
         
         if (schedule.getDoctor() != null) {
@@ -755,8 +768,157 @@ public class AppointmentService {
         
         // 清除签到时间和状态（改回 scheduled）
         appointment.setCheckInTime(null);
+        appointment.setIsOnTime(false); // 清除按时签到标记
+        appointment.setCalledAt(null); // 清除叫号时间
+        appointment.setRecheckInTime(null); // 清除重新签到时间
         appointment.setStatus(AppointmentStatus.scheduled); // 改回已预约状态
         appointmentRepository.save(appointment);
+        
+        return convertToResponseDto(appointment);
+    }
+
+    /**
+     * 获取叫号队列（已签到但未就诊的预约列表）
+     * 排序规则："挂号序号为底，签到时间补位"
+     * 1. 按时签到的小号优先：挂号序号小，且按时签到 → 按挂号序号排序（1号→2号→3号）
+     * 2. 迟到的小号延后：挂号序号小，但迟到 → 排在当前已签到队列末尾
+     * 3. 过号后重新签到的：排在所有正常签到之后，按重新签到时间排序
+     */
+    @Transactional(readOnly = true)
+    public List<AppointmentResponse> getCallQueue(Integer scheduleId) {
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + scheduleId));
+        
+        // 查询已签到且未就诊的预约
+        List<Appointment> appointments = appointmentRepository
+                .findByScheduleAndStatus(schedule, AppointmentStatus.CHECKED_IN);
+        
+        // 自定义排序逻辑
+        appointments.sort((a1, a2) -> {
+            // 1. 过号后重新签到的，排在最后
+            boolean a1Recheck = a1.getRecheckInTime() != null;
+            boolean a2Recheck = a2.getRecheckInTime() != null;
+            
+            if (a1Recheck && !a2Recheck) {
+                return 1; // a1排在后面
+            }
+            if (!a1Recheck && a2Recheck) {
+                return -1; // a2排在后面
+            }
+            if (a1Recheck && a2Recheck) {
+                // 都是重新签到的，按重新签到时间排序（早重新签到的优先）
+                return a1.getRecheckInTime().compareTo(a2.getRecheckInTime());
+            }
+            
+            // 2. 按时签到的，按挂号序号排序
+            boolean a1OnTime = Boolean.TRUE.equals(a1.getIsOnTime());
+            boolean a2OnTime = Boolean.TRUE.equals(a2.getIsOnTime());
+            
+            if (a1OnTime && a2OnTime) {
+                // 都是按时签到的，按挂号序号排序
+                return Integer.compare(a1.getAppointmentNumber(), a2.getAppointmentNumber());
+            }
+            
+            // 3. 一个按时一个迟到，按时的优先
+            if (a1OnTime && !a2OnTime) {
+                return -1; // a1优先
+            }
+            if (!a1OnTime && a2OnTime) {
+                return 1; // a2优先
+            }
+            
+            // 4. 都迟到或都提前签到，按签到时间排序（早签到的优先）
+            return a1.getCheckInTime().compareTo(a2.getCheckInTime());
+        });
+        
+        return appointments.stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取下一个应该叫号的预约
+     * 规则：先叫按时签到的（按序号），再叫迟到的（按签到时间），最后叫过号重新签到的
+     */
+    @Transactional(readOnly = true)
+    public AppointmentResponse getNextAppointmentToCall(Integer scheduleId) {
+        List<AppointmentResponse> queue = getCallQueue(scheduleId);
+        
+        // 找到第一个未叫号的
+        for (AppointmentResponse response : queue) {
+            Appointment appointment = appointmentRepository.findById(response.getAppointmentId())
+                    .orElse(null);
+            if (appointment != null && appointment.getCalledAt() == null) {
+                return response;
+            }
+        }
+        
+        return null; // 没有待叫号的预约
+    }
+
+    /**
+     * 执行叫号
+     */
+    @Transactional
+    public AppointmentResponse callAppointment(Integer appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id " + appointmentId));
+        
+        if (appointment.getStatus() != AppointmentStatus.CHECKED_IN) {
+            throw new BadRequestException("只有已签到的预约才能被叫号，当前状态：" + appointment.getStatus());
+        }
+        
+        // 如果已经叫过号（过号后重新签到），增加过号次数
+        if (appointment.getCalledAt() != null) {
+            appointment.setMissedCallCount(
+                    (appointment.getMissedCallCount() == null ? 0 : appointment.getMissedCallCount()) + 1);
+            logger.info("过号患者重新叫号 - 预约ID: {}, 过号次数: {}", appointmentId, appointment.getMissedCallCount());
+        }
+        
+        // 更新叫号时间
+        appointment.setCalledAt(LocalDateTime.now());
+        appointmentRepository.save(appointment);
+        
+        logger.info("叫号成功 - 预约ID: {}, 患者: {}, 就诊序号: {}, 是否按时: {}, 叫号时间: {}", 
+                appointmentId, appointment.getPatient().getFullName(), 
+                appointment.getAppointmentNumber(), appointment.getIsOnTime(), appointment.getCalledAt());
+        
+        return convertToResponseDto(appointment);
+    }
+
+    /**
+     * 过号后重新签到 - 就诊序号不变，但排到队列后面
+     */
+    @Transactional
+    public AppointmentResponse recheckInAfterMissedCall(Integer appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id " + appointmentId));
+        
+        if (appointment.getStatus() != AppointmentStatus.CHECKED_IN) {
+            throw new BadRequestException("只有已签到的预约才能重新签到，当前状态：" + appointment.getStatus());
+        }
+        
+        if (appointment.getCalledAt() == null) {
+            throw new BadRequestException("该预约还未被叫号，无需重新签到");
+        }
+        
+        // 关键：就诊序号不变！只是清除叫号记录，重新进入队列
+        // appointment.setAppointmentNumber(...); // 不修改序号
+        
+        // 清除叫号时间，允许重新排队
+        appointment.setCalledAt(null);
+        
+        // 记录重新签到时间（用于排序）
+        appointment.setRecheckInTime(LocalDateTime.now());
+        
+        // 重新签到后，isOnTime设为false（因为已经迟到了）
+        appointment.setIsOnTime(false);
+        
+        appointmentRepository.save(appointment);
+        
+        logger.info("过号重新签到成功 - 预约ID: {}, 患者: {}, 就诊序号: {} (不变), 重新签到时间: {}", 
+                appointmentId, appointment.getPatient().getFullName(), 
+                appointment.getAppointmentNumber(), appointment.getRecheckInTime());
         
         return convertToResponseDto(appointment);
     }

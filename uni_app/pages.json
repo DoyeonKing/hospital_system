@@ -128,24 +128,6 @@
 				"navigationBarTextStyle": "white",
 				"backgroundColor": "#F8F8F8"
 			}
-		},
-		{
-			"path": "pages/navigation/navigation",
-			"style": {
-				"navigationBarTitleText": "院内导航",
-				"navigationBarBackgroundColor": "#4FD9C3",
-				"navigationBarTextStyle": "white",
-				"backgroundColor": "#F8F8F8"
-			}
-		},
-		{
-			"path": "pages/navigation/navigation-simple",
-			"style": {
-				"navigationBarTitleText": "院内导航",
-				"navigationBarBackgroundColor": "#4FD9C3",
-				"navigationBarTextStyle": "white",
-				"backgroundColor": "#F8F8F8"
-			}
 		}
 	],
 	"globalStyle": {

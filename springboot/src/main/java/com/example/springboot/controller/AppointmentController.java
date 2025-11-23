@@ -150,4 +150,40 @@ public class AppointmentController {
     public ResponseEntity<AppointmentResponse> clearCheckIn(@PathVariable Integer appointmentId) {
         return ResponseEntity.ok(appointmentService.clearCheckIn(appointmentId));
     }
+
+    /**
+     * 获取叫号队列（已签到但未就诊的预约列表）
+     */
+    @GetMapping("/schedule/{scheduleId}/call-queue")
+    public ResponseEntity<List<AppointmentResponse>> getCallQueue(@PathVariable Integer scheduleId) {
+        return ResponseEntity.ok(appointmentService.getCallQueue(scheduleId));
+    }
+
+    /**
+     * 获取下一个应该叫号的预约
+     */
+    @GetMapping("/schedule/{scheduleId}/next-to-call")
+    public ResponseEntity<AppointmentResponse> getNextAppointmentToCall(@PathVariable Integer scheduleId) {
+        AppointmentResponse response = appointmentService.getNextAppointmentToCall(scheduleId);
+        if (response == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 执行叫号
+     */
+    @PostMapping("/{appointmentId}/call")
+    public ResponseEntity<AppointmentResponse> callAppointment(@PathVariable Integer appointmentId) {
+        return ResponseEntity.ok(appointmentService.callAppointment(appointmentId));
+    }
+
+    /**
+     * 过号后重新签到（序号排到后面）
+     */
+    @PostMapping("/{appointmentId}/recheck-in")
+    public ResponseEntity<AppointmentResponse> recheckInAfterMissedCall(@PathVariable Integer appointmentId) {
+        return ResponseEntity.ok(appointmentService.recheckInAfterMissedCall(appointmentId));
+    }
 }

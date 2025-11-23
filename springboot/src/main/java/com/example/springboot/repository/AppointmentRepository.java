@@ -73,7 +73,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
 
     Appointment findTopByScheduleOrderByAppointmentNumberDesc(Schedule schedule);
 
-    @Query("""
+    @Query(""" 
             SELECT a FROM Appointment a
             JOIN FETCH a.schedule s
             JOIN FETCH s.doctor d
@@ -92,5 +92,13 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
             @Param("doctorId") Integer doctorId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate,
+            @Param("status") com.example.springboot.entity.enums.AppointmentStatus status);
+    
+    /**
+     * 查询某个排班下指定状态的预约（用于叫号队列）
+     */
+    @Query("SELECT a FROM Appointment a WHERE a.schedule = :schedule AND a.status = :status")
+    List<Appointment> findByScheduleAndStatus(
+            @Param("schedule") Schedule schedule, 
             @Param("status") com.example.springboot.entity.enums.AppointmentStatus status);
 }

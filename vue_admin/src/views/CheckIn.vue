@@ -76,6 +76,155 @@
         <el-empty description="点击上方按钮扫描患者二维码进行签到" />
       </div>
       
+      <!-- 叫号队列 -->
+      <el-card style="margin-top: 20px;">
+        <template #header>
+          <div class="card-header">
+            <span>叫号队列</span>
+            <div>
+              <el-select 
+                v-model="selectedScheduleId" 
+                placeholder="选择排班" 
+                style="width: 300px; margin-right: 10px;"
+                @change="loadCallQueue"
+                filterable
+              >
+                <el-option
+                  v-for="schedule in scheduleList"
+                  :key="schedule.scheduleId"
+                  :label="`${schedule.doctorName || '未知医生'} - ${schedule.scheduleDate} ${schedule.slotName || '未知时段'}`"
+                  :value="schedule.scheduleId"
+                >
+                  <div style="display: flex; justify-content: space-between;">
+                    <span>{{ schedule.doctorName || '未知医生' }}</span>
+                    <span style="color: #909399; margin-left: 10px;">
+                      {{ schedule.scheduleDate }} {{ schedule.slotName || '未知时段' }}
+                    </span>
+                  </div>
+                </el-option>
+              </el-select>
+              <el-button type="primary" @click="loadCallQueue" :loading="loadingQueue">
+                <el-icon><Refresh /></el-icon>
+                刷新
+              </el-button>
+            </div>
+          </div>
+        </template>
+        
+        <div v-if="selectedScheduleId">
+          <div v-if="loadingQueue" style="text-align: center; padding: 20px;">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span style="margin-left: 10px;">加载中...</span>
+          </div>
+          <div v-else-if="callQueue.length === 0" style="text-align: center; padding: 20px;">
+            <el-empty description="暂无已签到的患者" />
+          </div>
+          <el-table v-else :data="Array.isArray(callQueue) ? callQueue : []" stripe style="width: 100%">
+            <el-table-column prop="appointmentNumber" label="就诊序号" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag type="primary" size="large">{{ row.appointmentNumber }}号</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="患者姓名" width="120">
+              <template #default="{ row }">
+                {{ row.patient?.fullName || '未知患者' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="签到状态" width="120" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.isOnTime ? 'success' : 'warning'">
+                  {{ row.isOnTime ? '按时' : '迟到' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="checkInTime" label="签到时间" width="180">
+              <template #default="{ row }">
+                {{ formatDateTime(row.checkInTime) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="叫号状态" width="120" align="center">
+              <template #default="{ row }">
+                <el-tag v-if="row.calledAt" type="info">已叫号</el-tag>
+                <el-tag v-else type="success">待叫号</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="叫号时间" width="180">
+              <template #default="{ row }">
+                {{ row.calledAt ? formatDateTime(row.calledAt) : '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="200" fixed="right">
+              <template #default="{ row }">
+                <el-button 
+                  v-if="!row.calledAt" 
+                  type="primary" 
+                  size="small" 
+                  @click="handleCall(row.appointmentId)"
+                  :loading="callingId === row.appointmentId"
+                >
+                  叫号
+                </el-button>
+                <el-button 
+                  v-if="row.calledAt" 
+                  type="warning" 
+                  size="small" 
+                  @click="handleRecheckIn(row.appointmentId)"
+                  :loading="recheckingId === row.appointmentId"
+                >
+                  重新签到
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <!-- 下一个叫号提示 -->
+          <div v-if="nextToCall" style="margin-top: 20px; padding: 15px; background-color: #f0f9ff; border-radius: 4px;">
+            <el-alert
+              title="下一个叫号"
+              type="info"
+              :closable="false"
+            >
+              <template #default>
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <div>
+                    <strong v-if="nextToCall.appointmentNumber">{{ nextToCall.appointmentNumber }}号</strong>
+                    <strong v-else>待叫号</strong>
+                    <span v-if="nextToCall.patient?.fullName"> - {{ nextToCall.patient.fullName }}</span>
+                    <span v-else> - 未知患者</span>
+                    <el-tag :type="nextToCall.isOnTime ? 'success' : 'warning'" style="margin-left: 10px;">
+                      {{ nextToCall.isOnTime ? '按时' : '迟到' }}
+                    </el-tag>
+                  </div>
+                  <div>
+                    <el-button 
+                      v-if="nextToCall.calledAt" 
+                      type="warning" 
+                      size="small" 
+                      @click="handleRecheckIn(nextToCall.appointmentId)"
+                      :loading="recheckingId === nextToCall.appointmentId"
+                      style="margin-right: 10px;"
+                    >
+                      重新签到
+                    </el-button>
+                    <el-button 
+                      type="primary" 
+                      @click="handleCall(nextToCall.appointmentId)" 
+                      :loading="callingId === nextToCall.appointmentId"
+                      :disabled="!nextToCall.appointmentId"
+                    >
+                      立即叫号
+                    </el-button>
+                  </div>
+                </div>
+              </template>
+            </el-alert>
+          </div>
+        </div>
+        <div v-else style="text-align: center; padding: 20px;">
+          <el-empty description="请先选择排班" />
+        </div>
+      </el-card>
+      
       <!-- 二维码扫描对话框 -->
       <el-dialog
         v-model="showScanner"
@@ -108,10 +257,11 @@
 </template>
 
 <script setup>
-import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { Camera } from '@element-plus/icons-vue'
-import { checkInAppointment, getAppointmentQrCode, clearCheckIn } from '@/api/appointment.js'
+import { Camera, Refresh, Loading } from '@element-plus/icons-vue'
+import { checkInAppointment, getAppointmentQrCode, clearCheckIn, getCallQueue, getNextAppointmentToCall, callAppointment, recheckInAfterMissedCall } from '@/api/appointment.js'
+import { getAllSchedules } from '@/api/schedule.js'
 import { Html5Qrcode } from 'html5-qrcode'
 
 const checkInResult = ref(null)
@@ -124,6 +274,15 @@ const isScanning = ref(false)
 const scanError = ref('')
 const qrReaderRef = ref(null)
 let html5QrCode = null
+
+// 叫号队列相关
+const selectedScheduleId = ref(null)
+const scheduleList = ref([])
+const callQueue = ref([])
+const nextToCall = ref(null)
+const loadingQueue = ref(false)
+const callingId = ref(null)
+const recheckingId = ref(null)
 
 const scanQRCode = () => {
   try {
@@ -456,6 +615,15 @@ const handleCheckIn = async (qrToken) => {
         data: checkInData
       }
       ElMessage.success('签到成功')
+      
+      // 如果已选择排班，自动刷新队列；如果未选择，尝试根据签到信息选择排班
+      if (selectedScheduleId.value) {
+        loadCallQueue()
+      } else if (checkInData.scheduleId) {
+        selectedScheduleId.value = checkInData.scheduleId
+        loadCallQueue()
+      }
+      
       // 5秒后清空结果
       setTimeout(() => { 
         checkInResult.value = null 
@@ -630,6 +798,139 @@ const copyToken = () => {
     })
   }
 }
+
+// 加载排班列表
+const loadScheduleList = async () => {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const response = await getAllSchedules(0, 1000)
+    if (response && response.content) {
+      // 只显示今天及以后的排班
+      scheduleList.value = response.content
+        .filter(schedule => schedule.scheduleDate >= today)
+        .map(schedule => ({
+          scheduleId: schedule.scheduleId,
+          doctorName: schedule.doctorName || '未知医生',
+          scheduleDate: schedule.scheduleDate,
+          slotName: schedule.slotName || '未知时段',
+          departmentName: schedule.departmentName || ''
+        }))
+        .sort((a, b) => {
+          // 按日期和时间排序
+          if (a.scheduleDate !== b.scheduleDate) {
+            return a.scheduleDate.localeCompare(b.scheduleDate)
+          }
+          return a.slotName.localeCompare(b.slotName)
+        })
+    }
+  } catch (error) {
+    console.error('加载排班列表失败:', error)
+    ElMessage.error('加载排班列表失败：' + (error.response?.data?.message || error.message))
+  }
+}
+
+// 加载叫号队列
+const loadCallQueue = async () => {
+  if (!selectedScheduleId.value) {
+    callQueue.value = []
+    nextToCall.value = null
+    return
+  }
+  
+  loadingQueue.value = true
+  try {
+    const [queueResponse, nextResponse] = await Promise.all([
+      getCallQueue(selectedScheduleId.value),
+      getNextAppointmentToCall(selectedScheduleId.value).catch(() => null)
+    ])
+    
+    // 确保返回的是数组
+    if (Array.isArray(queueResponse)) {
+      callQueue.value = queueResponse
+    } else if (queueResponse && Array.isArray(queueResponse.data)) {
+      callQueue.value = queueResponse.data
+    } else if (queueResponse && Array.isArray(queueResponse.content)) {
+      callQueue.value = queueResponse.content
+    } else {
+      console.warn('叫号队列数据格式异常:', queueResponse)
+      callQueue.value = []
+    }
+    
+    // 处理下一个叫号
+    if (nextResponse && typeof nextResponse === 'object') {
+      nextToCall.value = nextResponse.data || nextResponse
+    } else {
+      nextToCall.value = nextResponse || null
+    }
+  } catch (error) {
+    console.error('加载叫号队列失败:', error)
+    ElMessage.error('加载叫号队列失败：' + (error.response?.data?.message || error.message))
+    callQueue.value = []
+    nextToCall.value = null
+  } finally {
+    loadingQueue.value = false
+  }
+}
+
+// 执行叫号
+const handleCall = async (appointmentId) => {
+  callingId.value = appointmentId
+  try {
+    await callAppointment(appointmentId)
+    ElMessage.success('叫号成功')
+    // 刷新队列
+    await loadCallQueue()
+    // 如果签到成功，也刷新队列
+    if (checkInResult.value?.success) {
+      setTimeout(() => {
+        loadCallQueue()
+      }, 500)
+    }
+  } catch (error) {
+    const errorMsg = error.response?.data?.message || error.message || '叫号失败'
+    ElMessage.error(errorMsg)
+  } finally {
+    callingId.value = null
+  }
+}
+
+// 过号后重新签到
+const handleRecheckIn = async (appointmentId) => {
+  recheckingId.value = appointmentId
+  try {
+    await ElMessageBox.confirm(
+      '确认将该患者重新加入叫号队列？就诊序号不变，但会排在队列后面。',
+      '重新签到',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await recheckInAfterMissedCall(appointmentId)
+    ElMessage.success('重新签到成功')
+    // 刷新队列
+    await loadCallQueue()
+  } catch (error) {
+    if (error !== 'cancel') {
+      const errorMsg = error.response?.data?.message || error.message || '重新签到失败'
+      ElMessage.error(errorMsg)
+    }
+  } finally {
+    recheckingId.value = null
+  }
+}
+
+// 组件挂载时加载排班列表
+onMounted(() => {
+  loadScheduleList()
+  // 如果签到成功，自动刷新队列
+  if (checkInResult.value?.success && checkInResult.value?.data?.scheduleId) {
+    selectedScheduleId.value = checkInResult.value.data.scheduleId
+    loadCallQueue()
+  }
+})
 </script>
 
 <style scoped>

@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @Data
 public class CheckInResponse {
     private Integer appointmentId;
+    private Integer scheduleId; // 排班ID，用于前端跳转到叫号队列
     private String patientName;
     private String departmentName;
     private String doctorName;

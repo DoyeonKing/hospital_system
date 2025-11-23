@@ -34,3 +34,47 @@ export async function clearCheckIn(appointmentId) {
     });
 }
 
+/**
+ * 获取叫号队列（已签到但未就诊的预约列表）
+ * @param {Number} scheduleId - 排班ID
+ */
+export async function getCallQueue(scheduleId) {
+    return await request({
+        url: `/api/appointments/schedule/${scheduleId}/call-queue`,
+        method: 'GET'
+    });
+}
+
+/**
+ * 获取下一个应该叫号的预约
+ * @param {Number} scheduleId - 排班ID
+ */
+export async function getNextAppointmentToCall(scheduleId) {
+    return await request({
+        url: `/api/appointments/schedule/${scheduleId}/next-to-call`,
+        method: 'GET'
+    });
+}
+
+/**
+ * 执行叫号
+ * @param {Number} appointmentId - 预约ID
+ */
+export async function callAppointment(appointmentId) {
+    return await request({
+        url: `/api/appointments/${appointmentId}/call`,
+        method: 'POST'
+    });
+}
+
+/**
+ * 过号后重新签到
+ * @param {Number} appointmentId - 预约ID
+ */
+export async function recheckInAfterMissedCall(appointmentId) {
+    return await request({
+        url: `/api/appointments/${appointmentId}/recheck-in`,
+        method: 'POST'
+    });
+}
+
