@@ -15,4 +15,5 @@ public class WaitlistResponse {
     private WaitlistStatus status;
     private LocalDateTime notificationSentAt;
     private LocalDateTime createdAt;
+    private Integer queuePosition; // 排队位置（仅 waiting 状态有效）
 }

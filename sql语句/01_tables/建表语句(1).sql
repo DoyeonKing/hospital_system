@@ -145,13 +145,25 @@ CREATE TABLE `appointments` (
   `patient_id` INT NOT NULL COMMENT '患者ID',
   `schedule_id` INT NOT NULL COMMENT '排班ID',
   `appointment_number` INT NOT NULL COMMENT '就诊序号',
-  `status` ENUM('scheduled','completed','cancelled','no_show') NOT NULL DEFAULT 'scheduled' COMMENT '预约状态',
+  `status` ENUM(
+      'PENDING_PAYMENT',  -- 待支付
+      'scheduled',        -- 已预约（未签到）
+      'CHECKED_IN',       -- 已签到（未就诊）
+      'completed',        -- 已完成
+      'cancelled',        -- 已取消
+      'NO_SHOW'          -- 爽约
+  ) NOT NULL DEFAULT 'scheduled' COMMENT '预约状态',
   `payment_status` ENUM('unpaid','paid','refunded') NOT NULL DEFAULT 'unpaid' COMMENT '支付状态',
   `payment_method` VARCHAR(50) COMMENT '支付方式',
   `transaction_id` VARCHAR(255) COMMENT '支付流水号',
   `check_in_time` DATETIME COMMENT '现场签到时间',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '预约生成时间',
-  PRIMARY KEY (`appointment_id`)
+  `updated_at` TIMESTAMP NULL DEFAULT NULL COMMENT '最后更新时间（status变为completed时由触发器更新）',
+  PRIMARY KEY (`appointment_id`),
+  KEY `idx_patient_id` (`patient_id`),
+  KEY `idx_schedule_id` (`schedule_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_check_in_time` (`check_in_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='预约挂号表';
 
 -- 11. waitlist (候补表)

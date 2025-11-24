@@ -23,7 +23,8 @@
 					:key="getAppointmentKey(appointment, index)"
 					:class="{
 						completed: isCompletedStatus(appointment.status),
-						cancelled: isCancelledStatus(appointment.status)
+						cancelled: isCancelledStatus(appointment.status),
+						expired: isExpiredStatus(appointment)
 					}"
 					@click="navigateToDetail(getAppointmentId(appointment))"
 				>
@@ -38,12 +39,15 @@
 							<view class="status-badge cancelled-label" v-if="isCancelledStatus(appointment.status)">
 								<text class="status-text">已取消</text>
 							</view>
+							<view class="status-badge expired-label" v-else-if="isExpiredStatus(appointment)">
+								<text class="status-text">已过期</text>
+							</view>
 							<view class="status-badge" :class="{
-								confirmed: isConfirmedStatus(appointment.status),
+								confirmed: isConfirmedStatus(appointment.status) && !isExpiredStatus(appointment),
 								completed: isCompletedStatus(appointment.status),
 								cancelled: isCancelledStatus(appointment.status)
 							}" v-else>
-								<text class="status-text">{{ getStatusText(appointment.status) }}</text>
+								<text class="status-text">{{ getStatusText(appointment) }}</text>
 							</view>
 						</view>
 					</view>
@@ -62,19 +66,22 @@
 						</view>
 					</view>
 					<view class="appointment-actions" v-if="!isCancelledStatus(appointment.status)">
-						<!-- 已确认/已预约/待支付状态：显示取消预约按钮 -->
-						<view class="action-btn cancel-btn" v-if="isConfirmedStatus(appointment.status)" @click.stop="handleCancel(getAppointmentId(appointment))">
+						<!-- 已预约/待支付状态且未过期：显示取消预约按钮 -->
+						<view class="action-btn cancel-btn" v-if="canCancelAppointment(appointment)" @click.stop="handleCancel(getAppointmentId(appointment))">
 							<text class="btn-text">取消预约</text>
 						</view>
-						<!-- 已完成状态：同时显示取消预约和查看详情按钮 -->
-						<template v-if="isCompletedStatus(appointment.status)">
-							<view class="action-btn cancel-btn" @click.stop="handleCancel(getAppointmentId(appointment))">
-								<text class="btn-text">取消预约</text>
-							</view>
-							<view class="action-btn view-btn" @click.stop="navigateToDetail(getAppointmentId(appointment))">
-								<text class="btn-text">查看详情</text>
-							</view>
-						</template>
+						<!-- 已完成状态：只显示查看详情按钮 -->
+						<view class="action-btn view-btn" v-if="isCompletedStatus(appointment.status)" @click.stop="navigateToDetail(getAppointmentId(appointment))">
+							<text class="btn-text">查看详情</text>
+						</view>
+						<!-- 时间已过去但未完成的预约：显示查看详情按钮 -->
+						<view class="action-btn view-btn" v-if="isConfirmedStatus(appointment.status) && isAppointmentTimePassed(appointment) && !canCancelAppointment(appointment)" @click.stop="navigateToDetail(getAppointmentId(appointment))">
+							<text class="btn-text">查看详情</text>
+						</view>
+						<!-- 如果没有显示任何按钮，至少显示查看详情按钮 -->
+						<view class="action-btn view-btn" v-if="!canCancelAppointment(appointment) && !isCompletedStatus(appointment.status) && !isAppointmentTimePassed(appointment)" @click.stop="navigateToDetail(getAppointmentId(appointment))">
+							<text class="btn-text">查看详情</text>
+						</view>
 				</view>
 				<!-- 已取消状态：显示改约按钮 -->
 				<view class="appointment-actions" v-if="isCancelledStatus(appointment.status)">
@@ -122,11 +129,21 @@
 			}
 		},
 		onLoad() {
+			// 监听刷新事件
+			uni.$on('refreshAppointmentList', () => {
+				console.log('[appointments] 收到刷新事件，重新加载列表')
+				this.loadAppointments()
+			})
 			this.loadAppointments()
 		},
 		onShow() {
 			// 页面显示时刷新数据
+			console.log('[appointments onShow] 页面显示，刷新预约列表')
 			this.loadAppointments()
+		},
+		onUnload() {
+			// 页面卸载时移除事件监听
+			uni.$off('refreshAppointmentList')
 		},
 		methods: {
 			// 加载预约列表
@@ -213,6 +230,33 @@
 						})
 					}
 					
+					// 对列表进行排序：最新的预约显示在最上面（按创建时间或就诊时间倒序）
+					finalList.sort((a, b) => {
+						// 优先按创建时间倒序（appointmentTime 是创建时间）
+						if (a.appointmentTime && b.appointmentTime) {
+							const timeA = new Date(a.appointmentTime).getTime()
+							const timeB = new Date(b.appointmentTime).getTime()
+							if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
+								return timeB - timeA // 倒序：最新的在前
+							}
+						}
+						// 如果创建时间相同或不存在，按就诊时间倒序
+						if (a.scheduleTime && b.scheduleTime) {
+							const scheduleA = new Date(a.scheduleTime).getTime()
+							const scheduleB = new Date(b.scheduleTime).getTime()
+							if (!isNaN(scheduleA) && !isNaN(scheduleB)) {
+								return scheduleB - scheduleA // 倒序：最新的在前
+							}
+						}
+						return 0
+					})
+					
+					console.log('[loadAppointments] 排序后的预约列表:', finalList.map(apt => ({
+						id: apt.id || apt.appointmentId,
+						appointmentTime: apt.appointmentTime,
+						scheduleTime: apt.scheduleTime
+					})))
+					
 					// 直接替换整个数组，确保 Vue 响应式更新
 					// 直接赋值，在 Vue 2 中应该能触发响应式更新
 					this.appointmentList = finalList
@@ -275,22 +319,71 @@
 				}
 			},
 			
-			// 获取状态文本（兼容大小写）
-			getStatusText(status) {
-				if (!status) return '未知'
+			// 判断是否为已过期状态（时间已过去但不是已完成状态）
+			isExpiredStatus(appointment) {
+				if (!appointment) return false
+				// 已完成状态不算过期
+				if (this.isCompletedStatus(appointment.status)) {
+					return false
+				}
+				// 已取消状态不算过期
+				if (this.isCancelledStatus(appointment.status)) {
+					return false
+				}
+				// 检查时间是否已过去（至少1分钟）
+				if (!this.isAppointmentTimePassed(appointment)) {
+					return false
+				}
+				// 如果预约是今天创建的，且就诊时间也是今天，不显示为过期（可能是刚创建的预约）
+				if (appointment.appointmentTime) {
+					const appointmentDate = new Date(appointment.appointmentTime)
+					const scheduleDate = appointment.scheduleTime ? new Date(appointment.scheduleTime) : null
+					const now = new Date()
+					
+					// 如果预约是今天创建的，且就诊时间也是今天，不显示为过期
+					if (scheduleDate && 
+						appointmentDate.toDateString() === now.toDateString() &&
+						scheduleDate.toDateString() === now.toDateString()) {
+						// 检查预约创建时间和就诊时间的间隔
+						const timeDiff = scheduleDate.getTime() - appointmentDate.getTime()
+						// 如果预约创建时间在就诊时间之后，说明是刚创建的预约，不显示为过期
+						if (timeDiff < 0) {
+							return false
+						}
+					}
+				}
+				return true
+			},
+			
+			// 获取状态文本（兼容大小写，考虑过期状态）
+			getStatusText(appointment) {
+				if (!appointment || !appointment.status) return '未知'
+				
+				// 如果已过期，返回"已过期"
+				if (this.isExpiredStatus(appointment)) {
+					return '已过期'
+				}
+				
+				const status = appointment.status
 				const statusLower = status.toLowerCase()
 				const statusMap = {
-					'confirmed': '已确认',
-					'scheduled': '已确认',
+					'confirmed': '已预约',
+					'scheduled': '已预约',
+					'checked_in': '已签到',
+					'CHECKED_IN': '已签到',
 					'completed': '已完成',
 					'cancelled': '已取消',
-					'pending': '待支付'
+					'pending': '待支付',
+					'pending_payment': '待支付',
+					'no_show': '爽约',
+					'NO_SHOW': '爽约'
 				}
 				return statusMap[statusLower] || statusMap[status] || '未知'
 			},
 			
 			// 判断是否为已确认状态（兼容大小写）
 			// 包括：confirmed, scheduled, pending_payment（待支付状态也可以取消）
+			// 注意：CHECKED_IN（已签到）不算已确认状态，因为已签到不能取消
 			isConfirmedStatus(status) {
 				if (!status) {
 					console.log('[isConfirmedStatus] status 为空')
@@ -322,6 +415,99 @@
 				if (!status) return false
 				const statusLower = status.toLowerCase()
 				return statusLower === 'pending' || statusLower === 'pending_payment'
+			},
+			
+			// 判断预约时间是否已过去（检查排班结束时间，而不是开始时间）
+			isAppointmentTimePassed(appointment) {
+				if (!appointment) {
+					console.log('[isAppointmentTimePassed] 预约为空')
+					return false
+				}
+				
+				// 优先使用排班结束时间，如果没有则使用开始时间
+				const timeToCheck = appointment.scheduleEndTime || appointment.scheduleTime
+				if (!timeToCheck) {
+					console.log('[isAppointmentTimePassed] 预约时间为空')
+					return false
+				}
+				
+				const endTime = new Date(timeToCheck)
+				const now = new Date()
+				
+				// 检查日期是否有效
+				if (isNaN(endTime.getTime())) {
+					console.warn('[isAppointmentTimePassed] 无效的时间格式:', timeToCheck)
+					return false
+				}
+				
+				const timeDiff = endTime.getTime() - now.getTime()
+				const passed = timeDiff < -60 * 1000 // 至少过去1分钟
+				
+				console.log('[isAppointmentTimePassed] 时间判断:', {
+					scheduleTime: appointment.scheduleTime,
+					scheduleEndTime: appointment.scheduleEndTime,
+					timeToCheck: timeToCheck,
+					endTimeObj: endTime.toISOString(),
+					now: now.toISOString(),
+					timeDiffMinutes: Math.round(timeDiff / 1000 / 60),
+					passed: passed
+				})
+				
+				return passed
+			},
+			
+			// 判断是否可以取消预约（仅允许未过期的已确认/待支付状态）
+			canCancelAppointment(appointment) {
+				if (!appointment) {
+					console.log('[canCancelAppointment] appointment 为空')
+					return false
+				}
+				console.log('[canCancelAppointment] 检查预约:', {
+					id: appointment.id || appointment.appointmentId,
+					status: appointment.status,
+					scheduleTime: appointment.scheduleTime,
+					appointmentTime: appointment.appointmentTime
+				})
+				
+				// 已取消状态不能取消
+				if (this.isCancelledStatus(appointment.status)) {
+					console.log('[canCancelAppointment] 已取消状态，不能取消')
+					return false
+				}
+				// 已完成状态不能取消
+				if (this.isCompletedStatus(appointment.status)) {
+					console.log('[canCancelAppointment] 已完成状态，不能取消')
+					return false
+				}
+				// 已签到状态不能取消
+				const statusLower = (appointment.status || '').toLowerCase()
+				if (statusLower === 'checked_in') {
+					console.log('[canCancelAppointment] 已签到状态，不能取消')
+					return false
+				}
+				// 检查状态是否为已确认或待支付
+				const isConfirmed = this.isConfirmedStatus(appointment.status)
+				console.log('[canCancelAppointment] 是否已确认状态:', isConfirmed)
+				
+				if (!isConfirmed) {
+					console.log('[canCancelAppointment] 不是已确认或待支付状态，不能取消')
+					return false
+				}
+				
+				// 时间已过去的预约不能取消
+				const timePassed = this.isAppointmentTimePassed(appointment)
+				console.log('[canCancelAppointment] 时间是否已过去:', timePassed, {
+					scheduleTime: appointment.scheduleTime,
+					now: new Date().toISOString()
+				})
+				
+				if (timePassed) {
+					console.log('[canCancelAppointment] 时间已过去，不能取消')
+					return false
+				}
+				
+				console.log('[canCancelAppointment] 可以取消预约')
+				return true
 			},
 			
 			// 获取状态样式类名（用于 :class）
@@ -600,11 +786,37 @@
 		
 		// 取消预约
 		async handleCancel(appointmentId) {
-				uni.showModal({
-					title: '确认取消',
-					content: '确定要取消这个预约吗？',
+			// 先找到预约对象，检查时间
+			const appointment = this.appointmentList.find(apt => 
+				(apt.id && apt.id == appointmentId) || 
+				(apt.appointmentId && apt.appointmentId == appointmentId)
+			)
+			
+			// 检查时间是否已过去
+			if (appointment && this.isAppointmentTimePassed(appointment)) {
+				uni.showToast({
+					title: '预约时间已过，无法取消',
+					icon: 'none',
+					duration: 2000
+				})
+				return
+			}
+			
+			// 检查是否可以取消
+			if (appointment && !this.canCancelAppointment(appointment)) {
+				uni.showToast({
+					title: '该预约无法取消',
+					icon: 'none',
+					duration: 2000
+				})
+				return
+			}
+			
+			uni.showModal({
+				title: '确认取消',
+				content: '确定要取消这个预约吗？',
 				success: async (res) => {
-						if (res.confirm) {
+					if (res.confirm) {
 						try {
 							uni.showLoading({ title: '取消中...' })
 							// 调用取消预约 API
@@ -633,10 +845,10 @@
 						} finally {
 							uni.hideLoading()
 						}
-						}
 					}
-				})
-			}
+				}
+			})
+		}
 		}
 	}
 </script>
@@ -767,6 +979,11 @@
 		background: #f7f7f7;
 	}
 	
+	.appointment-item.expired {
+		opacity: 0.7;
+		background: #FFF7ED;
+	}
+	
 	.department-name.cancelled-line {
 		text-decoration: line-through;
 		text-decoration-color: #DC2626;
@@ -784,6 +1001,12 @@
 		background: #FEF2F2;
 		color: #DC2626;
 		border: 1rpx solid #FCA5A5;
+	}
+	
+	.status-badge.expired-label {
+		background: #FFF7ED;
+		color: #C2410C;
+		border: 1rpx solid #FED7AA;
 	}
 
 	.appointment-header {

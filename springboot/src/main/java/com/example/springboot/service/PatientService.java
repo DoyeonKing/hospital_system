@@ -191,6 +191,7 @@ import com.example.springboot.dto.common.PageResponse; // 导入新增方法所�
 import com.example.springboot.dto.patient.MedicalHistoryResponse; // 导入新增方法所需的DTO
 import com.example.springboot.dto.patient.MedicalHistoryUpdateRequest; // 导入新增方法所需的DTO
 import com.example.springboot.dto.patient.PatientResponse;
+import com.example.springboot.dto.patient.PatientSimpleResponse;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.PatientProfile;
 import com.example.springboot.entity.enums.BlacklistStatus;
@@ -528,5 +529,17 @@ public class PatientService {
     public PageResponse<MedicalHistoryResponse> updateMedicalHistory(Long id, MedicalHistoryUpdateRequest request) {
         // 抛出异常，提示需要 MedicalHistory 实体
         throw new UnsupportedOperationException("真正的病历记录更新需要 MedicalHistory 实体及其 Repository.");
+    }
+
+    @Transactional(readOnly = true)
+    public PatientSimpleResponse getPatientSimpleInfo(Long patientId) {
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id " + patientId));
+
+        PatientSimpleResponse response = new PatientSimpleResponse();
+        response.setPatientId(patient.getPatientId());
+        response.setName(patient.getFullName());
+        response.setPhone(patient.getPhoneNumber());
+        return response;
     }
 }

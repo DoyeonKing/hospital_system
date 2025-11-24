@@ -47,7 +47,22 @@ public class Appointment {
     @Column(name = "check_in_time")
     private LocalDateTime checkInTime; // 现场签到时间
 
+    @Column(name = "called_at")
+    private LocalDateTime calledAt; // 叫号时间（NULL表示未叫号）
+
+    @Column(name = "is_on_time")
+    private Boolean isOnTime = false; // 是否按时签到（预约时段开始后20分钟内）
+
+    @Column(name = "missed_call_count")
+    private Integer missedCallCount = 0; // 过号次数
+
+    @Column(name = "recheck_in_time")
+    private LocalDateTime recheckInTime; // 过号后重新签到时间
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt; // 预约生成时间
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt; // 最后更新时间（status变为completed时由触发器自动更新）
 }
