@@ -215,6 +215,15 @@ const routes = [
     },
     // =======================================================
 
+    // ===== 患者签到路由 =====
+    {
+        path: '/check-in',
+        name: 'CheckIn',
+        meta: { title: '患者签到', requiresAuth: true },
+        component: CheckIn
+    },
+    // =======================================================
+
 
     // 404 未找到页面路由
     { path: '/404', name: 'NotFound', meta: { title: '404找不到页面' }, component: NotFoundView },
