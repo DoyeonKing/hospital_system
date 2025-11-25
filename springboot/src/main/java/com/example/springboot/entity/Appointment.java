@@ -1,6 +1,7 @@
 package com.example.springboot.entity; // 包名调整
 
 import com.example.springboot.entity.enums.AppointmentStatus; // 导入路径调整
+import com.example.springboot.entity.enums.AppointmentType;   // 导入路径调整
 import com.example.springboot.entity.enums.PaymentStatus;     // 导入路径调整
 import jakarta.persistence.*;
 import lombok.Data;
@@ -58,6 +59,25 @@ public class Appointment {
 
     @Column(name = "recheck_in_time")
     private LocalDateTime recheckInTime; // 过号后重新签到时间
+
+    @Column(name = "is_walk_in")
+    private Boolean isWalkIn = false; // 是否现场挂号（false=预约，true=现场挂号）
+
+    @Column(name = "real_time_queue_number")
+    private Integer realTimeQueueNumber; // 实时候诊序号（在时段内按签到时间分配）
+
+    @Column(name = "is_late")
+    private Boolean isLate = false; // 是否迟到（超过时段结束时间+软关门时间）
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "appointment_type")
+    private AppointmentType appointmentType = AppointmentType.APPOINTMENT; // 预约类型
+
+    @Column(name = "original_appointment_id")
+    private Integer originalAppointmentId; // 原始预约ID（用于复诊号关联，复诊号关联到原始预约）
+
+    @Column(name = "is_add_on")
+    private Boolean isAddOn = false; // 是否加号
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

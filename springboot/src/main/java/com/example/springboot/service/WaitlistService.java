@@ -31,7 +31,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -274,7 +276,32 @@ public class WaitlistService {
     public List<WaitlistResponse> findByPatientId(Long patientId) {
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id " + patientId));
+        LocalDateTime now = LocalDateTime.now();
+        
         return waitlistRepository.findByPatient(patient).stream()
+                .filter(waitlist -> {
+                    // 只返回等待中或已通知的候补（排除已过期和已预约的）
+                    WaitlistStatus status = waitlist.getStatus();
+                    if (status != WaitlistStatus.waiting && status != WaitlistStatus.notified) {
+                        return false;
+                    }
+                    
+                    // 过滤掉排班时间已过去的候补
+                    Schedule schedule = waitlist.getSchedule();
+                    if (schedule != null && schedule.getScheduleDate() != null && schedule.getSlot() != null) {
+                        LocalDate scheduleDate = schedule.getScheduleDate();
+                        LocalTime endTime = schedule.getSlot().getEndTime();
+                        if (endTime != null) {
+                            LocalDateTime scheduleEndTime = LocalDateTime.of(scheduleDate, endTime);
+                            // 如果排班结束时间已过去，则不显示
+                            if (scheduleEndTime.isBefore(now)) {
+                                return false;
+                            }
+                        }
+                    }
+                    
+                    return true;
+                })
                 .map(this::convertToResponseDto)
                 .collect(Collectors.toList());
     }

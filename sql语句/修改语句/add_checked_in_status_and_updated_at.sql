@@ -30,10 +30,10 @@ COMMENT '最后更新时间（status变为completed时由触发器更新）';
 
 -- 步骤3: 数据迁移 - 将已签到的记录状态改为 CHECKED_IN
 -- 将 check_in_time 不为 NULL 且状态为 scheduled 的记录改为 CHECKED_IN
-UPDATE `appointments` 
-SET `status` = 'CHECKED_IN' 
-WHERE `check_in_time` IS NOT NULL 
-  AND `status` = 'scheduled';
+-- UPDATE `appointments` 
+-- SET `status` = 'CHECKED_IN' 
+-- WHERE `check_in_time` IS NOT NULL 
+--   AND `status` = 'scheduled';
 
 -- 步骤4: 验证数据迁移结果
 -- SELECT 
@@ -74,4 +74,5 @@ CREATE TABLE `appointments` (
   KEY `idx_check_in_time` (`check_in_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='预约挂号表';
 */
+
 

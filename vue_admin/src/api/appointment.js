@@ -68,12 +68,34 @@ export async function callAppointment(appointmentId) {
 }
 
 /**
- * 过号后重新签到
+ * 标记过号（仅标记，不重新排队）
+ * @param {Number} appointmentId - 预约ID
+ */
+export async function markMissedCall(appointmentId) {
+    return await request({
+        url: `/api/appointments/${appointmentId}/mark-missed`,
+        method: 'POST'
+    });
+}
+
+/**
+ * 过号后重新签到（患者重新扫码后调用）
  * @param {Number} appointmentId - 预约ID
  */
 export async function recheckInAfterMissedCall(appointmentId) {
     return await request({
         url: `/api/appointments/${appointmentId}/recheck-in`,
+        method: 'POST'
+    });
+}
+
+/**
+ * 标记就诊完成（会自动叫号下一位）
+ * @param {Number} appointmentId - 预约ID
+ */
+export async function completeAppointment(appointmentId) {
+    return await request({
+        url: `/api/appointments/${appointmentId}/complete`,
         method: 'POST'
     });
 }

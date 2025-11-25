@@ -45,13 +45,27 @@
 					<text class="label">排队号：</text>
 					<text class="value queue-number">第{{ appointment.queueNumber || appointment.appointmentNumber }}号</text>
 				</view>
+				<!-- 过号状态显示 -->
+				<view class="info-row" v-if="appointment.missedCallCount > 0">
+					<text class="label">过号次数：</text>
+					<text class="value missed-call-count">已过号{{ appointment.missedCallCount }}次</text>
+				</view>
 				<view class="info-row">
 					<text class="label">预约时间：</text>
 					<text class="value">{{ formatDateTime(appointment.appointmentTime) }}</text>
 				</view>
 			</view>
 			
-			<!-- 签到二维码（仅已确认且未过期状态显示） -->
+			<!-- 过号提示卡片（已叫号但状态已改回scheduled） -->
+			<view class="missed-call-card" v-if="appointment.calledAt && appointment.status !== 'checked_in'">
+				<view class="missed-call-icon">⚠️</view>
+				<view class="missed-call-content">
+					<text class="missed-call-title">您已过号</text>
+					<text class="missed-call-desc">请重新扫码签到</text>
+				</view>
+			</view>
+			
+			<!-- 签到二维码（已确认且未过期状态显示） -->
 			<view class="qr-code-card" v-if="isConfirmedStatus(appointment.status) && !isExpiredStatus(appointment)">
 				<view class="qr-title">
 					<text class="qr-icon">📱</text>
@@ -245,8 +259,7 @@ onUnload() {
 				
 				// 检查预约状态，已确认或已签到的预约都可以生成二维码
 				const statusLower = (this.appointment.status || '').toLowerCase()
-				const canGenerate = this.isConfirmedStatus(this.appointment.status) || 
-									statusLower === 'checked_in'
+				const canGenerate = this.isConfirmedStatus(this.appointment.status) || statusLower === 'checked_in'
 				const isExpired = this.isExpiredStatus(this.appointment)
 				
 				console.log('[前端] 预约状态检查:', {
@@ -332,7 +345,7 @@ onUnload() {
 				const isConfirmed = this.isConfirmedStatus(this.appointment.status)
 				const isExpired = this.isExpiredStatus(this.appointment)
 				console.log('[前端] 自动刷新检查 - 预约状态:', this.appointment.status, ', isConfirmed:', isConfirmed, ', isExpired:', isExpired)
-				
+
 				// 只有已确认且未过期的预约才启动刷新
 				if (!isConfirmed || isExpired) {
 					console.warn('[前端] 不满足自动刷新条件，取消启动')
@@ -496,7 +509,7 @@ onUnload() {
 			
 			// 判断是否为已确认状态（兼容大小写）
 			// 包括：confirmed, scheduled, pending_payment（待支付状态也可以取消）
-			// 注意：CHECKED_IN（已签到）不算已确认状态，因为已签到不能取消
+			// 注意：CHECKED_IN（已签到）也算已确认状态，因为已签到可以显示二维码
 			isConfirmedStatus(status) {
 				if (!status) {
 					console.log('[detail isConfirmedStatus] status 为空')
@@ -506,7 +519,9 @@ onUnload() {
 				const result = statusLower === 'confirmed' || 
 					   statusLower === 'scheduled' || 
 					   statusLower === 'pending_payment' ||
-					   statusLower === 'pending'
+					   statusLower === 'pending' ||
+					   statusLower === 'checked_in' ||
+					   statusLower === 'CHECKED_IN'
 				console.log('[detail isConfirmedStatus] 状态:', status, '转换为:', statusLower, '结果:', result)
 				return result
 			},
@@ -908,5 +923,45 @@ onUnload() {
 		color: #38A2AC;
 		font-size: 32rpx;
 		font-weight: 600;
+	}
+
+	.missed-call-count {
+		color: #FF4D4F;
+		font-weight: 700;
+		font-size: 28rpx;
+	}
+
+	.missed-call-card {
+		background: #FFF7E6;
+		border: 2rpx solid #FFD591;
+		border-radius: 20rpx;
+		padding: 30rpx;
+		margin-bottom: 20rpx;
+		display: flex;
+		align-items: center;
+		gap: 20rpx;
+	}
+
+	.missed-call-icon {
+		font-size: 48rpx;
+	}
+
+	.missed-call-content {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 8rpx;
+	}
+
+	.missed-call-title {
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #FA8C16;
+	}
+
+	.missed-call-desc {
+		font-size: 26rpx;
+		color: #AD6800;
+		line-height: 1.5;
 	}
 </style>
