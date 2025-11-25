@@ -112,6 +112,58 @@ public class NotificationService {
     }
 
     /**
+     * 发送请假批准通知
+     */
+    @Transactional
+    public NotificationResponse sendLeaveApprovedNotification(Integer doctorId, Integer leaveRequestId,
+                                                              String startTime, String endTime,
+                                                              String approverComments) {
+        NotificationCreateRequest request = new NotificationCreateRequest();
+        request.setUserId(doctorId);
+        request.setUserType(UserType.doctor);
+        request.setType(NotificationType.leave_approved);
+        request.setTitle("请假申请已批准");
+        
+        String content = String.format("您的请假申请已批准！\n请假时间：%s 至 %s", startTime, endTime);
+        if (approverComments != null && !approverComments.trim().isEmpty()) {
+            content += "\n审批意见：" + approverComments;
+        }
+        
+        request.setContent(content);
+        request.setRelatedEntity("leave_request");
+        request.setRelatedId(leaveRequestId);
+        request.setPriority(NotificationPriority.high);
+
+        return createNotification(request);
+    }
+
+    /**
+     * 发送请假拒绝通知
+     */
+    @Transactional
+    public NotificationResponse sendLeaveRejectedNotification(Integer doctorId, Integer leaveRequestId,
+                                                              String startTime, String endTime,
+                                                              String approverComments) {
+        NotificationCreateRequest request = new NotificationCreateRequest();
+        request.setUserId(doctorId);
+        request.setUserType(UserType.doctor);
+        request.setType(NotificationType.leave_rejected);
+        request.setTitle("请假申请已拒绝");
+        
+        String content = String.format("您的请假申请已被拒绝\n请假时间：%s 至 %s", startTime, endTime);
+        if (approverComments != null && !approverComments.trim().isEmpty()) {
+            content += "\n拒绝理由：" + approverComments;
+        }
+        
+        request.setContent(content);
+        request.setRelatedEntity("leave_request");
+        request.setRelatedId(leaveRequestId);
+        request.setPriority(NotificationPriority.high);
+
+        return createNotification(request);
+    }
+
+    /**
      * 获取用户通知列表
      */
     @Transactional(readOnly = true)

@@ -2,6 +2,7 @@ package com.example.springboot.entity; // 包名调整
 
 import com.example.springboot.entity.enums.LeaveRequestStatus; // 导入路径调整
 import com.example.springboot.entity.enums.RequestType;         // 导入路径调整
+import com.example.springboot.converter.LeaveRequestStatusConverter;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
@@ -36,7 +37,10 @@ public class LeaveRequest {
 
     private String reason; // 申请事由
 
-    @Enumerated(EnumType.STRING)
+    @Column(name = "proof_document_url", length = 500)
+    private String proofDocumentUrl; // 请假证明文件URL（图片或PDF）
+
+    @Convert(converter = LeaveRequestStatusConverter.class)
     @Column(nullable = false)
     private LeaveRequestStatus status; // 审批状态
 

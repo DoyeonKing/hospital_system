@@ -34,6 +34,7 @@ public class LeaveRequestService {
     private final ScheduleRepository scheduleRepository;
     private final DoctorService doctorService; // For converting doctor entity to DTO
     private final AdminService adminService; // For converting admin entity to DTO
+    private final NotificationService notificationService; // For sending notifications
 
     @Autowired
     public LeaveRequestService(LeaveRequestRepository leaveRequestRepository,
@@ -41,18 +42,33 @@ public class LeaveRequestService {
                                AdminRepository adminRepository,
                                ScheduleRepository scheduleRepository,
                                DoctorService doctorService,
-                               AdminService adminService) {
+                               AdminService adminService,
+                               NotificationService notificationService) {
         this.leaveRequestRepository = leaveRequestRepository;
         this.doctorRepository = doctorRepository;
         this.adminRepository = adminRepository;
         this.scheduleRepository = scheduleRepository;
         this.doctorService = doctorService;
         this.adminService = adminService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
     public List<LeaveRequestResponse> findAllLeaveRequests() {
-        return leaveRequestRepository.findAll().stream()
+        List<LeaveRequest> requests = leaveRequestRepository.findAll();
+        // 强制加载医生信息以避免LazyInitializationException
+        requests.forEach(request -> {
+            if (request.getDoctor() != null) {
+                request.getDoctor().getFullName(); // 触发lazy loading
+                if (request.getDoctor().getDepartment() != null) {
+                    request.getDoctor().getDepartment().getName(); // 触发department lazy loading
+                }
+            }
+            if (request.getApprover() != null) {
+                request.getApprover().getFullName(); // 触发approver lazy loading
+            }
+        });
+        return requests.stream()
                 .map(this::convertToResponseDto)
                 .collect(Collectors.toList());
     }
@@ -74,14 +90,41 @@ public class LeaveRequestService {
             throw new BadRequestException("医生已删除，无法查询请假记录");
         }
         
-        return leaveRequestRepository.findByDoctor(doctor).stream()
+        List<LeaveRequest> requests = leaveRequestRepository.findByDoctor(doctor);
+        // 强制加载医生和审批人信息以避免LazyInitializationException
+        requests.forEach(request -> {
+            if (request.getDoctor() != null) {
+                request.getDoctor().getFullName(); // 触发lazy loading
+                if (request.getDoctor().getDepartment() != null) {
+                    request.getDoctor().getDepartment().getName(); // 触发department lazy loading
+                }
+            }
+            if (request.getApprover() != null) {
+                request.getApprover().getFullName(); // 触发approver lazy loading
+            }
+        });
+        
+        return requests.stream()
                 .map(this::convertToResponseDto)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<LeaveRequestResponse> findLeaveRequestsByStatus(LeaveRequestStatus status) {
-        return leaveRequestRepository.findByStatus(status).stream()
+        List<LeaveRequest> requests = leaveRequestRepository.findByStatus(status);
+        // 强制加载医生信息以避免LazyInitializationException
+        requests.forEach(request -> {
+            if (request.getDoctor() != null) {
+                request.getDoctor().getFullName(); // 触发lazy loading
+                if (request.getDoctor().getDepartment() != null) {
+                    request.getDoctor().getDepartment().getName(); // 触发department lazy loading
+                }
+            }
+            if (request.getApprover() != null) {
+                request.getApprover().getFullName(); // 触发approver lazy loading
+            }
+        });
+        return requests.stream()
                 .map(this::convertToResponseDto)
                 .collect(Collectors.toList());
     }
@@ -105,15 +148,21 @@ public class LeaveRequestService {
         leaveRequest.setStatus(LeaveRequestStatus.PENDING); // 初始状态为待审批
         leaveRequest.setCreatedAt(LocalDateTime.now());
         leaveRequest.setUpdatedAt(LocalDateTime.now());
-
         return convertToResponseDto(leaveRequestRepository.save(leaveRequest));
     }
 
     @Transactional
     public LeaveRequestResponse updateLeaveRequest(Integer id, LeaveRequestUpdateRequest request) {
+        System.out.println("=== Service: updateLeaveRequest ===");
+        System.out.println("请假申请ID: " + id);
+        System.out.println("请求状态: " + request.getStatus());
+        System.out.println("审批人ID: " + request.getApproverId());
+        
         LeaveRequest existingRequest = leaveRequestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("LeaveRequest not found with id " + id));
 
+        System.out.println("现有请假状态: " + existingRequest.getStatus());
+        
         // 只有PENDING状态的申请可以修改或审批
         if (existingRequest.getStatus() != LeaveRequestStatus.PENDING && request.getStatus() != null && request.getStatus() != existingRequest.getStatus()) {
             throw new BadRequestException("Only pending leave requests can be updated or approved/rejected.");
@@ -129,12 +178,42 @@ public class LeaveRequestService {
         }
 
         if (request.getStatus() != null) {
+            System.out.println("设置新状态: " + request.getStatus());
             existingRequest.setStatus(request.getStatus());
             if (request.getStatus() == LeaveRequestStatus.APPROVED) {
+                System.out.println("处理批准逻辑...");
                 // 如果申请被批准，需要更新相关排班的状态
                 updateAffectedSchedules(existingRequest.getDoctor(), existingRequest.getStartTime(), existingRequest.getEndTime(), ScheduleStatus.cancelled);
+                
+                // 发送批准通知
+                try {
+                    notificationService.sendLeaveApprovedNotification(
+                        existingRequest.getDoctor().getDoctorId(),
+                        existingRequest.getRequestId(),
+                        existingRequest.getStartTime().toString(),
+                        existingRequest.getEndTime().toString(),
+                        request.getApproverComments()
+                    );
+                } catch (Exception e) {
+                    // 通知发送失败不影响主流程
+                    System.err.println("Failed to send leave approved notification: " + e.getMessage());
+                }
             } else if (request.getStatus() == LeaveRequestStatus.REJECTED) {
                 // 如果被拒绝，不做排班更改
+                
+                // 发送拒绝通知
+                try {
+                    notificationService.sendLeaveRejectedNotification(
+                        existingRequest.getDoctor().getDoctorId(),
+                        existingRequest.getRequestId(),
+                        existingRequest.getStartTime().toString(),
+                        existingRequest.getEndTime().toString(),
+                        request.getApproverComments()
+                    );
+                } catch (Exception e) {
+                    // 通知发送失败不影响主流程
+                    System.err.println("Failed to send leave rejected notification: " + e.getMessage());
+                }
             }
         }
 
@@ -146,7 +225,10 @@ public class LeaveRequestService {
         if (request.getApproverComments() != null) existingRequest.setApproverComments(request.getApproverComments());
 
         existingRequest.setUpdatedAt(LocalDateTime.now());
-        return convertToResponseDto(leaveRequestRepository.save(existingRequest));
+        LeaveRequest savedRequest = leaveRequestRepository.save(existingRequest);
+        System.out.println("保存后的状态: " + savedRequest.getStatus());
+        System.out.println("保存后的审批人ID: " + (savedRequest.getApprover() != null ? savedRequest.getApprover().getAdminId() : "null"));
+        return convertToResponseDto(savedRequest);
     }
 
     @Transactional

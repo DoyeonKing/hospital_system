@@ -123,12 +123,23 @@
           <p>扫描患者二维码进行签到</p>
         </div>
       </router-link>
+
+      <!-- 请假审批入口 -->
+      <router-link to="/leave-approval" class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #FEF3E2;">
+            <el-icon :size="32" color="#F59E0B"><Checked /></el-icon>
+          </div>
+          <h3>请假审批</h3>
+          <p>审批医生请假申请与调班安排</p>
+        </div>
+      </router-link>
     </div>
   </div>
 </template>
 
 <script setup>
-import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine } from '@element-plus/icons-vue';
+import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Checked } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import doctorImage from '@/assets/doctor.jpg';

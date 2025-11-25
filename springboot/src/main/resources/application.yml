@@ -55,3 +55,8 @@ logging:
   level:
     org.springframework: INFO
     com.example.springboot: DEBUG # 调整为你的根包名
+
+# 文件上传配置
+file:
+  upload:
+    path: uploads/
