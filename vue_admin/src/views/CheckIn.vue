@@ -171,10 +171,10 @@
             <el-table-column label="操作" width="280" fixed="right">
               <template #default="{ row }">
                 <!-- 未叫号：显示叫号按钮 -->
-                <el-button
-                  v-if="!row.calledAt"
-                  type="primary"
-                  size="small"
+                <el-button 
+                  v-if="!row.calledAt" 
+                  type="primary" 
+                  size="small" 
                   @click="handleCall(row.appointmentId)"
                   :loading="callingId === row.appointmentId"
                 >
@@ -182,14 +182,14 @@
                 </el-button>
                 <!-- 已叫号：显示就诊完成和标记过号按钮 -->
                 <div v-if="row.calledAt" style="display: flex; gap: 8px;">
-                  <el-button
+                <el-button 
                     type="success"
-                    size="small"
+                  size="small" 
                     @click="handleCompleteAppointment(row.appointmentId)"
                     :loading="completingId === row.appointmentId"
-                  >
+                >
                     就诊完成
-                  </el-button>
+                </el-button>
                   <el-button
                     type="danger"
                     size="small"
@@ -222,17 +222,17 @@
                     </el-tag>
                   </div>
                   <div>
-                    <el-button
-                      v-if="nextToCall.calledAt"
+                    <el-button 
+                      v-if="nextToCall.calledAt" 
                       type="success"
-                      size="small"
+                      size="small" 
                       @click="handleCompleteAppointment(nextToCall.appointmentId)"
                       :loading="completingId === nextToCall.appointmentId"
                       style="margin-right: 10px;"
                     >
                       就诊完成
                     </el-button>
-                    <el-button
+                    <el-button 
                       v-if="nextToCall.calledAt"
                       type="danger"
                       size="small"
@@ -244,8 +244,8 @@
                     </el-button>
                     <el-button
                       v-if="!nextToCall.calledAt"
-                      type="primary"
-                      @click="handleCall(nextToCall.appointmentId)"
+                      type="primary" 
+                      @click="handleCall(nextToCall.appointmentId)" 
                       :loading="callingId === nextToCall.appointmentId"
                       :disabled="!nextToCall.appointmentId"
                     >
@@ -946,7 +946,7 @@ const handleMarkMissedCall = async (appointmentId) => {
         type: 'warning'
       }
     )
-
+    
     await markMissedCall(appointmentId)
     ElMessage.success('已标记过号，签到记录已清除，患者可重新扫码签到')
     // 刷新队列

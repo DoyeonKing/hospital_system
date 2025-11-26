@@ -100,3 +100,88 @@ export async function completeAppointment(appointmentId) {
     });
 }
 
+/**
+ * 现场挂号（分诊台辅助患者挂号）
+ * @param {Object} data - { patientId, scheduleId }
+ */
+export async function createWalkInAppointment(data) {
+    return await request({
+        url: '/api/appointments/walk-in',
+        method: 'POST',
+        data
+    });
+}
+
+/**
+ * 退款接口（管理员功能）
+ * @param {Number} appointmentId - 预约ID
+ */
+export async function refundAppointment(appointmentId) {
+    return await request({
+        url: `/api/admin/appointments/${appointmentId}/refund`,
+        method: 'POST'
+    });
+}
+
+/**
+ * 获取患者的所有预约
+ * @param {Number} patientId - 患者ID
+ */
+export async function getPatientAppointments(patientId) {
+    return await request({
+        url: `/api/appointments/patient/${patientId}`,
+        method: 'GET'
+    });
+}
+
+/**
+ * 获取预约列表（管理员功能，用于搜索）
+ * @param {Object} params - 查询参数
+ * @param {String} params.patientName - 患者姓名（可选）
+ * @param {Number} params.appointmentId - 预约ID（可选）
+ * @param {String} params.paymentStatus - 支付状态（可选）
+ * @param {Number} params.page - 页码（可选）
+ * @param {Number} params.size - 每页数量（可选）
+ */
+export async function searchAppointments(params = {}) {
+    return await request({
+        url: '/api/appointments',
+        method: 'GET',
+        params
+    });
+}
+
+/**
+ * 获取预约详情
+ * @param {Number} appointmentId - 预约ID
+ */
+export async function getAppointmentDetail(appointmentId) {
+    return await request({
+        url: `/api/appointments/${appointmentId}`,
+        method: 'GET'
+    });
+}
+
+/**
+ * 支付预约费用（管理员功能）
+ * @param {Number} appointmentId - 预约ID
+ * @param {Object} paymentData - 支付数据
+ * @param {String} paymentData.paymentMethod - 支付方式：cash/wechat/alipay/card
+ * @param {String} paymentData.transactionId - 交易流水号（可选）
+ * @param {Number} paymentData.amount - 实收金额（可选）
+ * @param {String} paymentData.remark - 备注（可选）
+ */
+export async function payForAppointment(appointmentId, paymentData) {
+    return await request({
+        url: `/api/appointments/${appointmentId}/pay`,
+        method: 'POST',
+        data: {
+            paymentStatus: 'paid',
+            paymentMethod: paymentData.paymentMethod,
+            transactionId: paymentData.transactionId,
+            amount: paymentData.amount,
+            remark: paymentData.remark
+        }
+    });
+}
+

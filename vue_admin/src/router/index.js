@@ -40,6 +40,8 @@ import FeeManagement from '@/views/fees/FeeManagement.vue';
 // ===== 新增：导入签到管理页面组件 =====
 // import CheckIn from '@/views/CheckIn.vue';
 const CheckIn = () => import('@/views/CheckIn.vue');
+// ===== 新增：导入现场服务页面组件 =====
+const OnSiteService = () => import('@/views/OnSiteService.vue');
 // ===== 新增：导入数据大屏页面组件 =====
 import StatsCanvas from '@/views/dashboard/StatsCanvas.vue';
 
@@ -221,6 +223,15 @@ const routes = [
         name: 'CheckIn',
         meta: { title: '患者签到', requiresAuth: true },
         component: CheckIn
+    },
+    // =======================================================
+
+    // ===== 现场服务路由 =====
+    {
+        path: '/on-site-service',
+        name: 'OnSiteService',
+        meta: { title: '现场服务', requiresAuth: true },
+        component: OnSiteService
     },
     // =======================================================
 

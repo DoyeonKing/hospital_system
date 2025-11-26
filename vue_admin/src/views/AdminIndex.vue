@@ -123,12 +123,23 @@
           <p>扫描患者二维码进行签到</p>
         </div>
       </router-link>
+
+      <!-- 现场服务入口 -->
+      <router-link to="/on-site-service" class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #FFF4E6;">
+            <el-icon :size="32" color="#F59E0B"><Service /></el-icon>
+          </div>
+          <h3>现场服务</h3>
+          <p>辅助患者挂号、退款等现场服务</p>
+        </div>
+      </router-link>
     </div>
   </div>
 </template>
 
 <script setup>
-import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine } from '@element-plus/icons-vue';
+import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Service } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import doctorImage from '@/assets/doctor.jpg';
