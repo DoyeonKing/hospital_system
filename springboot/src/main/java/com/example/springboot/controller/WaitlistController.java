@@ -1,11 +1,15 @@
 package com.example.springboot.controller;
 
 import com.example.springboot.dto.appointment.AppointmentResponse;
+import com.example.springboot.dto.common.PageResponse;
 import com.example.springboot.dto.payment.PaymentRequest;
-import com.example.springboot.dto.waitlist.WaitlistCreateRequest;
-import com.example.springboot.dto.waitlist.WaitlistResponse;
+import com.example.springboot.dto.waitlist.*;
+import com.example.springboot.entity.enums.WaitlistStatus;
 import com.example.springboot.service.WaitlistService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -63,4 +67,25 @@ public class WaitlistController {
             @RequestBody PaymentRequest paymentData) {
         return ResponseEntity.ok(waitlistService.processWaitlistPayment(waitlistId, paymentData));
     }
+
+    /**
+     * 查询排队位置
+     */
+    @GetMapping("/{waitlistId}/position")
+    public ResponseEntity<WaitlistPositionResponse> getWaitlistPosition(@PathVariable Integer waitlistId) {
+        return ResponseEntity.ok(waitlistService.getWaitlistPosition(waitlistId));
+    }
+
+    @GetMapping("/schedule/{scheduleId}")
+    public ResponseEntity<PageResponse<WaitlistManagementResponse>> getWaitlistsBySchedule(
+            @PathVariable Integer scheduleId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+
+        return ResponseEntity.ok(
+                waitlistService.getWaitlistsByScheduleForManagement(scheduleId, status, page, size)
+        );
+    }
+
 }

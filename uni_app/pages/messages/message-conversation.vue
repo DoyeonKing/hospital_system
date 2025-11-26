@@ -18,12 +18,17 @@
 				class="message-bubble" 
 				v-for="notification in conversation.messages" 
 				:key="notification.notificationId || notification.id"
-				:class="{ 'unread': notification.status === 'unread' }"
+				:class="{ 'unread': notification.status === 'unread', 'clickable': isClickableNotification(notification) }"
+				@click="handleNotificationClick(notification)"
 			>
 				<view class="message-time">{{ formatTime(notification.sentAt || notification.createTime) }}</view>
 				<view class="message-content-wrapper">
 					<view class="message-title">{{ notification.title }}</view>
 					<text class="message-text">{{ notification.content }}</text>
+					<!-- 候补通知显示操作提示 -->
+					<view class="action-hint" v-if="notification.type === 'waitlist_available'">
+						<text class="hint-text">点击查看详情并支付</text>
+					</view>
 				</view>
 			</view>
 			
@@ -141,6 +146,45 @@
 				return typeMap[type] || '系统通知'
 			},
 			
+			// 判断通知是否可点击
+			isClickableNotification(notification) {
+				return notification.type === 'waitlist_available' && notification.waitlistId
+			},
+			
+			// 处理通知点击
+			handleNotificationClick(notification) {
+				if (!this.isClickableNotification(notification)) {
+					return
+				}
+				
+				// 候补通知：跳转到候补详情页
+				if (notification.type === 'waitlist_available' && notification.waitlistId) {
+					const waitlistId = notification.waitlistId
+					uni.navigateTo({
+						url: `/pages/waitlist/waitlist-detail?waitlistId=${waitlistId}`,
+						success: () => {
+							// 标记该通知为已读
+							this.markNotificationAsRead(notification)
+						}
+					})
+				}
+			},
+			
+			// 标记单个通知为已读
+			async markNotificationAsRead(notification) {
+				try {
+					const patientInfo = uni.getStorageSync('patientInfo')
+					if (patientInfo && patientInfo.id && notification.notificationId) {
+						await markAsRead(notification.notificationId)
+						// 更新本地状态
+						notification.status = 'read'
+						this.unreadCount = Math.max(0, this.unreadCount - 1)
+					}
+				} catch (error) {
+					console.error('标记通知为已读失败:', error)
+				}
+			},
+			
 			async markAllAsRead() {
 				// 调用API标记该类型的所有通知为已读
 				if (this.conversation.messages && this.conversation.messages.length > 0) {
@@ -250,6 +294,30 @@
 	.message-bubble.unread {
 		background: linear-gradient(135deg, #ffffff 0%, #F0FDFA 100%);
 		border-left: 4rpx solid $color-primary;
+	}
+	
+	.message-bubble.clickable {
+		cursor: pointer;
+		transition: all 0.3s ease;
+		
+		&:active {
+			transform: scale(0.98);
+			box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.1);
+		}
+	}
+	
+	.action-hint {
+		margin-top: 12rpx;
+		padding: 12rpx;
+		background: #FFF7E6;
+		border-radius: 8rpx;
+		border-left: 3rpx solid #FFA500;
+	}
+	
+	.hint-text {
+		font-size: 24rpx;
+		color: #FF8C00;
+		font-weight: 500;
 	}
 	
 	.message-time {

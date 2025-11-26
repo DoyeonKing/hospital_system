@@ -145,13 +145,54 @@ CREATE TABLE `appointments` (
   `patient_id` INT NOT NULL COMMENT '患者ID',
   `schedule_id` INT NOT NULL COMMENT '排班ID',
   `appointment_number` INT NOT NULL COMMENT '就诊序号',
-  `status` ENUM('scheduled','completed','cancelled','no_show') NOT NULL DEFAULT 'scheduled' COMMENT '预约状态',
+  `status` ENUM(
+      'PENDING_PAYMENT',  -- 待支付
+      'scheduled',        -- 已预约（未签到）
+      'CHECKED_IN',       -- 已签到（未就诊）
+      'completed',        -- 已完成
+      'cancelled',        -- 已取消
+      'NO_SHOW'          -- 爽约
+  ) NOT NULL DEFAULT 'scheduled' COMMENT '预约状态',
   `payment_status` ENUM('unpaid','paid','refunded') NOT NULL DEFAULT 'unpaid' COMMENT '支付状态',
   `payment_method` VARCHAR(50) COMMENT '支付方式',
   `transaction_id` VARCHAR(255) COMMENT '支付流水号',
   `check_in_time` DATETIME COMMENT '现场签到时间',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '预约生成时间',
-  PRIMARY KEY (`appointment_id`)
+  `updated_at` TIMESTAMP NULL DEFAULT NULL COMMENT '最后更新时间（status变为completed时由触发器更新）',
+  -- 叫号相关字段
+  `called_at` DATETIME NULL COMMENT '叫号时间（NULL表示未叫号）',
+  `is_on_time` TINYINT(1) DEFAULT 0 COMMENT '是否按时签到（预约时段开始后20分钟内）',
+  `missed_call_count` INT DEFAULT 0 COMMENT '过号次数',
+  `recheck_in_time` DATETIME NULL COMMENT '过号后重新签到时间',
+  -- 排队相关字段
+  `is_walk_in` TINYINT(1) DEFAULT 0 COMMENT '是否现场挂号（0=预约，1=现场挂号）',
+  `real_time_queue_number` INT NULL COMMENT '实时候诊序号（在时段内按签到时间分配）',
+  `is_late` TINYINT(1) DEFAULT 0 COMMENT '是否迟到（超过时段结束时间+软关门时间）',
+  -- 预约类型相关字段
+  `appointment_type` ENUM(
+      'APPOINTMENT',        -- 预约挂号
+      'WALK_IN',            -- 现场挂号
+      'SAME_DAY_FOLLOW_UP', -- 当日复诊号
+      'ADD_ON'              -- 加号
+  ) NULL DEFAULT 'APPOINTMENT' COMMENT '预约类型',
+  `original_appointment_id` INT NULL COMMENT '原始预约ID（用于复诊号关联，复诊号关联到原始预约）',
+  `is_add_on` TINYINT(1) DEFAULT 0 COMMENT '是否加号（0=否，1=是）',
+  PRIMARY KEY (`appointment_id`),
+  KEY `idx_patient_id` (`patient_id`),
+  KEY `idx_schedule_id` (`schedule_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_check_in_time` (`check_in_time`),
+  KEY `idx_called_at` (`called_at`),
+  KEY `idx_is_on_time` (`is_on_time`),
+  KEY `idx_recheck_in_time` (`recheck_in_time`),
+  KEY `idx_is_walk_in` (`is_walk_in`),
+  KEY `idx_real_time_queue_number` (`real_time_queue_number`),
+  KEY `idx_is_late` (`is_late`),
+  KEY `idx_appointment_type` (`appointment_type`),
+  KEY `idx_original_appointment_id` (`original_appointment_id`),
+  KEY `idx_is_add_on` (`is_add_on`),
+  CONSTRAINT `fk_original_appointment` FOREIGN KEY (`original_appointment_id`) 
+      REFERENCES `appointments` (`appointment_id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='预约挂号表';
 
 -- 11. waitlist (候补表)
@@ -660,5 +701,26 @@ UNION ALL
 SELECT 'departments' as table_name, department_id, name FROM departments WHERE department_id = 999;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- =====================================================
+-- 创建触发器
+-- =====================================================
+
+-- 创建触发器：当 appointments.status 更新为 'completed' 时，自动更新 updated_at
+DELIMITER $$
+
+DROP TRIGGER IF EXISTS `trg_appointment_completed_update_time`$$
+
+CREATE TRIGGER `trg_appointment_completed_update_time`
+BEFORE UPDATE ON `appointments`
+FOR EACH ROW
+BEGIN
+    -- 当 status 从非 completed 变为 completed 时，更新 updated_at 为当前时间
+    IF NEW.status = 'completed' AND (OLD.status IS NULL OR OLD.status != 'completed') THEN
+        SET NEW.updated_at = NOW();
+    END IF;
+END$$
+
+DELIMITER ;
 
 COMMIT;

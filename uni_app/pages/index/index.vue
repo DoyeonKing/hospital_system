@@ -180,11 +180,45 @@
 				return this.patientInfo.identifier
 			},
 			isWithin24Hours() {
-				if (!this.upcomingAppointment || !this.upcomingAppointment.scheduleTime) return false
-				const scheduleTime = new Date(this.upcomingAppointment.scheduleTime)
+				if (!this.upcomingAppointment) return false
 				const now = new Date()
-				const diff = scheduleTime - now
-				return diff > 0 && diff <= 24 * 60 * 60 * 1000
+				
+				// 优先使用排班结束时间判断：只要排班结束时间还没到，就显示
+				if (this.upcomingAppointment.scheduleEndTime) {
+					const scheduleEndTime = new Date(this.upcomingAppointment.scheduleEndTime)
+					// 如果排班结束时间还没到，就显示
+					if (scheduleEndTime > now) {
+						console.log('[首页] isWithin24Hours检查 - 排班结束时间未到:', {
+							scheduleEndTime: this.upcomingAppointment.scheduleEndTime,
+							now: now.toISOString(),
+							diff: scheduleEndTime - now
+						})
+						return true
+					} else {
+						console.log('[首页] isWithin24Hours检查 - 排班结束时间已过:', {
+							scheduleEndTime: this.upcomingAppointment.scheduleEndTime,
+							now: now.toISOString()
+						})
+						return false
+					}
+				}
+				
+				// 如果没有排班结束时间，使用开始时间判断（兼容旧数据）
+				if (this.upcomingAppointment.scheduleTime) {
+					const scheduleTime = new Date(this.upcomingAppointment.scheduleTime)
+					// 如果开始时间在未来24小时内，也显示
+					const diff = scheduleTime - now
+					const result = diff > 0 && diff <= 24 * 60 * 60 * 1000
+					console.log('[首页] isWithin24Hours检查 - 使用开始时间:', {
+						scheduleTime: this.upcomingAppointment.scheduleTime,
+						now: now.toISOString(),
+						diff: diff,
+						result: result
+					})
+					return result
+				}
+				
+				return false
 			}
 		},
 		onLoad() {
@@ -391,15 +425,79 @@
 					if (patientInfo && patientInfo.id) {
 						// 获取即将就诊的预约
 						const appointmentResponse = await getUpcomingAppointments(patientInfo.id)
-						console.log('即将就诊预约响应:', appointmentResponse)
+						console.log('[首页] 即将就诊预约响应:', appointmentResponse)
 						if (appointmentResponse && appointmentResponse.code === '200' && appointmentResponse.data) {
-							// 过滤掉已取消的预约，取第一个即将就诊的预约
-							const validAppointments = appointmentResponse.data.filter(apt => 
-								apt.status !== 'cancelled' && apt.status !== 'CANCELLED'
-							)
-							this.upcomingAppointment = validAppointments.length > 0 ? validAppointments[0] : null
+							const now = new Date()
+							console.log('[首页] 当前时间:', now.toISOString())
+							
+							// 过滤掉已取消和已完成的预约
+							// 注意：不过滤时间已过去的预约，因为只要排班结束时间还没到，就算"即将就诊"
+							const validAppointments = appointmentResponse.data.filter(apt => {
+								// 过滤已取消的预约
+								if (apt.status === 'cancelled' || apt.status === 'CANCELLED') {
+									console.log('[首页] 过滤已取消的预约:', apt.appointmentId, apt.scheduleTime)
+									return false
+								}
+								// 过滤已完成的预约
+								if (apt.status === 'completed' || apt.status === 'COMPLETED') {
+									console.log('[首页] 过滤已完成的预约:', apt.appointmentId, apt.scheduleTime)
+									return false
+								}
+								
+								// 检查排班结束时间：如果排班结束时间已过，则过滤掉
+								if (apt.scheduleEndTime) {
+									const scheduleEndTime = new Date(apt.scheduleEndTime)
+									if (scheduleEndTime <= now) {
+										console.log('[首页] 过滤排班结束时间已过的预约:', {
+											id: apt.appointmentId,
+											scheduleTime: apt.scheduleTime,
+											scheduleEndTime: apt.scheduleEndTime,
+											now: now.toISOString()
+										})
+										return false
+									}
+								} else if (apt.scheduleTime) {
+									// 如果没有排班结束时间，使用开始时间+默认时长（比如4小时）来判断
+									// 或者直接不过滤，让后端查询逻辑处理
+									console.log('[首页] 预约没有排班结束时间，使用开始时间:', apt.appointmentId, apt.scheduleTime)
+								}
+								
+								return true
+							})
+							
+							console.log('[首页] 过滤后的有效预约数量:', validAppointments.length)
+							console.log('[首页] 有效预约列表:', validAppointments.map(apt => ({
+								id: apt.appointmentId,
+								scheduleTime: apt.scheduleTime,
+								scheduleEndTime: apt.scheduleEndTime,
+								status: apt.status
+							})))
+							
+							// 按就诊时间升序排序，取最早的预约
+							if (validAppointments.length > 0) {
+								validAppointments.sort((a, b) => {
+									if (!a.scheduleTime && !b.scheduleTime) return 0
+									if (!a.scheduleTime) return 1
+									if (!b.scheduleTime) return -1
+									const timeA = new Date(a.scheduleTime).getTime()
+									const timeB = new Date(b.scheduleTime).getTime()
+									return timeA - timeB // 升序：最早的在前
+								})
+								
+								this.upcomingAppointment = validAppointments[0]
+								console.log('[首页] 最终选择的即将就诊预约:', {
+									id: this.upcomingAppointment.appointmentId,
+									scheduleTime: this.upcomingAppointment.scheduleTime,
+									scheduleEndTime: this.upcomingAppointment.scheduleEndTime,
+									status: this.upcomingAppointment.status
+								})
+							} else {
+								this.upcomingAppointment = null
+								console.log('[首页] 没有有效的即将就诊预约')
+							}
 						} else {
 							this.upcomingAppointment = null
+							console.log('[首页] API响应无效，清空即将就诊预约')
 						}
 						
 						// 获取候补数量（只统计等待中和已通知的候补）
@@ -529,11 +627,54 @@
 				})
 			},
 			
-			// 导航到候补列表
-			navigateToWaitlist() {
-				uni.navigateTo({
-					url: '/pages/waitlist/waitlist'
-				})
+			// 导航到候补列表（优先跳转到 notified 状态的候补详情）
+			async navigateToWaitlist() {
+				try {
+					const patientInfo = uni.getStorageSync('patientInfo')
+					if (!patientInfo || !patientInfo.id) {
+						// 未登录，直接跳转到候补列表
+						uni.navigateTo({
+							url: '/pages/waitlist/waitlist'
+						})
+						return
+					}
+					
+					// 获取候补列表
+					const { getPatientWaitlist } = await import('../../api/appointment.js')
+					const waitlistResponse = await getPatientWaitlist(patientInfo.id)
+					
+					let waitlistList = []
+					if (waitlistResponse && waitlistResponse.code === '200' && waitlistResponse.data) {
+						waitlistList = Array.isArray(waitlistResponse.data) ? waitlistResponse.data : []
+					} else if (Array.isArray(waitlistResponse)) {
+						waitlistList = waitlistResponse
+					}
+					
+					// 优先查找 notified 状态的候补
+					const notifiedWaitlist = waitlistList.find(w => {
+						const status = (w.status || '').toLowerCase()
+						return status === 'notified'
+					})
+					
+					if (notifiedWaitlist) {
+						// 有已通知的候补，跳转到详情页
+						const waitlistId = notifiedWaitlist.id || notifiedWaitlist.waitlistId
+						uni.navigateTo({
+							url: `/pages/waitlist/waitlist-detail?waitlistId=${waitlistId}`
+						})
+					} else {
+						// 没有已通知的候补，跳转到候补列表
+						uni.navigateTo({
+							url: '/pages/waitlist/waitlist'
+						})
+					}
+				} catch (error) {
+					console.error('获取候补列表失败:', error)
+					// 出错时跳转到候补列表
+					uni.navigateTo({
+						url: '/pages/waitlist/waitlist'
+					})
+				}
 			},
 			
 			// 显示联系方式

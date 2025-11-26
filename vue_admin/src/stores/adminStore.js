@@ -94,6 +94,7 @@ export const useAdminStore = defineStore('admin', {
             // 优先使用 loggedInAdminBasicInfo 中的 adminId
             const adminIdToFetch = this.loggedInAdminBasicInfo?.adminId;
             // 如果 adminId 不可用，可以考虑使用 name 作为备用查询条件（如果后端支持）
+            const adminNameToFetch = this.loggedInAdminBasicInfo?.name;
             let identifierForAPI = null;
             let endpoint = '';
 
