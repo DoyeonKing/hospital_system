@@ -67,6 +67,14 @@ public class AppointmentController {
     }
 
     /**
+     * 现场挂号（分诊台辅助患者挂号）
+     */
+    @PostMapping("/walk-in")
+    public ResponseEntity<AppointmentResponse> createWalkInAppointment(@RequestBody AppointmentCreateRequest request) {
+        return ResponseEntity.ok(appointmentService.createWalkInAppointment(request));
+    }
+
+    /**
      * 取消预约
      */
     @PutMapping("/{appointmentId}/cancel")
@@ -180,10 +188,27 @@ public class AppointmentController {
     }
 
     /**
+     * 标记过号（仅标记，不重新排队，需要患者重新扫码才能重新排队）
+     */
+    @PostMapping("/{appointmentId}/mark-missed")
+    public ResponseEntity<AppointmentResponse> markMissedCall(@PathVariable Integer appointmentId) {
+        return ResponseEntity.ok(appointmentService.markMissedCall(appointmentId));
+    }
+
+    /**
      * 过号后重新签到（序号排到后面）
+     * 规则：患者重新扫码后调用此接口，系统将其放在当前时段最后一位
      */
     @PostMapping("/{appointmentId}/recheck-in")
     public ResponseEntity<AppointmentResponse> recheckInAfterMissedCall(@PathVariable Integer appointmentId) {
         return ResponseEntity.ok(appointmentService.recheckInAfterMissedCall(appointmentId));
+    }
+
+    /**
+     * 标记就诊完成（医生完成就诊后调用，会自动叫号下一位）
+     */
+    @PostMapping("/{appointmentId}/complete")
+    public ResponseEntity<AppointmentResponse> completeAppointment(@PathVariable Integer appointmentId) {
+        return ResponseEntity.ok(appointmentService.completeAppointment(appointmentId));
     }
 }

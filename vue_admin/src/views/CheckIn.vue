@@ -77,10 +77,14 @@
       </div>
       
       <!-- 叫号队列 -->
+      <!-- 
+        注意：此页面包含叫号功能，用于测试。
+        正式环境中，叫号功能应由医生端完成，管理员/分诊台仅负责签到和队列管理。
+      -->
       <el-card style="margin-top: 20px;">
         <template #header>
           <div class="card-header">
-            <span>叫号队列</span>
+            <span>叫号队列（测试用）</span>
             <div>
               <el-select 
                 v-model="selectedScheduleId" 
@@ -142,10 +146,16 @@
                 {{ formatDateTime(row.checkInTime) }}
               </template>
             </el-table-column>
-            <el-table-column label="叫号状态" width="120" align="center">
+            <el-table-column label="叫号状态" width="140" align="center">
               <template #default="{ row }">
-                <el-tag v-if="row.calledAt" type="info">已叫号</el-tag>
-                <el-tag v-else type="success">待叫号</el-tag>
+                <div style="display: flex; flex-direction: column; gap: 4px; align-items: center;">
+                  <el-tag v-if="row.calledAt && row.recheckInTime" type="danger" size="small">已过号</el-tag>
+                  <el-tag v-else-if="row.calledAt" type="info" size="small">已叫号</el-tag>
+                  <el-tag v-else type="success" size="small">待叫号</el-tag>
+                  <span v-if="row.missedCallCount > 0" style="font-size: 12px; color: #f56c6c;">
+                    过号{{ row.missedCallCount }}次
+                  </span>
+                </div>
               </template>
             </el-table-column>
             <el-table-column label="叫号时间" width="180">
@@ -153,8 +163,14 @@
                 {{ row.calledAt ? formatDateTime(row.calledAt) : '-' }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="200" fixed="right">
+            <el-table-column label="重新签到时间" width="180">
               <template #default="{ row }">
+                {{ row.recheckInTime ? formatDateTime(row.recheckInTime) : '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="280" fixed="right">
+              <template #default="{ row }">
+                <!-- 未叫号：显示叫号按钮 -->
                 <el-button 
                   v-if="!row.calledAt" 
                   type="primary" 
@@ -164,15 +180,25 @@
                 >
                   叫号
                 </el-button>
+                <!-- 已叫号：显示就诊完成和标记过号按钮 -->
+                <div v-if="row.calledAt" style="display: flex; gap: 8px;">
                 <el-button 
-                  v-if="row.calledAt" 
-                  type="warning" 
+                    type="success"
                   size="small" 
-                  @click="handleRecheckIn(row.appointmentId)"
-                  :loading="recheckingId === row.appointmentId"
+                    @click="handleCompleteAppointment(row.appointmentId)"
+                    :loading="completingId === row.appointmentId"
                 >
-                  重新签到
+                    就诊完成
                 </el-button>
+                  <el-button
+                    type="danger"
+                    size="small"
+                    @click="handleMarkMissedCall(row.appointmentId)"
+                    :loading="markingId === row.appointmentId"
+                  >
+                    标记过号
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -198,15 +224,26 @@
                   <div>
                     <el-button 
                       v-if="nextToCall.calledAt" 
-                      type="warning" 
+                      type="success"
                       size="small" 
-                      @click="handleRecheckIn(nextToCall.appointmentId)"
-                      :loading="recheckingId === nextToCall.appointmentId"
+                      @click="handleCompleteAppointment(nextToCall.appointmentId)"
+                      :loading="completingId === nextToCall.appointmentId"
                       style="margin-right: 10px;"
                     >
-                      重新签到
+                      就诊完成
                     </el-button>
                     <el-button 
+                      v-if="nextToCall.calledAt"
+                      type="danger"
+                      size="small"
+                      @click="handleMarkMissedCall(nextToCall.appointmentId)"
+                      :loading="markingId === nextToCall.appointmentId"
+                      style="margin-right: 10px;"
+                    >
+                      标记过号
+                    </el-button>
+                    <el-button
+                      v-if="!nextToCall.calledAt"
                       type="primary" 
                       @click="handleCall(nextToCall.appointmentId)" 
                       :loading="callingId === nextToCall.appointmentId"
@@ -260,7 +297,7 @@
 import { ref, onUnmounted, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { Camera, Refresh, Loading } from '@element-plus/icons-vue'
-import { checkInAppointment, getAppointmentQrCode, clearCheckIn, getCallQueue, getNextAppointmentToCall, callAppointment, recheckInAfterMissedCall } from '@/api/appointment.js'
+import { checkInAppointment, getAppointmentQrCode, clearCheckIn, getCallQueue, getNextAppointmentToCall, callAppointment, markMissedCall, recheckInAfterMissedCall, completeAppointment } from '@/api/appointment.js'
 import { getAllSchedules } from '@/api/schedule.js'
 import { Html5Qrcode } from 'html5-qrcode'
 
@@ -282,6 +319,8 @@ const callQueue = ref([])
 const nextToCall = ref(null)
 const loadingQueue = ref(false)
 const callingId = ref(null)
+const markingId = ref(null) // 标记过号的loading状态
+const completingId = ref(null) // 就诊完成的loading状态
 const recheckingId = ref(null)
 
 const scanQRCode = () => {
@@ -894,31 +933,59 @@ const handleCall = async (appointmentId) => {
   }
 }
 
-// 过号后重新签到
-const handleRecheckIn = async (appointmentId) => {
-  recheckingId.value = appointmentId
+// 标记过号（状态改回scheduled，患者可重新扫码）
+const handleMarkMissedCall = async (appointmentId) => {
+  markingId.value = appointmentId
   try {
     await ElMessageBox.confirm(
-      '确认将该患者重新加入叫号队列？就诊序号不变，但会排在队列后面。',
-      '重新签到',
+      '确认该患者已过号？系统将清除签到记录，患者可重新扫码签到。',
+      '标记过号',
       {
-        confirmButtonText: '确认',
+        confirmButtonText: '确认过号',
         cancelButtonText: '取消',
         type: 'warning'
       }
     )
     
-    await recheckInAfterMissedCall(appointmentId)
-    ElMessage.success('重新签到成功')
+    await markMissedCall(appointmentId)
+    ElMessage.success('已标记过号，签到记录已清除，患者可重新扫码签到')
     // 刷新队列
     await loadCallQueue()
   } catch (error) {
     if (error !== 'cancel') {
-      const errorMsg = error.response?.data?.message || error.message || '重新签到失败'
+      const errorMsg = error.response?.data?.message || error.message || '标记过号失败'
       ElMessage.error(errorMsg)
     }
   } finally {
-    recheckingId.value = null
+    markingId.value = null
+  }
+}
+
+// 就诊完成处理
+const handleCompleteAppointment = async (appointmentId) => {
+  completingId.value = appointmentId
+  try {
+    await ElMessageBox.confirm(
+      '确认该患者就诊已完成？系统将自动叫号下一位患者。',
+      '就诊完成',
+      {
+        confirmButtonText: '确认完成',
+        cancelButtonText: '取消',
+        type: 'success'
+      }
+    )
+
+    await completeAppointment(appointmentId)
+    ElMessage.success('就诊完成，已自动叫号下一位患者')
+    // 刷新队列
+    await loadCallQueue()
+  } catch (error) {
+    if (error !== 'cancel') {
+      const errorMsg = error.response?.data?.message || error.message || '标记就诊完成失败'
+      ElMessage.error(errorMsg)
+    }
+  } finally {
+    completingId.value = null
   }
 }
 
