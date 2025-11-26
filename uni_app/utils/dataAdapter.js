@@ -59,6 +59,8 @@ export function adaptAppointment(appointment) {
 		'SCHEDULED': 'confirmed',
 		'confirmed': 'confirmed',
 		'CONFIRMED': 'confirmed',
+		'checked_in': 'checked_in',
+		'CHECKED_IN': 'checked_in',
 		'completed': 'completed',
 		'COMPLETED': 'completed',
 		'cancelled': 'cancelled',
@@ -77,6 +79,23 @@ export function adaptAppointment(appointment) {
 	}
 	const finalStatus = statusMap[statusValue] || statusMap[statusValue?.toLowerCase()] || statusValue?.toLowerCase() || 'pending'
 	
+	const scheduleTime = schedule.scheduleDate ? 
+		(schedule.scheduleDate + 'T' + formatTime(schedule.startTime)) : ''
+	const scheduleEndTime = schedule.scheduleDate && schedule.endTime ? 
+		(schedule.scheduleDate + 'T' + formatTime(schedule.endTime)) : ''
+	
+	console.log('[数据适配] schedule原始数据:', {
+		scheduleDate: schedule.scheduleDate,
+		startTime: schedule.startTime,
+		endTime: schedule.endTime,
+		startTimeType: typeof schedule.startTime,
+		endTimeType: typeof schedule.endTime
+	})
+	console.log('[数据适配] 格式化后的时间:', {
+		scheduleTime: scheduleTime,
+		scheduleEndTime: scheduleEndTime
+	})
+	
 	const adapted = {
 		id: appointment.appointmentId,
 		appointmentId: appointment.appointmentId,
@@ -86,8 +105,8 @@ export function adaptAppointment(appointment) {
 		doctorId: schedule.doctorId,
 		doctorName: schedule.doctorName || '',
 		doctorTitle: schedule.doctorTitle || '',
-		scheduleTime: schedule.scheduleDate ? 
-			(schedule.scheduleDate + 'T' + formatTime(schedule.startTime)) : '',
+		scheduleTime: scheduleTime,
+		scheduleEndTime: scheduleEndTime,
 		appointmentTime: appointment.createdAt || '',
 		status: finalStatus,
 		queueNumber: appointment.appointmentNumber,
@@ -96,14 +115,16 @@ export function adaptAppointment(appointment) {
 		patientId: patient.patientId || patient.id
 	}
 	
-	console.log('adaptAppointment 适配后数据:', JSON.stringify(adapted, null, 2))
-	console.log('adaptAppointment 适配后字段检查:', {
+	console.log('[数据适配] 适配后数据:', JSON.stringify(adapted, null, 2))
+	console.log('[数据适配] 适配后字段检查:', {
 		id: adapted.id,
 		appointmentId: adapted.appointmentId,
 		departmentName: adapted.departmentName,
 		doctorName: adapted.doctorName,
 		status: adapted.status,
 		scheduleTime: adapted.scheduleTime,
+		scheduleEndTime: adapted.scheduleEndTime,
+		hasScheduleEndTime: !!adapted.scheduleEndTime,
 		hasDepartmentName: !!adapted.departmentName,
 		hasDoctorName: !!adapted.doctorName
 	})

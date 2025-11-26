@@ -19,5 +19,9 @@ public class AppointmentResponse {
     private String paymentMethod;
     private String transactionId;
     private LocalDateTime checkInTime;
+    private LocalDateTime calledAt; // 叫号时间
+    private Boolean isOnTime; // 是否按时签到
+    private Integer missedCallCount; // 过号次数
+    private LocalDateTime recheckInTime; // 过号后重新签到时间
     private LocalDateTime createdAt;
 }

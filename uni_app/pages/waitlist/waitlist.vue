@@ -101,6 +101,7 @@
 			return {
 				waitlistList: [],
 				countdownTimer: null,
+				refreshTimer: null, // 定期刷新定时器
 				loading: false
 			}
 		},
@@ -110,12 +111,25 @@
 		onShow() {
 			// 页面显示时刷新数据
 			this.loadWaitlist()
+			// 启动定期刷新（每30秒）
+			this.startAutoRefresh()
+		},
+		onHide() {
+			// 页面隐藏时停止定期刷新
+			this.stopAutoRefresh()
 		},
 		onUnload() {
-			// 页面卸载时清除定时器
+			// 页面卸载时清除所有定时器
 			if (this.countdownTimer) {
 				clearInterval(this.countdownTimer)
 			}
+			this.stopAutoRefresh()
+		},
+		onPullDownRefresh() {
+			// 下拉刷新
+			this.loadWaitlist().finally(() => {
+				uni.stopPullDownRefresh()
+			})
 		},
 		methods: {
 			// 加载候补列表
@@ -226,6 +240,23 @@
 						this.loadWaitlist() // 重新加载数据
 					}
 				}, 1000)
+			},
+			
+			// 启动定期刷新
+			startAutoRefresh() {
+				this.stopAutoRefresh() // 先清除旧的定时器
+				// 每30秒刷新一次数据
+				this.refreshTimer = setInterval(() => {
+					this.loadWaitlist()
+				}, 30000)
+			},
+			
+			// 停止定期刷新
+			stopAutoRefresh() {
+				if (this.refreshTimer) {
+					clearInterval(this.refreshTimer)
+					this.refreshTimer = null
+				}
 			},
 			
 			// 获取状态文本
@@ -531,8 +562,14 @@
 	}
 
 	@keyframes blink {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.5; }
+		0%, 100% { 
+			opacity: 1; 
+			transform: scale(1);
+		}
+		50% { 
+			opacity: 0.7; 
+			transform: scale(1.05);
+		}
 	}
 
 	.waitlist-actions {

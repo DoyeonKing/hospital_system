@@ -1,17 +1,24 @@
 package com.example.springboot.controller;
 
 import com.example.springboot.dto.report.DoctorHoursResponse;
+import com.example.springboot.dto.report.RegistrationHoursResponse;
 import com.example.springboot.dto.schedule.ScheduleListRequest;
 import com.example.springboot.dto.schedule.ScheduleResponse;
 import com.example.springboot.service.ScheduleService;
+import com.example.springboot.service.RegistrationReportService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.*;
@@ -24,6 +31,9 @@ public class ReportController {
 
     @Autowired
     private ScheduleService scheduleService;
+
+    @Autowired
+    private RegistrationReportService registrationReportService;
 
     @GetMapping("/doctor-hours")
     public ResponseEntity<List<DoctorHoursResponse>> getDoctorHours(
@@ -88,6 +98,47 @@ public class ReportController {
         }).collect(Collectors.toList());
 
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/registration-hours")
+    public ResponseEntity<List<RegistrationHoursResponse>> getRegistrationHours(
+            @RequestParam(required = false) Integer departmentId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Integer doctorId
+    ) {
+        List<RegistrationHoursResponse> data = registrationReportService.collectRegistrationHours(
+                departmentId,
+                doctorId,
+                startDate,
+                endDate
+        );
+        return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/registration-hours/export")
+    public ResponseEntity<byte[]> exportRegistrationHours(
+            @RequestParam(required = false) Integer departmentId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Integer doctorId
+    ) {
+        byte[] content = registrationReportService.exportRegistrationHoursExcel(
+                departmentId,
+                doctorId,
+                startDate,
+                endDate
+        );
+        String filename = String.format("registration-hours-%s-%s.xlsx", startDate, endDate);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename(filename, StandardCharsets.UTF_8)
+                .build());
+        headers.setContentLength(content.length);
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(content);
     }
 
     private String nullSafe(String s) { return s == null ? "" : s; }

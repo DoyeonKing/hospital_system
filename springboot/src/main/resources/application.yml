@@ -13,9 +13,9 @@ spring:
     upload-dir: images/doctors/
 
   datasource:
-    url: jdbc:mysql://localhost:3306/hopital?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/hospital_05?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true
     username: root
-    password: Mga@5182 # 请替换为你的 MySQL 密码
+    password: 123456 # 使用引号包裹密码，避免特殊字符解析问题
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -29,6 +29,19 @@ spring:
   #   user:
   #     name: user # 默认用户
   #     password: password # 默认密码，生产环境应禁用或使用更复杂机制
+  
+  # Redis配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
 
 # OpenAPI (Swagger UI) configuration
 springdoc:

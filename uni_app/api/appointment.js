@@ -277,7 +277,7 @@ export async function cancelWaitlist(waitlistId) {
 /**
  * 支付候补费用（候补转正式预约）
  * @param {Number} waitlistId - 候补ID
- * @param {Object} paymentData - 支付信息
+ * @param {Object} paymentData - 支付信息 { paymentMethod, transactionId }
  */
 export async function payForWaitlist(waitlistId, paymentData) {
 	const response = await post(`/api/waitlist/${waitlistId}/pay`, paymentData)
@@ -294,6 +294,47 @@ export async function payForWaitlist(waitlistId, paymentData) {
 			...response,
 			data: adaptAppointment(response.data)
 		}
+	}
+	return response
+}
+
+/**
+ * 获取预约二维码Token
+ * @param {Number} appointmentId - 预约ID
+ */
+export async function getAppointmentQrCode(appointmentId) {
+	const response = await get(`/api/appointments/${appointmentId}/qr-code`)
+	// 后端直接返回 QrCodeResponse 对象
+	if (response && response.qrToken) {
+		return {
+			code: '200',
+			data: response
+		}
+	}
+	// 兼容可能的 Result 格式
+	if (response.code === '200' && response.data) {
+		return response
+	}
+	return response
+}
+
+/**
+ * 查询候补排队位置
+ * @param {Number} waitlistId - 候补ID
+ * @returns {Promise} 返回排队位置信息
+ */
+export async function getWaitlistPosition(waitlistId) {
+	const response = await get(`/api/waitlist/${waitlistId}/position`)
+	// 后端直接返回位置信息对象
+	if (response && response.waitlistId) {
+		return {
+			code: '200',
+			data: response
+		}
+	}
+	// 兼容可能的 Result 格式
+	if (response.code === '200' && response.data) {
+		return response
 	}
 	return response
 }

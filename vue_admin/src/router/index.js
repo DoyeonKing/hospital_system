@@ -37,6 +37,9 @@ import EditRegulation from '@/views/regulations/Edit.vue';
 // ===== 新增：导入费用管理页面组件 =====
 import FeeManagement from '@/views/fees/FeeManagement.vue';
 
+// ===== 新增：导入签到管理页面组件 =====
+// import CheckIn from '@/views/CheckIn.vue';
+const CheckIn = () => import('@/views/CheckIn.vue');
 // ===== 新增：导入数据大屏页面组件 =====
 import StatsCanvas from '@/views/dashboard/StatsCanvas.vue';
 
@@ -165,23 +168,11 @@ const routes = [
         component: AutoSchedule
     },
         
-    {path: '/scheduling/doctor-hours',
-        name: 'DoctorWorkHours',
-        meta: { title: '医生工时统计', requiresAuth: true },
-        component: DoctorWorkHours
-    
-    },
     {
         path: '/scheduling/doctor-hours',
         name: 'DoctorWorkHours',
         meta: { title: '医生工时统计', requiresAuth: true },
         component: DoctorWorkHours
-     },
-    {   
-     path: '/scheduling/auto-schedule',
-        name: 'AutoSchedule',
-        meta: { title: '自动排班', requiresAuth: true },
-        component: AutoSchedule
     },
     // =======================================================
 
@@ -224,6 +215,15 @@ const routes = [
     },
     // =======================================================
 
+    // ===== 患者签到路由 =====
+    {
+        path: '/check-in',
+        name: 'CheckIn',
+        meta: { title: '患者签到', requiresAuth: true },
+        component: CheckIn
+    },
+    // =======================================================
+
 
     // 404 未找到页面路由
     { path: '/404', name: 'NotFound', meta: { title: '404找不到页面' }, component: NotFoundView },
@@ -241,20 +241,50 @@ const router = createRouter({
 import { useAdminStore } from '@/stores/adminStore';
 
 router.beforeEach((to, from, next) => {
-    document.title = to.meta.title || '医院后台管理'; // 默认标题
+    try {
+        console.log('🔒 路由守卫触发:', { from: from.path, to: to.path, name: to.name });
+        document.title = to.meta.title || '医院后台管理'; // 默认标题
 
-    // 检查是否需要登录验证
-    if (to.meta.requiresAuth) {
-        // 确保 useAdminStore() 在这里可以被调用
-        const adminStore = useAdminStore();
-        if (adminStore.isAuthenticated) {
-            next();
+        // 检查是否需要登录验证
+        if (to.meta.requiresAuth) {
+            try {
+                // 确保 useAdminStore() 在这里可以被调用
+                const adminStore = useAdminStore();
+                console.log('🔒 检查认证状态:', adminStore.isAuthenticated);
+                if (adminStore.isAuthenticated) {
+                    next();
+                } else {
+                    // 如果未登录，重定向到登录页（避免循环重定向）
+                    if (to.name !== 'AdminLogin') {
+                        console.log('🔒 未登录，重定向到登录页');
+                        next({ name: 'AdminLogin' });
+                    } else {
+                        next();
+                    }
+                }
+            } catch (storeError) {
+                console.error('🔒 Store访问错误:', storeError);
+                // Store 访问失败，允许访问登录页
+                if (to.name !== 'AdminLogin') {
+                    next({ name: 'AdminLogin' });
+                } else {
+                    next();
+                }
+            }
         } else {
-            // 如果未登录，重定向到登录页
-            next({ name: 'AdminLogin' });
+            // 不需要认证的页面直接通过
+            console.log('🔒 页面不需要认证，直接通过');
+            next();
         }
-    } else {
-        next();
+    } catch (error) {
+        console.error('❌ 路由守卫错误:', error);
+        console.error('错误堆栈:', error.stack);
+        // 如果出错，至少让登录页可以访问
+        if (to.name !== 'AdminLogin') {
+            next({ name: 'AdminLogin' });
+        } else {
+            next();
+        }
     }
 });
 

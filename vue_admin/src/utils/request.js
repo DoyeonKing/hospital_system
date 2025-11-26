@@ -29,6 +29,10 @@ request.interceptors.request.use(config => {
 // 可以在接口响应后统一处理结果
 request.interceptors.response.use(
   response => {
+    if (response?.config?.responseType === 'blob') {
+      return response.data;
+    }
+
     let res = response.data;
     
     // 处理字符串响应

@@ -146,21 +146,26 @@
 					if (response && response.code === '200' && response.data) {
 						this.waitlist = response.data
 					
-					// 计算倒计时
-						if (this.waitlist.status === 'NOTIFIED' && this.waitlist.notificationSentAt) {
-						const now = new Date()
-						const notificationTime = new Date(this.waitlist.notificationSentAt)
-						const elapsedSeconds = Math.floor((now - notificationTime) / 1000)
-						this.remainingSeconds = Math.max(0, 15 * 60 - elapsedSeconds)
+						// 计算倒计时（兼容大小写状态值）
+						const status = this.waitlist.status || ''
+						const isNotified = status === 'NOTIFIED' || status === 'notified'
 						
-						// 如果倒计时结束，更新状态
-						if (this.remainingSeconds === 0) {
-								this.waitlist.status = 'EXPIRED'
+						if (isNotified && this.waitlist.notificationSentAt) {
+							const now = new Date()
+							const notificationTime = new Date(this.waitlist.notificationSentAt)
+							const elapsedSeconds = Math.floor((now - notificationTime) / 1000)
+							this.remainingSeconds = Math.max(0, 15 * 60 - elapsedSeconds) // 15分钟 = 900秒
+							
+							// 如果倒计时结束，更新状态
+							if (this.remainingSeconds === 0) {
+								this.waitlist.status = 'expired'
+							}
+						} else {
+							this.remainingSeconds = 0
 						}
-					}
 					
-					// 启动倒计时
-					this.startCountdown()
+						// 启动倒计时
+						this.startCountdown()
 					} else {
 						uni.showToast({
 							title: response?.msg || '加载失败',
@@ -183,12 +188,18 @@
 					clearInterval(this.countdownTimer)
 				}
 				
-				if (this.waitlist.status === 'NOTIFIED' || this.waitlist.status === 'notified') {
+				// 兼容大小写状态值
+				const status = this.waitlist.status || ''
+				const isNotified = status === 'NOTIFIED' || status === 'notified'
+				
+				if (isNotified) {
 					this.countdownTimer = setInterval(() => {
 						if (this.remainingSeconds > 0) {
 							this.remainingSeconds--
 						} else {
 							// 倒计时结束，重新加载数据
+							clearInterval(this.countdownTimer)
+							this.countdownTimer = null
 							this.loadWaitlistDetail()
 						}
 					}, 1000)
