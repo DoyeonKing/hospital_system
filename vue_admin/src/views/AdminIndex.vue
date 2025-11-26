@@ -91,17 +91,6 @@
         </div>
       </router-link>
 
-      <!-- 费用规则管理入口 -->
-      <router-link to="/fees" class="feature-card-link">
-        <div class="feature-card">
-          <div class="icon-wrapper" style="background-color: #fff0e6;">
-            <el-icon :size="32" color="#ff8c42"><Money /></el-icon>
-          </div>
-          <h3>费用规则管理</h3>
-          <p>为不同号别设置挂号费用</p>
-        </div>
-      </router-link>
-
       <!-- 医生工时统计入口 -->
       <router-link to="/scheduling/doctor-hours" class="feature-card-link">
         <div class="feature-card">
@@ -132,6 +121,9 @@
           </div>
           <h3>请假审批</h3>
           <p>审批医生请假申请与调班安排</p>
+        </div>
+      </router-link>
+
       <!-- 现场服务入口 -->
       <router-link to="/on-site-service" class="feature-card-link">
         <div class="feature-card">
@@ -147,8 +139,7 @@
 </template>
 
 <script setup>
-import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Checked } from '@element-plus/icons-vue';
-import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Service } from '@element-plus/icons-vue';
+import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Checked, Service } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import doctorImage from '@/assets/doctor.jpg';
