@@ -140,4 +140,26 @@ public class LeaveRequestController {
         System.out.println("更新后的状态: " + updatedRequest.getStatus());
         return ResponseEntity.ok(updatedRequest);
     }
+
+    /**
+     * 获取请假批准详情（包含受影响的排班和可用替班医生）
+     */
+    @GetMapping("/{id}/approval-detail")
+    public ResponseEntity<com.example.springboot.dto.leaverequest.LeaveApprovalDetailResponse> getLeaveApprovalDetail(
+            @PathVariable Integer id) {
+        com.example.springboot.dto.leaverequest.LeaveApprovalDetailResponse detail = 
+                leaveRequestService.getLeaveApprovalDetail(id);
+        return ResponseEntity.ok(detail);
+    }
+
+    /**
+     * 确认替班安排
+     */
+    @PostMapping("/confirm-substitution")
+    public ResponseEntity<com.example.springboot.dto.leaverequest.SubstituteConfirmResponse> confirmSubstitution(
+            @Valid @RequestBody com.example.springboot.dto.leaverequest.SubstituteConfirmRequest request) {
+        com.example.springboot.dto.leaverequest.SubstituteConfirmResponse response = 
+                leaveRequestService.confirmSubstitution(request);
+        return ResponseEntity.ok(response);
+    }
 }

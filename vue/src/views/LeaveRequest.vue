@@ -199,23 +199,22 @@ const fileList = ref([]);
 const currentFeedback = ref(null);
 const uploadAction = ref('http://localhost:8080/api/upload'); // 文件上传接口地址
 
-// 从 localStorage 或路由参数获取当前医生ID
+// 从 localStorage 获取当前医生ID（参考 MySchedule.vue 的实现）
 const getCurrentDoctorId = () => {
-  // 优先从 localStorage 获取
-  const storedDoctorId = localStorage.getItem('doctorId');
-  if (storedDoctorId) {
-    return parseInt(storedDoctorId);
+  const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'));
+  const doctorId = savedInfo?.doctorId;
+  
+  console.log('=== 获取医生ID ===');
+  console.log('localStorage中的savedInfo:', savedInfo);
+  console.log('提取的doctorId:', doctorId);
+  
+  if (doctorId) {
+    console.log('成功获取医生ID:', doctorId);
+    return doctorId;
   }
   
-  // 如果 localStorage 没有，尝试从 URL 获取
-  const urlParams = new URLSearchParams(window.location.search);
-  const urlDoctorId = urlParams.get('doctorId');
-  if (urlDoctorId) {
-    return parseInt(urlDoctorId);
-  }
-  
-  // 默认值（如果都没有）
-  return 11; // 根据截图修改为11
+  console.error('未能从 localStorage 获取医生ID');
+  return null;
 };
 
 const currentDoctorId = ref(getCurrentDoctorId());
@@ -437,6 +436,13 @@ const formatDateTime = (dateTimeStr) => {
 onMounted(() => {
   // 显示当前使用的医生ID
   console.log('当前医生ID:', currentDoctorId.value);
+  
+  // 检查是否获取到医生ID
+  if (!currentDoctorId.value) {
+    ElMessage.error('未获取到医生信息，请重新登录');
+    return;
+  }
+  
   fetchHistory();
 });
 </script>

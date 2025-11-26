@@ -184,11 +184,14 @@
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Refresh } from '@element-plus/icons-vue';
 import BackButton from '@/components/BackButton.vue';
 import { getAllLeaveRequests, getLeaveRequestsByStatus, approveLeaveRequest, rejectLeaveRequest } from '@/api/leave';
 import { useAdminStore } from '@/stores/adminStore';
+
+const router = useRouter();
 
 // 状态管理
 const loading = ref(false);
@@ -293,6 +296,15 @@ const submitApproval = async () => {
       const response = await approveLeaveRequest(requestId, approverId, comments);
       console.log('批准响应:', response);
       ElMessage.success('请假申请已批准');
+      
+      // 关闭对话框
+      approvalDialogVisible.value = false;
+      
+      // 跳转到替班医生选择页面
+      router.push({
+        name: 'SubstituteSelection',
+        params: { id: requestId }
+      });
     } else {
       if (!comments.trim()) {
         ElMessage.warning('请输入拒绝理由');
@@ -301,10 +313,10 @@ const submitApproval = async () => {
       const response = await rejectLeaveRequest(requestId, approverId, comments);
       console.log('拒绝响应:', response);
       ElMessage.success('请假申请已拒绝');
+      
+      approvalDialogVisible.value = false;
+      fetchLeaveRequests(); // 刷新列表
     }
-    
-    approvalDialogVisible.value = false;
-    fetchLeaveRequests(); // 刷新列表
   } catch (error) {
     console.error('审批失败:', error);
     console.error('错误详情:', error.response?.data || error);

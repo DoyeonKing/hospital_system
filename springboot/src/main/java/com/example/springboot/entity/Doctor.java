@@ -43,6 +43,9 @@ public class Doctor {
     @Column(name = "title", length = 100)
     private String title; // 职称 (如："主治医师")
 
+    @Column(name = "title_level")
+    private Integer titleLevel; // 职称等级：0-主任医师，1-副主任医师，2-主治医师
+
     @Lob // 适用于 TEXT 类型
     @Column(name = "specialty")
     private String specialty; // 擅长领域描述

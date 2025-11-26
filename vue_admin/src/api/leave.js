@@ -54,3 +54,45 @@ export function rejectLeaveRequest(requestId, approverId, comments = '') {
         }
     });
 }
+
+/**
+ * 获取请假批准详情（包含受影响的排班和可用替班医生）
+ * @param {number} requestId - 申请ID
+ */
+export function getLeaveApprovalDetail(requestId) {
+    return request({
+        url: `/api/leave-requests/${requestId}/approval-detail`,
+        method: 'get'
+    });
+}
+
+/**
+ * 确认替班安排
+ * @param {Object} data - 替班确认数据
+ * @param {number} data.leaveRequestId - 请假申请ID
+ * @param {Object} data.substitutions - 替班安排 {scheduleId: doctorId}
+ */
+export function confirmSubstitution(data) {
+    return request({
+        url: '/api/leave-requests/confirm-substitution',
+        method: 'post',
+        data
+    });
+}
+
+/**
+ * 获取医生在指定时间段的排班和请假信息
+ * @param {number} doctorId - 医生ID
+ * @param {string} startDate - 开始日期 (YYYY-MM-DD)
+ * @param {string} endDate - 结束日期 (YYYY-MM-DD)
+ */
+export function getDoctorScheduleAndLeave(doctorId, startDate, endDate) {
+    return request({
+        url: `/api/doctors/${doctorId}/schedule-and-leave`,
+        method: 'get',
+        params: {
+            startDate,
+            endDate
+        }
+    });
+}
