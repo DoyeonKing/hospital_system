@@ -38,6 +38,12 @@
             </div>
             <div class="toolbar-right">
               <el-button 
+                :icon="Refresh" 
+                @click="loadSchedules">
+                刷新
+              </el-button>
+              <el-divider direction="vertical" />
+              <el-button 
                 type="primary" 
                 :icon="Money" 
                 @click="showBatchEditDialog('fee')" 
@@ -74,7 +80,7 @@
         <el-card shadow="always" class="schedule-card" v-if="activeSub">
           <template #header>
             <div class="card-header">
-              <span>{{ selectedDepartmentName }} - 本周排班号别管理</span>
+              <span>{{ selectedDepartmentName }} - 排班号别管理</span>
               <el-checkbox v-model="selectAll" @change="handleSelectAll" label="全选" />
             </div>
           </template>
@@ -243,7 +249,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { ArrowLeft, ArrowRight, Money, Tickets, RefreshLeft, Check } from '@element-plus/icons-vue';
+import { ArrowLeft, ArrowRight, Money, Tickets, RefreshLeft, Check, Refresh } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import BackButton from '@/components/BackButton.vue';
 import { getSchedules, batchUpdateSchedules } from '@/api/schedule';
@@ -268,8 +274,19 @@ const departments = ref([
 // --- 排班数据（从后端获取）---
 const scheduleData = ref({});
 
+// 获取当前周的周一日期
+const getCurrentMonday = () => {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 = 周日, 1 = 周一, ..., 6 = 周六
+  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // 如果是周日，往回6天；否则往回到周一
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + diff);
+  monday.setHours(0, 0, 0, 0); // 重置时间为00:00:00
+  return monday;
+};
+
 // --- 状态管理 ---
-const currentMonday = ref(new Date('2025-10-20'));
+const currentMonday = ref(getCurrentMonday()); // 自动定位到当前周
 const activeParent = ref(null);
 const activeSub = ref(null);
 const selectedSchedules = ref([]);
@@ -468,7 +485,13 @@ const weekRangeText = computed(() => {
   const start = new Date(currentMonday.value);
   const end = new Date(currentMonday.value);
   end.setDate(end.getDate() + 6);
-  return `${formatDateShort(start)} - ${formatDateShort(end)}`;
+  
+  // 判断是否是本周
+  const realMonday = getCurrentMonday();
+  const isCurrentWeek = start.getTime() === realMonday.getTime();
+  
+  const dateRange = `${formatDateShort(start)} - ${formatDateShort(end)}`;
+  return isCurrentWeek ? `${dateRange} (本周)` : dateRange;
 });
 
 const batchEditTitle = computed(() => {
@@ -561,7 +584,7 @@ const changeWeek = (offset) => {
       }
     ).then(() => {
       if (offset === 0) {
-        currentMonday.value = new Date('2025-10-20');
+        currentMonday.value = getCurrentMonday(); // 跳转到真正的本周
       } else {
         const newDate = new Date(currentMonday.value);
         newDate.setDate(newDate.getDate() + (offset * 7));
@@ -584,7 +607,7 @@ const changeWeek = (offset) => {
     });
   } else {
     if (offset === 0) {
-      currentMonday.value = new Date('2025-10-20');
+      currentMonday.value = getCurrentMonday(); // 跳转到真正的本周
     } else {
       const newDate = new Date(currentMonday.value);
       newDate.setDate(newDate.getDate() + (offset * 7));
