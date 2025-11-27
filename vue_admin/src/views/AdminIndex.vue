@@ -124,6 +124,17 @@
         </div>
       </router-link>
 
+      <!-- 加号审批入口 -->
+      <router-link to="/slot-approval" class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #E6F7FF;">
+            <el-icon :size="32" color="#1890FF"><DocumentAdd /></el-icon>
+          </div>
+          <h3>加号审批</h3>
+          <p>审批医生加号申请与号源管理</p>
+        </div>
+      </router-link>
+
       <!-- 现场服务入口 -->
       <router-link to="/on-site-service" class="feature-card-link">
         <div class="feature-card">
@@ -139,7 +150,7 @@
 </template>
 
 <script setup>
-import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Checked, Service } from '@element-plus/icons-vue';
+import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Checked, Service, DocumentAdd } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import doctorImage from '@/assets/doctor.jpg';
