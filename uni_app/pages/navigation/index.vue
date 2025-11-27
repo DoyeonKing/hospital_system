@@ -339,38 +339,54 @@ export default {
 		}
 	},
 	onLoad(options) {
-		console.log('导航页面加载，参数:', options)
-		
-		// 确保停止所有演示模式和定时器
-		this.stopDemoMode()
-		this.stopLocationTracking()
-		
-		// 支持两种方式：直接传locationId，或传appointmentId
-		if (options.locationId) {
-			this.locationId = parseInt(options.locationId)
-			this.loadMapData()
-		} else if (options.appointmentId) {
-			this.appointmentId = parseInt(options.appointmentId)
-			this.loadAppointmentAndNavigate()
-		} else {
+		try {
+			console.log('导航页面加载，参数:', options)
+			
+			// 确保停止所有演示模式和定时器（添加安全检查）
+			if (typeof this.stopDemoMode === 'function') {
+				this.stopDemoMode()
+			}
+			if (typeof this.stopLocationTracking === 'function') {
+				this.stopLocationTracking()
+			}
+			
+			// 支持两种方式：直接传locationId，或传appointmentId
+			if (options && options.locationId) {
+				this.locationId = parseInt(options.locationId)
+				if (typeof this.loadMapData === 'function') {
+					this.loadMapData()
+				}
+			} else if (options && options.appointmentId) {
+				this.appointmentId = parseInt(options.appointmentId)
+				if (typeof this.loadAppointmentAndNavigate === 'function') {
+					this.loadAppointmentAndNavigate()
+				}
+			} else {
+				uni.showToast({
+					title: '缺少必要参数',
+					icon: 'none'
+				})
+				setTimeout(() => {
+					uni.navigateBack()
+				}, 1500)
+			}
+			
+			// 提示用户扫码定位
+			setTimeout(() => {
+				uni.showModal({
+					title: '开始导航',
+					content: '请点击"📷 扫码定位"按钮，扫描医院里的二维码来定位当前位置，系统将自动为您规划到目的地的路径。',
+					showCancel: false,
+					confirmText: '知道了'
+				})
+			}, 1000)
+		} catch (error) {
+			console.error('导航页面加载失败:', error)
 			uni.showToast({
-				title: '缺少必要参数',
+				title: '页面加载失败',
 				icon: 'none'
 			})
-			setTimeout(() => {
-				uni.navigateBack()
-			}, 1500)
 		}
-		
-		// 提示用户扫码定位
-		setTimeout(() => {
-			uni.showModal({
-				title: '开始导航',
-				content: '请点击"📷 扫码定位"按钮，扫描医院里的二维码来定位当前位置，系统将自动为您规划到目的地的路径。',
-				showCancel: false,
-				confirmText: '知道了'
-			})
-		}, 1000)
 	},
 	onReady() {
 		// 获取canvas上下文
@@ -713,8 +729,25 @@ export default {
 		
 		console.log('⚠️ 模拟数据初始化完成（这是临时数据，不是真实诊室）')
 		
-		// 继续加载目标节点（会失败并给出错误提示）
-		this.loadTargetNode()
+		// 设置默认起点（医院大门）
+		if (!this.startNode) {
+			this.startNode = { x: 20, y: 29 }
+		}
+		
+		// 如果有locationId，尝试加载目标节点
+		if (this.locationId) {
+			// 异步调用，但不等待结果（避免阻塞）
+			this.loadTargetNode().catch(err => {
+				console.warn('加载目标节点失败（使用模拟数据时）:', err)
+				// 如果加载失败，使用默认目标节点
+				const defaultTarget = this.nodes.find(n => n.locationId === this.locationId) || this.nodes[0]
+				if (defaultTarget) {
+					this.targetNode = { x: defaultTarget.x, y: defaultTarget.y }
+					this.targetNodeName = defaultTarget.name
+					console.log('使用默认目标节点:', this.targetNodeName)
+				}
+			})
+		}
 		},
 		
 		async loadTargetNode() {

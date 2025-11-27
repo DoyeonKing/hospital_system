@@ -1,6 +1,7 @@
 # Server configuration
 server:
   port: 8080
+  address: 0.0.0.0  # 允许外部访问（真机调试必需）
 
 # Spring Data Source (MySQL)
 spring:
@@ -29,6 +30,19 @@ spring:
   #   user:
   #     name: user # 默认用户
   #     password: password # 默认密码，生产环境应禁用或使用更复杂机制
+  
+  # Redis配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
 
 # OpenAPI (Swagger UI) configuration
 springdoc:
@@ -43,7 +57,7 @@ logging:
     org.springframework: INFO
     com.example.springboot: DEBUG # 调整为你的根包名
 
-# 应用自定义配置
-app:
-  qrcode:
-    upload-dir: uploads/qrcodes  # 二维码图片上传目录（相对于项目根目录）
+# 文件上传配置
+file:
+  upload:
+    path: uploads/
