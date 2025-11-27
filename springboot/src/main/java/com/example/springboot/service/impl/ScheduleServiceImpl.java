@@ -87,12 +87,14 @@ public class ScheduleServiceImpl implements ScheduleService {
                 pageable
         );
         
-        // 转换为响应DTO，并动态计算实际的已预约数量
+        // 转换为响应DTO
+        // 注意：患者预约界面需要使用数据库中的 bookedSlots（包含锁定的候补号源）
+        // 这样当候补锁定了号源后，界面会正确显示"已约满"和"候补"按钮
         return schedulePage.map(schedule -> {
             ScheduleResponse response = ScheduleResponse.fromEntity(schedule);
-            // 动态统计实际有效预约数（排除已取消的）
-            long actualBookedCount = appointmentRepository.countByScheduleAndStatusNotCancelled(schedule);
-            response.setBookedSlots((int) actualBookedCount);
+            // 直接使用数据库中的 bookedSlots（包含锁定的候补号源）
+            // 这样当候补锁定了号源后，bookedSlots = totalSlots，界面会显示"已约满"
+            response.setBookedSlots(schedule.getBookedSlots());
             return response;
         });
     }
@@ -333,12 +335,12 @@ public class ScheduleServiceImpl implements ScheduleService {
         Page<Schedule> schedulePage = scheduleRepository.findSchedulesByDoctorIdAndDateRange(
                 doctorId, start, end, pageable);
         
-        // 转换为响应DTO，并动态计算实际的已预约数量
+        // 转换为响应DTO
+        // 注意：患者预约界面需要使用数据库中的 bookedSlots（包含锁定的候补号源）
         return schedulePage.map(schedule -> {
             ScheduleResponse response = ScheduleResponse.fromEntity(schedule);
-            // 动态统计实际有效预约数（排除已取消的）
-            long actualBookedCount = appointmentRepository.countByScheduleAndStatusNotCancelled(schedule);
-            response.setBookedSlots((int) actualBookedCount);
+            // 直接使用数据库中的 bookedSlots（包含锁定的候补号源）
+            response.setBookedSlots(schedule.getBookedSlots());
             return response;
         });
     }
