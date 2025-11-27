@@ -14,7 +14,7 @@ spring:
     upload-dir: images/doctors/
 
   datasource:
-    url: jdbc:mysql://localhost:3306/hospital_db?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/hospital_05?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8&allowPublicKeyRetrieval=true
     username: root
     password: 123456 # 使用引号包裹密码，避免特殊字符解析问题
     driver-class-name: com.mysql.cj.jdbc.Driver

@@ -128,6 +128,15 @@
 				"navigationBarTextStyle": "white",
 				"backgroundColor": "#F8F8F8"
 			}
+		},
+		{
+			"path": "pages/navigation/index",
+			"style": {
+				"navigationBarTitleText": "室内导航",
+				"navigationBarBackgroundColor": "#4FD9C3",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F8F8F8"
+			}
 		}
 	],
 	"globalStyle": {

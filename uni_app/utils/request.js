@@ -19,13 +19,24 @@ function getBaseURL() {
 function request(options) {
 	return new Promise((resolve, reject) => {
 		const fullUrl = getBaseURL() + options.url
+		const startTime = Date.now() // 记录请求开始时间
+		
 		console.log(`[REQUEST] ${options.method || 'GET'} ${fullUrl}`)
 		console.log('[REQUEST] 请求参数:', options.data || {})
+		
+		// 显示加载提示（可选，通过 options.showLoading 控制）
+		if (options.showLoading !== false) {
+			uni.showLoading({
+				title: options.loadingText || '加载中...',
+				mask: true
+			})
+		}
 		
 		uni.request({
 			url: fullUrl,
 			method: options.method || 'GET',
 			data: options.data || {},
+			timeout: options.timeout || 30000, // 默认30秒超时（真机调试网络可能较慢）
 			header: {
 				'Content-Type': 'application/json',
 				// 如果有token，自动添加到请求头
@@ -33,10 +44,21 @@ function request(options) {
 				...getAuthHeader()
 			},
 			success: (res) => {
+				const duration = Date.now() - startTime
 				console.log(`[RESPONSE] ${options.method || 'GET'} ${fullUrl}`)
+				console.log(`[RESPONSE] 耗时: ${duration}ms`)
 				console.log('[RESPONSE] 状态码:', res.statusCode)
 				console.log('[RESPONSE] 响应数据:', res.data)
-				console.log('[RESPONSE] 响应数据类型:', typeof res.data, '是否为数组:', Array.isArray(res.data))
+				
+				// 隐藏加载提示
+				if (options.showLoading !== false) {
+					uni.hideLoading()
+				}
+				
+				// 如果请求时间超过3秒，记录警告
+				if (duration > 3000) {
+					console.warn(`[PERFORMANCE] 请求耗时较长: ${duration}ms, URL: ${fullUrl}`)
+				}
 				
 				// 统一处理响应
 				if (res.statusCode === 200) {
@@ -59,9 +81,36 @@ function request(options) {
 				}
 			},
 			fail: (err) => {
+				const duration = Date.now() - startTime
 				console.error('[REQUEST] 请求失败:', err)
 				console.error('[REQUEST] 失败URL:', fullUrl)
-				// 不显示toast，让调用方处理错误
+				console.error('[REQUEST] 请求耗时:', duration + 'ms')
+				
+				// 隐藏加载提示（添加错误保护）
+				if (options.showLoading !== false) {
+					try {
+						uni.hideLoading()
+					} catch (e) {
+						// 忽略hideLoading错误（可能toast不存在）
+						console.warn('[REQUEST] hideLoading失败:', e)
+					}
+				}
+				
+				// 根据错误类型给出提示
+				if (err.errMsg && err.errMsg.includes('timeout')) {
+					uni.showToast({
+						title: '请求超时，请检查网络',
+						icon: 'none',
+						duration: 2000
+					})
+				} else if (err.errMsg && err.errMsg.includes('CONNECTION_REFUSED')) {
+					uni.showToast({
+						title: '无法连接服务器，请检查网络配置',
+						icon: 'none',
+						duration: 2000
+					})
+				}
+				
 				reject(err)
 			}
 		})
@@ -84,22 +133,24 @@ function getAuthHeader() {
 /**
  * GET请求
  */
-export function get(url, data = {}) {
+export function get(url, data = {}, options = {}) {
 	return request({
 		url,
 		method: 'GET',
-		data
+		data,
+		...options // 支持传递额外的配置选项
 	})
 }
 
 /**
  * POST请求
  */
-export function post(url, data = {}) {
+export function post(url, data = {}, options = {}) {
 	return request({
 		url,
 		method: 'POST',
-		data
+		data,
+		...options // 支持传递额外的配置选项（如showLoading, timeout等）
 	})
 }
 

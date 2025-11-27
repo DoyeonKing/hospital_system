@@ -184,7 +184,7 @@
 				
 		// 跳转到支付页面
 		uni.navigateTo({
-			url: `/pages/payment/payment?scheduleId=${this.scheduleId}&fee=${this.scheduleInfo.fee}&departmentName=${encodeURIComponent(this.scheduleInfo.departmentName)}&doctorName=${encodeURIComponent(this.scheduleInfo.doctorName)}&doctorTitle=${encodeURIComponent(this.scheduleInfo.doctorTitle)}&scheduleDate=${encodeURIComponent(this.scheduleInfo.scheduleDate)}&slotName=${encodeURIComponent(this.scheduleInfo.slotName)}`
+			url: `/pages/payment/payment?scheduleId=${this.scheduleId}&fee=${this.scheduleInfo.fee}&departmentName=${encodeURIComponent(this.scheduleInfo.departmentName)}&doctorName=${encodeURIComponent(this.scheduleInfo.doctorName)}&doctorTitle=${encodeURIComponent(this.scheduleInfo.doctorTitle)}&scheduleDate=${encodeURIComponent(this.scheduleInfo.scheduleDate)}&slotName=${encodeURIComponent(this.scheduleInfo.slotName)}&location=${encodeURIComponent(this.scheduleInfo.location || '')}`
 		})
 			}
 		}
