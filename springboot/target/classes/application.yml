@@ -1,0 +1,57 @@
+# Server configuration
+server:
+  port: 8080
+
+# Spring Data Source (MySQL)
+spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+  # 自定义文件上传路径
+  file:
+    upload-dir: images/doctors/
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/hopital?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true
+    username: root
+    password: Mga@5182 # 使用引号包裹密码，避免特殊字符解析问题
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none # 暂时禁用自动DDL，避免外键约束问题
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+  # security:
+  #   user:
+  #     name: user # 默认用户
+  #     password: password # 默认密码，生产环境应禁用或使用更复杂机制
+  
+  # Redis配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+# OpenAPI (Swagger UI) configuration
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+# Logging configuration
+logging:
+  level:
+    org.springframework: INFO
+    com.example.springboot: DEBUG # 调整为你的根包名

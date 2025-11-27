@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="ccce0244-439c-40a5-95be-426046928e0d" name="更改" comment="">
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/controller/NavigationController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/dto/navigation/FloorMapResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/dto/navigation/LocationScanRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/dto/navigation/LocationScanResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/dto/navigation/MapEdgeResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/dto/navigation/MapNodeResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/dto/navigation/NavigationRouteRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/dto/navigation/NavigationRouteResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/entity/MapEdge.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/entity/MapNode.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/entity/enums/NodeType.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/repository/MapEdgeRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/repository/MapNodeRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/service/NavigationService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/service/impl/NavigationServiceImpl.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uni_app/pages/location/scan-location.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/dto/auto/AutoScheduleRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/dto/auto/AutoScheduleRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/repository/ScheduleRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/repository/ScheduleRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/service/impl/AutoScheduleServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/springboot/src/main/java/com/example/springboot/service/impl/AutoScheduleServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/springboot/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/springboot/src/main/resources/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sql语句/01_tables/建表语句(1).sql" beforeDir="false" afterPath="$PROJECT_DIR$/sql语句/01_tables/建表语句(1).sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/uni_app/pages.json" beforeDir="false" afterPath="$PROJECT_DIR$/uni_app/pages.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/uni_app/project.config.json" beforeDir="false" afterPath="$PROJECT_DIR$/uni_app/project.config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/uni_app/project.private.config.json" beforeDir="false" afterPath="$PROJECT_DIR$/uni_app/project.private.config.json" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+        <option value="Vue Composition API Component" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectCodeStyleSettingsMigration">
+    <option name="version" value="2" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 1
+}</component>
+  <component name="ProjectId" id="34Q1KtCfImk6RL0E8S1DYpf8n1P" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RequestMappingsPanelOrder0": "0",
+    "RequestMappingsPanelOrder1": "1",
+    "RequestMappingsPanelWidth0": "75",
+    "RequestMappingsPanelWidth1": "75",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "Spring Boot.SpringbootApplication.executor": "Run",
+    "git-widget-placeholder": "wangwei",
+    "last_opened_file_path": "C:/Users/25182/Documents/GitHub/hospital_system",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "vue.rearranger.settings.migration": "true"
+  },
+  "keyToStringList": {
+    "vue.recent.templates": [
+      "Vue Composition API Component"
+    ]
+  }
+}]]></component>
+  <component name="RunManager">
+    <configuration name="SpringbootApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <option name="FRAME_DEACTIVATION_UPDATE_POLICY" value="UpdateClassesAndResources" />
+      <module name="ghlm-backend" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="com.example.springboot.SpringbootApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-9823dce3aa75-fbdcb00ec9e3-intellij.indexing.shared.core-IU-251.25410.129" />
+        <option value="bundled-js-predefined-d6986cc7102b-6a121458b545-JavaScript-IU-251.25410.129" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="ccce0244-439c-40a5-95be-426046928e0d" name="更改" comment="" />
+      <created>1761130921739</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1761130921739</updated>
+      <workItem from="1761130923317" duration="2543000" />
+      <workItem from="1761140282687" duration="2009000" />
+      <workItem from="1761285925092" duration="5617000" />
+      <workItem from="1761304061622" duration="794000" />
+      <workItem from="1761314803724" duration="5972000" />
+      <workItem from="1761366355029" duration="2158000" />
+      <workItem from="1761565863672" duration="832000" />
+      <workItem from="1761577456241" duration="679000" />
+      <workItem from="1761829291548" duration="333000" />
+      <workItem from="1761829663947" duration="6070000" />
+      <workItem from="1761890173508" duration="7362000" />
+      <workItem from="1762176627186" duration="4781000" />
+      <workItem from="1762243723112" duration="1140000" />
+      <workItem from="1762430619654" duration="1119000" />
+      <workItem from="1762495698311" duration="15000" />
+      <workItem from="1762495725721" duration="1759000" />
+      <workItem from="1763015324026" duration="889000" />
+      <workItem from="1763033937532" duration="84000" />
+      <workItem from="1763101484448" duration="2405000" />
+      <workItem from="1763455577358" duration="3448000" />
+      <workItem from="1763527642608" duration="2771000" />
+      <workItem from="1763544438806" duration="363000" />
+      <workItem from="1763710681031" duration="3009000" />
+      <workItem from="1763877269993" duration="1290000" />
+      <workItem from="1764143939244" duration="4990000" />
+      <workItem from="1764152153035" duration="2422000" />
+      <workItem from="1764164395158" duration="10011000" />
+      <workItem from="1764209705266" duration="4533000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>
