@@ -51,8 +51,8 @@ public class WebSecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 💡 关键修复点：将两个前端应用的地址都添加到允许列表中
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:5174"));
+        // 💡 关键修复点：将所有前端应用的地址都添加到允许列表中
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:5174", "http://localhost:5175"));
 
         // 允许常用方法 (GET, POST, PUT, DELETE, OPTIONS)
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));

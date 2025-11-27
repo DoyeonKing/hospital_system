@@ -1,47 +1,7 @@
 import request from '@/utils/request';
 
 /**
- * 获取指定医生的所有休假申请记录
- * @param {number} doctorId - 医生ID
- */
-export function getMyLeaveRequests(doctorId) {
-    return request({
-        url: `/api/leave-requests/doctor/${doctorId}`,
-        method: 'get'
-    });
-}
-
-/**
- * 创建新的休假申请
- * @param {Object} data - 请假申请数据
- * @param {number} data.doctorId - 医生ID
- * @param {string} data.requestType - 申请类型 (leave/schedule_change)
- * @param {string} data.startTime - 开始时间 (ISO格式)
- * @param {string} data.endTime - 结束时间 (ISO格式)
- * @param {string} data.reason - 请假事由
- * @param {string} data.proofDocumentUrl - 请假证明文件URL (可选)
- */
-export function createLeaveRequest(data) {
-    return request({
-        url: '/api/leave-requests',
-        method: 'post',
-        data: data
-    });
-}
-
-/**
- * 删除休假申请
- * @param {number} requestId - 申请ID
- */
-export function cancelLeaveRequest(requestId) {
-    return request({
-        url: `/api/leave-requests/${requestId}`,
-        method: 'delete'
-    });
-}
-
-/**
- * 获取所有休假申请 (管理员用)
+ * 获取所有请假申请 (管理员用)
  */
 export function getAllLeaveRequests() {
     return request({
@@ -51,7 +11,7 @@ export function getAllLeaveRequests() {
 }
 
 /**
- * 根据状态获取休假申请
+ * 根据状态获取请假申请
  * @param {string} status - 状态 (PENDING/APPROVED/REJECTED)
  */
 export function getLeaveRequestsByStatus(status) {
@@ -91,6 +51,48 @@ export function rejectLeaveRequest(requestId, approverId, comments = '') {
         params: {
             approverId,
             comments
+        }
+    });
+}
+
+/**
+ * 获取请假批准详情（包含受影响的排班和可用替班医生）
+ * @param {number} requestId - 申请ID
+ */
+export function getLeaveApprovalDetail(requestId) {
+    return request({
+        url: `/api/leave-requests/${requestId}/approval-detail`,
+        method: 'get'
+    });
+}
+
+/**
+ * 确认替班安排
+ * @param {Object} data - 替班确认数据
+ * @param {number} data.leaveRequestId - 请假申请ID
+ * @param {Object} data.substitutions - 替班安排 {scheduleId: doctorId}
+ */
+export function confirmSubstitution(data) {
+    return request({
+        url: '/api/leave-requests/confirm-substitution',
+        method: 'post',
+        data
+    });
+}
+
+/**
+ * 获取医生在指定时间段的排班和请假信息
+ * @param {number} doctorId - 医生ID
+ * @param {string} startDate - 开始日期 (YYYY-MM-DD)
+ * @param {string} endDate - 结束日期 (YYYY-MM-DD)
+ */
+export function getDoctorScheduleAndLeave(doctorId, startDate, endDate) {
+    return request({
+        url: `/api/doctors/${doctorId}/schedule-and-leave`,
+        method: 'get',
+        params: {
+            startDate,
+            endDate
         }
     });
 }

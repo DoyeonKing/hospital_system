@@ -45,6 +45,10 @@ const OnSiteService = () => import('@/views/OnSiteService.vue');
 // ===== 新增：导入数据大屏页面组件 =====
 import StatsCanvas from '@/views/dashboard/StatsCanvas.vue';
 
+// ===== 新增：导入请假审批页面组件 =====
+import LeaveApproval from '@/views/LeaveApproval.vue';
+import SubstituteSelection from '@/views/SubstituteSelection.vue';
+
 // 通用视图组件导入
 const NotFoundView = () => import('../views/404.vue');
 
@@ -223,6 +227,20 @@ const routes = [
         name: 'CheckIn',
         meta: { title: '患者签到', requiresAuth: true },
         component: CheckIn
+    },
+
+    // ===== 请假审批路由 =====
+    {
+        path: '/leave-approval',
+        name: 'LeaveApproval',
+        meta: { title: '请假审批', requiresAuth: true },
+        component: LeaveApproval
+    },
+    {
+        path: '/leave-approval/substitute/:id',
+        name: 'SubstituteSelection',
+        meta: { title: '替班医生选择', requiresAuth: true },
+        component: SubstituteSelection
     },
     // =======================================================
 

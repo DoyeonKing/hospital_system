@@ -174,4 +174,30 @@ public class DoctorController {
             return ResponseEntity.internalServerError().body("{\"error\": \"服务器内部错误，密码修改失败\"}");
         }
     }
+
+    /**
+     * 获取医生在指定时间段的排班和请假信息
+     * 用于替班医生选择时的悬停显示
+     * 
+     * @param doctorId 医生ID
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @return 医生的排班和请假信息
+     */
+    @GetMapping("/{doctorId}/schedule-and-leave")
+    public ResponseEntity<?> getDoctorScheduleAndLeave(
+            @PathVariable Integer doctorId,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
+        try {
+            Map<String, Object> result = doctorService.getDoctorScheduleAndLeave(doctorId, startDate, endDate);
+            return ResponseEntity.ok(result);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "获取医生信息失败: " + e.getMessage()));
+        }
+    }
 }

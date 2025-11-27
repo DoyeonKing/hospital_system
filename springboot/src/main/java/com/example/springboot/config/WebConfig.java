@@ -21,5 +21,9 @@ public class WebConfig implements WebMvcConfigurer {
         // 如果需要，保留原有的 images 映射
         registry.addResourceHandler("/images/**")
                 .addResourceLocations("file:images/");
+        
+        // 添加请假证明文件的映射
+        registry.addResourceHandler("/api/files/leave-proofs/**")
+                .addResourceLocations("file:uploads/leave-proofs/");
     }
 }
