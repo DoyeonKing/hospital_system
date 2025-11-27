@@ -156,20 +156,11 @@ public class WaitlistService {
         Schedule schedule = scheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + scheduleId));
 
-        // 检查是否有空余号源（使用实际的有效预约数，排除已取消的预约）
-        long actualBookedCount = appointmentRepository.countByScheduleAndStatusNotCancelled(schedule);
-        System.out.println("候补填充检查号源 - bookedSlots(数据库): " + schedule.getBookedSlots() + ", 实际有效预约数: " + actualBookedCount + ", totalSlots: " + schedule.getTotalSlots());
+        // 检查是否有空余号源
+        System.out.println("候补填充检查号源 - bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
         
-        // 如果数据库中的 bookedSlots 不准确，同步更新它
-        if (schedule.getBookedSlots() != actualBookedCount) {
-            System.out.println("发现 bookedSlots 不准确，从 " + schedule.getBookedSlots() + " 更新为 " + actualBookedCount);
-            schedule.setBookedSlots((int) actualBookedCount);
-            scheduleRepository.save(schedule);
-        }
-        
-        // 使用实际的有效预约数来判断是否还有空位
-        if (actualBookedCount >= schedule.getTotalSlots()) {
-            System.out.println("号源已满（实际有效预约数: " + actualBookedCount + "），无法填充候补");
+        if (schedule.getBookedSlots() >= schedule.getTotalSlots()) {
+            System.out.println("号源已满（bookedSlots: " + schedule.getBookedSlots() + "），无法填充候补");
             return null; // 没有空余号源
         }
 
