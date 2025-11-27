@@ -1,0 +1,29 @@
+{
+    "pages" : [
+        {
+            "path" : "pages/login/patient-login",
+            "style" : {
+                "navigationBarTitleText" : "患者登录",
+                "navigationBarBackgroundColor" : "#FFFFFF",
+                "navigationBarTextStyle" : "black",
+                "backgroundColor" : "#FFFFFF"
+            }
+        },
+        {
+            "path" : "pages/index/index",
+            "style" : {
+                "backgroundColor" : "#F8F8F8",
+                "navigationBarBackgroundColor" : "#F8F8F8",
+                "navigationBarTextStyle" : "black",
+                "navigationBarTitleText" : "首页"
+            }
+        }
+    ],
+    "globalStyle" : {
+        "navigationBarTextStyle" : "black",
+        "navigationBarTitleText" : "校医院挂号系统",
+        "navigationBarBackgroundColor" : "#FFFFFF",
+        "backgroundColor" : "#FFFFFF"
+    },
+    "uniIdRouter" : {}
+}
