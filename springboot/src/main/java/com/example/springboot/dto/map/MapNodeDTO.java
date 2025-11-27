@@ -33,6 +33,21 @@ public class MapNodeDTO {
      */
     private Integer locationId;
     
+    /**
+     * 二维码内容（格式：HOSPITAL_NODE_{nodeId}）
+     */
+    private String qrcodeContent;
+    
+    /**
+     * 二维码图片路径
+     */
+    private String qrcodeImagePath;
+    
+    /**
+     * 二维码状态
+     */
+    private String qrcodeStatus;
+    
     public MapNodeDTO() {
     }
     
@@ -42,6 +57,18 @@ public class MapNodeDTO {
         this.x = x;
         this.y = y;
         this.locationId = locationId;
+    }
+    
+    public MapNodeDTO(Integer nodeId, String name, int x, int y, Integer locationId, 
+                     String qrcodeContent, String qrcodeImagePath, String qrcodeStatus) {
+        this.nodeId = nodeId;
+        this.name = name;
+        this.x = x;
+        this.y = y;
+        this.locationId = locationId;
+        this.qrcodeContent = qrcodeContent;
+        this.qrcodeImagePath = qrcodeImagePath;
+        this.qrcodeStatus = qrcodeStatus;
     }
 }
 

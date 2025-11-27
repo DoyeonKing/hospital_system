@@ -1,48 +1,67 @@
 <template>
+	<scroll-view class="page-scroll" :scroll-y="true">
 	<view class="container">
 		<!-- 控制面板 -->
 		<view class="control-panel">
+			<!-- 楼层选择器 -->
+			<view class="floor-selector" v-if="availableFloors.length > 1">
+				<text class="info-label">当前楼层：</text>
+				<view class="floor-buttons">
+					<view 
+						v-for="floor in availableFloors" 
+						:key="floor"
+						class="floor-btn"
+						:class="{ 'active': currentFloor === floor }"
+						@click="switchFloor(floor)"
+					>
+						{{ floor }}楼
+					</view>
+				</view>
+			</view>
+			
+			<!-- 导航指引区域 -->
+			<view class="navigation-guide" v-if="currentStep">
+				<view class="guide-header">
+					<text class="guide-icon">🧭</text>
+					<text class="guide-title">当前指引</text>
+				</view>
+				<view class="guide-content">
+					<text class="guide-text">{{ currentStep.instruction }}</text>
+				</view>
+				<view class="guide-detail" v-if="currentStep.distance > 0">
+					距离：{{ Math.round(currentStep.distance) }}米 | 
+					预计：{{ Math.round(currentStep.walkTime / 60) }}分钟
+				</view>
+				<view class="guide-actions">
+					<button class="arrived-btn" @click="markAsArrived" v-if="currentStep.toNodeName">
+						✅ 已到达 {{ currentStep.toNodeName }}
+					</button>
+				</view>
+			</view>
+			
+			<!-- 下一步提示 -->
+			<view class="next-step-hint" v-if="nextStep && nextStep.instruction">
+				<text class="hint-text">💡 下一步：{{ nextStep.instruction }}</text>
+			</view>
+			
 			<view class="info-row">
 				<text class="info-label">正在前往：</text>
 				<text class="info-value">{{ targetNodeName || '加载中...' }}</text>
 			</view>
-			<view class="info-row">
-				<text class="info-label">剩余距离：</text>
-				<text class="info-value">{{ remainingDistance }}米</text>
-			</view>
 			<view class="control-buttons">
-				<view class="control-btn primary" :class="{ 'active': isRealTimeMode }" @click="toggleRealTimeLocation">
-					<text class="btn-text">{{ isRealTimeMode ? '⏸️ 停止定位' : '📍 开始定位' }}</text>
+				<view class="control-btn" @click.stop="scanLocationCode" style="background: #52C41A;">
+					<text class="btn-text">📷 扫码定位</text>
 				</view>
-				<view class="control-btn" :class="{ 'active': enableClickToMove }" @click="toggleClickToMove">
-					<text class="btn-text">{{ enableClickToMove ? '✅ 点击移动' : '👆 点击移动' }}</text>
-				</view>
-				<view class="control-btn" @click.stop="showLocationPicker">
-					<text class="btn-text">📌 选择位置</text>
-				</view>
-				<view class="debug-toggle" @click="toggleDebugMode">
-					<text class="debug-text">{{ showDebugGrid ? '隐藏' : '显示' }}网格</text>
-				</view>
-				<view class="control-btn" :class="{ 'active': isTestMode }" @click="toggleTestMode" style="background: #722ED1;">
-					<text class="btn-text">{{ isTestMode ? '🛑 停止测试' : '🧪 测试模式' }}</text>
-				</view>
-				<view class="control-btn" @click="manualMoveArrow" style="background: #FA8C16; margin-top: 10rpx;">
-					<text class="btn-text">➡️ 手动移动</text>
-				</view>
-			</view>
-			<!-- 定位状态提示 -->
-			<view class="location-status" v-if="locationStatus">
-				<text class="status-text">{{ locationStatus }}</text>
 			</view>
 		</view>
 		
 		<!-- 地图容器 -->
 		<view class="map-container">
-			<!-- 背景图片（可选，如果不存在则不显示） -->
+			<!-- 背景图片（根据楼层动态切换） -->
 			<image 
 				v-if="showBackgroundImage"
 				class="background-image" 
-				src="/static/images/hospital_floor_1.jpg" 
+				:src="`/static/images/hospital_floor_${currentFloor}.jpg`"
 				mode="aspectFit"
 				@error="handleImageError"
 				@load="handleImageLoad"
@@ -67,15 +86,75 @@
 			</view>
 		</view>
 		
+		<!-- 地图图例 -->
+		<view class="map-legend">
+			<view class="legend-item">
+				<view class="legend-dot current"></view>
+				<text class="legend-text">当前位置</text>
+			</view>
+			<view class="legend-item">
+				<view class="legend-dot next"></view>
+				<text class="legend-text">下一步节点</text>
+			</view>
+			<view class="legend-item">
+				<view class="legend-dot destination"></view>
+				<text class="legend-text">终点/诊室</text>
+			</view>
+			<view class="legend-item">
+				<view class="legend-line path"></view>
+				<text class="legend-text">规划路线</text>
+			</view>
+			<view class="legend-item">
+				<view class="legend-block obstacle"></view>
+				<text class="legend-text">房间/墙体</text>
+			</view>
+		</view>
+		
 		<!-- 加载提示 -->
 		<view class="loading-overlay" v-if="loading">
 			<text class="loading-text">正在加载地图...</text>
 		</view>
 	</view>
+	</scroll-view>
 </template>
 
 <script>
-import { getMapConfig, getTargetNode } from '../../api/map.js'
+const FLOOR_LAYOUTS = {
+	1: {
+		corridors: [
+			{ x: 6, y: 18, width: 28, height: 4, color: 'rgba(255,255,255,0.85)' },
+			{ x: 18, y: 6, width: 4, height: 24, color: 'rgba(255,255,255,0.85)' }
+		],
+		rooms: [
+			{ x: 2, y: 22, width: 10, height: 6, label: '门诊大厅' },
+			{ x: 28, y: 6, width: 8, height: 6, label: '检验科' },
+			{ x: 30, y: 18, width: 8, height: 6, label: '放射科' }
+		]
+	},
+	2: {
+		corridors: [
+			{ x: 6, y: 18, width: 28, height: 4, color: 'rgba(255,255,255,0.85)' },
+			{ x: 6, y: 10, width: 28, height: 4, color: 'rgba(255,255,255,0.85)' }
+		],
+		rooms: [
+			{ x: 2, y: 20, width: 8, height: 6, label: '外科诊区' },
+			{ x: 30, y: 20, width: 8, height: 6, label: '专科诊区' },
+			{ x: 18, y: 4, width: 8, height: 6, label: 'VIP候诊区' }
+		]
+	},
+	3: {
+		corridors: [
+			{ x: 6, y: 16, width: 28, height: 4, color: 'rgba(255,255,255,0.85)' }
+		],
+		rooms: [
+			{ x: 2, y: 20, width: 10, height: 6, label: '内科病房' },
+			{ x: 28, y: 20, width: 10, height: 6, label: '骨科病房' },
+			{ x: 18, y: 6, width: 8, height: 6, label: '医生办公室' }
+		]
+	}
+}
+
+import { getMapConfig, getTargetNode, scanQRCode, calculateNavigationPath, getNextStep } from '../../api/map.js'
 import { getAppointmentDetail } from '../../api/appointment.js'
 
 // 注意：pathfinding库需要通过npm安装
@@ -137,17 +216,12 @@ class SimpleAStar {
 				return path
 			}
 			
-			// 检查相邻节点
+			// 检查相邻节点（只允许上下左右4个方向，禁止对角线，避免视觉上“穿墙”）
 			const neighbors = [
 				{ x: current.x + 1, y: current.y },
 				{ x: current.x - 1, y: current.y },
 				{ x: current.x, y: current.y + 1 },
-				{ x: current.x, y: current.y - 1 },
-				// 对角线移动（可选）
-				{ x: current.x + 1, y: current.y + 1 },
-				{ x: current.x - 1, y: current.y - 1 },
-				{ x: current.x + 1, y: current.y - 1 },
-				{ x: current.x - 1, y: current.y + 1 }
+				{ x: current.x, y: current.y - 1 }
 			]
 			
 			for (const neighbor of neighbors) {
@@ -167,10 +241,8 @@ class SimpleAStar {
 					continue
 				}
 				
-				// 计算g值（移动成本）
-				const isDiagonal = Math.abs(neighbor.x - current.x) === 1 && 
-								   Math.abs(neighbor.y - current.y) === 1
-				const g = current.g + (isDiagonal ? 1.414 : 1)
+				// 计算g值（移动成本，4方向统一为1）
+				const g = current.g + 1
 				
 				// 计算h值（启发式距离）
 				const h = Math.abs(neighbor.x - endX) + Math.abs(neighbor.y - endY)
@@ -201,7 +273,7 @@ class SimpleAStar {
 }
 
 export default {
-	data() {
+		data() {
 		return {
 			locationId: null,
 			appointmentId: null,
@@ -223,8 +295,19 @@ export default {
 			remainingDistance: 0,
 			showDebugGrid: true,
 			loading: true,
+			// 导航指引相关
+			navigationSteps: [], // 导航步骤列表（从后端API获取）
+			currentStepIndex: 0, // 当前步骤索引
+			currentStep: null, // 当前步骤信息
+			nextStep: null, // 下一步信息
+			useRealNavigation: true, // 是否使用真实导航（基于map_edges）
 			imageLoaded: false,
 			showBackgroundImage: false, // 默认不显示背景图片（如果图片不存在会报错）
+			// 楼层相关
+			currentFloor: 1, // 当前楼层
+			availableFloors: [1, 2, 3], // 可用楼层列表
+			floorLayouts: FLOOR_LAYOUTS,
+			currentNode: null, // 当前节点信息（包含楼层）
 			// 真实定位相关
 			isRealTimeMode: false, // 是否开启实时定位模式
 			currentLocation: null, // 当前实际位置 {x, y} (整数网格坐标)
@@ -240,11 +323,6 @@ export default {
 			demoMoveTimer: null, // 演示移动定时器
 			demoPathIndex: 0, // 演示路径索引
 			enableClickToMove: false, // 是否允许点击地图移动
-			// 测试模式相关（用于调试：模拟GPS移动）
-			isTestMode: false, // 是否开启测试模式（模拟GPS移动）
-			testMoveTimer: null, // 测试移动定时器
-			testBaseLocation: null, // 测试基准GPS坐标
-			testMoveStep: 0, // 测试移动步数
 			// 🎯 教室演示GPS坐标配置（超小范围调试模式：约1-2平方米）
 			// 
 			// 📍 实际GPS坐标：东经 116°20'19" (116.338611°) 北纬 39°57'0" (39.95°)
@@ -283,6 +361,16 @@ export default {
 				uni.navigateBack()
 			}, 1500)
 		}
+		
+		// 提示用户扫码定位
+		setTimeout(() => {
+			uni.showModal({
+				title: '开始导航',
+				content: '请点击"📷 扫码定位"按钮，扫描医院里的二维码来定位当前位置，系统将自动为您规划到目的地的路径。',
+				showCancel: false,
+				confirmText: '知道了'
+			})
+		}, 1000)
 	},
 	onReady() {
 		// 获取canvas上下文
@@ -318,14 +406,9 @@ export default {
 			clearInterval(this.demoMoveTimer)
 			this.demoMoveTimer = null
 		}
-		if (this.testMoveTimer) {
-			clearInterval(this.testMoveTimer)
-			this.testMoveTimer = null
-		}
 		// 停止所有模式
 		this.stopDemoMode()
 		this.stopLocationTracking()
-		this.stopTestMode()
 		// 重置动画索引（已禁用动画模式）
 		this.currentPathIndex = 0
 	},
@@ -406,12 +489,12 @@ export default {
 			}
 		},
 		
-		async loadMapData() {
-			this.loading = true
-			try {
-				// 获取地图配置
-				const configResponse = await getMapConfig()
-				console.log('地图配置响应（完整）:', JSON.stringify(configResponse, null, 2))
+	async loadMapData() {
+		this.loading = true
+		try {
+			// 获取地图配置（传入当前楼层）
+			const configResponse = await getMapConfig(this.currentFloor || 1)
+			console.log('地图配置响应（完整）:', JSON.stringify(configResponse, null, 2))
 				console.log('响应类型:', typeof configResponse)
 				console.log('响应data:', configResponse?.data)
 				console.log('响应data类型:', typeof configResponse?.data)
@@ -618,21 +701,20 @@ export default {
 			console.log('分诊台(20,20)可通行:', this.gridMatrix[20][20] === 0)
 			console.log('终点(5,10)可通行:', this.gridMatrix[10][5] === 0)
 			
-			// 初始化节点
-			this.nodes = [
-				{nodeId: 1, name: "医院大门", x: 20, y: 29, locationId: null},
-				{nodeId: 2, name: "分诊台", x: 20, y: 20, locationId: null},
-				{nodeId: 3, name: "电梯口", x: 35, y: 20, locationId: null},
-				{nodeId: 4, name: "内科诊室", x: 5, y: 10, locationId: 1},
-				{nodeId: 5, name: "外科诊室", x: 5, y: 5, locationId: 2}
-			]
-			
-			console.log('模拟数据初始化完成，已确保起点和终点可通行')
-			
-			console.log('模拟数据初始化完成')
-			
-			// 继续加载目标节点
-			this.loadTargetNode()
+		// ⚠️ 警告：使用模拟数据（仅用于开发测试）
+		console.error('⚠️ 警告：后端API失败，使用模拟数据！这不应该在生产环境出现！')
+		console.error('请检查：1. 后端服务是否启动  2. 数据库是否有节点数据  3. API地址是否正确')
+		
+		// 最小化的模拟节点（仅用于网格测试）
+		this.nodes = [
+			{nodeId: 1, name: "起点（模拟）", x: 20, y: 29, locationId: null},
+			{nodeId: 2, name: "中转点（模拟）", x: 20, y: 20, locationId: null}
+		]
+		
+		console.log('⚠️ 模拟数据初始化完成（这是临时数据，不是真实诊室）')
+		
+		// 继续加载目标节点（会失败并给出错误提示）
+		this.loadTargetNode()
 		},
 		
 		async loadTargetNode() {
@@ -653,44 +735,57 @@ export default {
 				}
 				
 				if (nodeData) {
-					this.targetNode = nodeData
-					this.targetNodeName = this.targetNode.name || '诊室'
-				} else {
-					// 如果API失败，尝试从nodes中找到对应的节点
-					console.warn('目标节点API失败，尝试从节点列表查找')
-					const foundNode = this.nodes.find(n => n.locationId === this.locationId)
-					
-					if (foundNode) {
-						this.targetNode = foundNode
-						this.targetNodeName = this.targetNode.name || '诊室'
-						console.log('从节点列表找到目标节点:', this.targetNode)
-					} else {
-						// 如果还是找不到，使用默认值
-						console.warn('未找到对应的节点，使用默认值')
-						if (this.locationId === 1) {
-							this.targetNode = {nodeId: 4, name: "内科诊室", x: 5, y: 10, locationId: 1}
-						} else if (this.locationId === 2) {
-							this.targetNode = {nodeId: 5, name: "外科诊室", x: 5, y: 5, locationId: 2}
-						} else {
-							// 如果locationId不在预设范围内，使用第一个诊室节点
-							const clinicNode = this.nodes.find(n => n.locationId !== null)
-							if (clinicNode) {
-								this.targetNode = clinicNode
-							} else {
-								this.targetNode = {nodeId: 4, name: "内科诊室", x: 5, y: 10, locationId: 1}
-							}
-						}
-						this.targetNodeName = this.targetNode.name || '诊室'
+					this.targetNode = {
+						x: nodeData.x,
+						y: nodeData.y,
+						nodeId: nodeData.nodeId,
+						name: nodeData.name,
+						locationId: nodeData.locationId
 					}
+					this.targetNodeName = this.targetNode.name || '诊室'
+					console.log('✅ 成功获取目标节点:', this.targetNode)
+			} else {
+				// 如果API失败，尝试从nodes中找到对应的节点
+				console.warn('⚠️ 目标节点API失败，尝试从节点列表查找')
+				const foundNode = this.nodes.find(n => n.locationId === this.locationId)
+				
+				if (foundNode) {
+					this.targetNode = foundNode
+					this.targetNodeName = this.targetNode.name || '诊室'
+					console.log('✅ 从节点列表找到目标节点:', this.targetNode)
+				} else {
+					// ❌ 无法找到目标节点，给出明确错误提示
+					console.error('❌ 无法找到locationId=' + this.locationId + '的节点')
+					console.error('当前nodes列表:', this.nodes)
+					
+					uni.showModal({
+						title: '无法找到诊室',
+						content: `无法找到诊室ID为${this.locationId}的位置信息。\n\n可能原因：\n1. 数据库中该诊室未配置地图节点\n2. 后端API返回数据异常\n\n请联系管理员配置该诊室的位置信息。`,
+						showCancel: false,
+						confirmText: '返回',
+						success: () => {
+							uni.navigateBack()
+						}
+					})
+					return // 直接返回，不继续执行
 				}
+			}
 				
-				// 设置起点（医院大门，nodeId=1）
-				this.startNode = this.nodes.find(n => n.nodeId === 1) || { x: 20, y: 29 }
-				
-				console.log('起点:', this.startNode, '终点:', this.targetNode)
-				
-				// 计算路径
-				this.calculatePath()
+				// 不在这里设置起点！起点只能通过扫码定位获得
+				// 如果已经有起点（之前扫码过），才计算路径
+				if (this.startNode && this.startNode.nodeId) {
+					console.log('已有起点，计算路径:', { 起点: this.startNode, 终点: this.targetNode })
+					// 计算路径
+					this.calculatePath()
+				} else {
+					console.log('等待扫码定位当前位置...')
+					// 提示用户扫码
+					uni.showToast({
+						title: '请先扫码定位当前位置',
+						icon: 'none',
+						duration: 2000
+					})
+				}
 			} catch (error) {
 				console.error('加载目标节点失败:', error)
 				uni.showToast({
@@ -700,7 +795,132 @@ export default {
 			}
 		},
 		
-		calculatePath() {
+		async calculatePath() {
+			// 检查必要数据
+			if (!this.startNode || !this.startNode.nodeId) {
+				console.error('❌ 无法计算路径：起点节点ID缺失', this.startNode)
+				uni.showToast({
+					title: '请先扫码定位当前位置',
+					icon: 'none',
+					duration: 2000
+				})
+				return
+			}
+			
+			if (!this.targetNode || !this.targetNode.nodeId) {
+				console.error('❌ 无法计算路径：终点节点ID缺失', this.targetNode)
+				// 尝试重新加载目标节点
+				if (this.locationId) {
+					console.log('尝试重新加载目标节点...')
+					await this.loadTargetNode()
+					if (!this.targetNode || !this.targetNode.nodeId) {
+						uni.showToast({
+							title: '无法获取目的地信息',
+							icon: 'none',
+							duration: 2000
+						})
+						return
+					}
+				} else {
+					uni.showToast({
+						title: '请先设置目的地',
+						icon: 'none',
+						duration: 2000
+					})
+					return
+				}
+			}
+			
+			// 优先使用真实导航API（基于map_edges）
+			let realNavigationSucceeded = false
+			if (this.useRealNavigation) {
+				try {
+					console.log('🧭 使用真实导航API计算路径', {
+						startNodeId: this.startNode.nodeId,
+						startNodeName: this.startNode.name,
+						endNodeId: this.targetNode.nodeId,
+						endNodeName: this.targetNode.name
+					})
+					
+					const response = await calculateNavigationPath(
+						this.startNode.nodeId,
+						this.targetNode.nodeId
+					)
+					
+					if (response && response.code === '200' && response.data) {
+						const pathData = response.data
+						this.navigationSteps = pathData.steps || []
+						this.currentStepIndex = 0
+						
+						if (this.navigationSteps.length === 0) {
+							console.warn('⚠️ 后端返回路径为空，改用前端网格规划')
+						} else {
+							// 更新当前步骤和下一步
+							this.currentStep = this.navigationSteps[0]
+							this.nextStep = this.navigationSteps.length > 1 ? this.navigationSteps[1] : null
+							
+							console.log('✅ 导航路径获取成功', {
+								总步数: this.navigationSteps.length,
+								当前步骤: this.currentStep.instruction,
+								下一步: this.nextStep ? this.nextStep.instruction : '无',
+								总距离: pathData.totalDistance,
+								总时间: pathData.totalTime
+							})
+							
+							// 更新剩余距离和时间
+							this.remainingDistance = Math.round(pathData.totalDistance || 0)
+							this.totalTime = pathData.totalTime || 0
+							
+							// 根据导航步骤生成路径点（用于绘制）
+							this.path = this.generatePathFromSteps(this.navigationSteps)
+							
+							// 验证路径是否生成成功
+							if (!this.path || this.path.length === 0) {
+								console.error('❌ 路径生成失败，steps:', this.navigationSteps)
+								console.error('当前nodes列表:', this.nodes.map(n => ({ nodeId: n.nodeId, name: n.name, x: n.x, y: n.y })))
+								// 如果路径生成失败，至少保证起点和终点在路径中
+								if (this.startNode && this.targetNode) {
+									this.path = [
+										{ x: this.startNode.x, y: this.startNode.y },
+										{ x: this.targetNode.x, y: this.targetNode.y }
+									]
+									console.warn('⚠️ 使用简化路径（起点到终点直线）')
+								}
+							}
+							
+							// 如果路径中有楼层变化，切换到对应楼层
+							if (this.currentStep && this.currentStep.toFloor) {
+								await this.switchFloor(this.currentStep.toFloor)
+							}
+							
+							// 绘制地图
+							this.$nextTick(() => {
+								this.drawMap()
+							})
+							
+							this.updateArrowHeading()
+							
+							realNavigationSucceeded = true
+							
+							uni.showToast({
+								title: `路径规划成功，共${this.navigationSteps.length}步`,
+								icon: 'success',
+								duration: 2000
+							})
+						}
+					} else {
+						throw new Error('后端API返回错误：' + (response?.message || '未知错误'))
+					}
+				} catch (error) {
+					console.error('真实导航API调用失败，降级到网格路径规划:', error)
+					// 降级到原来的网格路径规划
+				}
+			}
+			
+			// 如果真实导航失败或没有返回步数，降级方案：使用网格路径规划
+			if (realNavigationSucceeded) {
+				return
+			}
 			if (!this.gridMatrix || !this.startNode || !this.targetNode) {
 				console.error('缺少必要数据，无法计算路径', {
 					hasGridMatrix: !!this.gridMatrix,
@@ -789,7 +1009,13 @@ export default {
 				this.targetNode.y
 			)
 			
-			console.log('路径计算完成，路径长度:', this.path.length)
+			console.log('网格路径计算完成，路径长度:', this.path.length)
+			
+			// 如果没有导航步骤，清空指引
+			if (!this.navigationSteps || this.navigationSteps.length === 0) {
+				this.currentStep = null
+				this.nextStep = null
+			}
 			
 			if (this.path.length === 0) {
 				console.error('路径计算失败，可能原因：')
@@ -807,17 +1033,79 @@ export default {
 			// 计算剩余距离（网格单位，假设每个网格1米）
 			this.remainingDistance = this.path.length - 1
 			
+			// 如果还没有导航步骤（比如后端路径为空时），根据路径生成一个简单的导航步骤
+			if (!this.navigationSteps || this.navigationSteps.length === 0) {
+				console.log('生成前端降级导航步骤', {
+					startNode: this.startNode,
+					targetNode: this.targetNode,
+					pathLength: this.path.length
+				})
+				
+				this.navigationSteps = [{
+					fromNodeId: this.startNode.nodeId,
+					fromNodeName: this.startNode.name || '当前位置',
+					toNodeId: this.targetNode.nodeId,
+					toNodeName: this.targetNode.name || '目的地',
+					distance: this.remainingDistance,
+					walkTime: this.remainingDistance * 3,
+					instruction: `沿绿色路线前往【${this.targetNode.name || '目的地'}】`,
+					fromFloor: this.currentFloor,
+					toFloor: this.targetNode.floorLevel || this.currentFloor,
+					nodeType: 'ROOM'
+				}]
+				this.currentStepIndex = 0
+				this.currentStep = this.navigationSteps[0]
+				this.nextStep = null
+				
+				console.log('✅ 前端降级导航步骤已生成:', this.currentStep)
+			}
+			
 			// 绘制地图和路径
 			this.$nextTick(() => {
-				console.log('准备绘制地图，数据状态:', {
-					hasCtx: !!this.ctx,
-					hasGridMatrix: !!this.gridMatrix,
-					hasPath: !!this.path,
-					pathLength: this.path ? this.path.length : 0
-				})
 				this.drawMap()
-				// 真机调试：不使用动画模式，只使用GPS定位
 			})
+
+			this.updateArrowHeading()
+		},
+
+		updateArrowHeading() {
+			if (!this.path || this.path.length < 2) {
+				return
+			}
+			
+			let currentPoint = this.currentLocation
+				? { x: this.currentLocation.x, y: this.currentLocation.y }
+				: this.path[0]
+			let index = this.path.findIndex(p => p.x === currentPoint.x && p.y === currentPoint.y)
+			if (index === -1) {
+				index = 0
+				currentPoint = this.path[0]
+			}
+			
+			let nextIndex = index < this.path.length - 1 ? index + 1 : index
+			if (nextIndex === index && this.path.length >= 2) {
+				nextIndex = this.path.length - 1
+				index = this.path.length - 2
+			}
+			
+			const fromPoint = this.path[index]
+			const toPoint = this.path[nextIndex]
+			const dx = toPoint.x - fromPoint.x
+			const dy = toPoint.y - fromPoint.y
+			
+			let angle = Math.atan2(dx, -dy) * 180 / Math.PI
+			if (isNaN(angle)) {
+				angle = 0
+			}
+			this.locationHeading = (angle + 360) % 360
+		},
+
+		activateArrowMode(gridX, gridY) {
+			this.isRealTimeMode = true
+			this.currentLocation = { x: gridX, y: gridY }
+			this.currentLocationFloat = { x: gridX + 0.5, y: gridY + 0.5 }
+			// 开启指南针监听，让箭头随手机方向旋转
+			this.startCompassListener()
 		},
 		
 		drawMap() {
@@ -854,27 +1142,77 @@ export default {
 			// 清空画布
 			ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight)
 			
-			// 绘制调试网格（半透明）
+			// 柔和背景
+			const bgGradient = ctx.createLinearGradient(0, 0, this.canvasWidth, this.canvasHeight)
+			bgGradient.addColorStop(0, '#f6fbff')
+			bgGradient.addColorStop(1, '#ecf7ff')
+			ctx.setFillStyle(bgGradient)
+			ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight)
+			
+			// 绘制楼层预设布局（走廊/房间）
+			this.drawFloorLayout(ctx, cellWidth, cellHeight)
+			
+			// 可选的网格线（仅在调试模式下显示）
 			if (this.showDebugGrid) {
-				ctx.setFillStyle('rgba(255, 0, 0, 0.3)')
-				for (let y = 0; y < this.gridHeight; y++) {
-					for (let x = 0; x < this.gridWidth; x++) {
-						if (this.gridMatrix[y][x] === 1) {
-							ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight)
-						}
+				ctx.setStrokeStyle('rgba(0, 0, 0, 0.05)')
+				ctx.setLineWidth(1)
+				for (let x = 0; x <= this.gridWidth; x++) {
+					const px = x * cellWidth
+					ctx.beginPath()
+					ctx.moveTo(px, 0)
+					ctx.lineTo(px, this.canvasHeight)
+					ctx.stroke()
+				}
+				for (let y = 0; y <= this.gridHeight; y++) {
+					const py = y * cellHeight
+					ctx.beginPath()
+					ctx.moveTo(0, py)
+					ctx.lineTo(this.canvasWidth, py)
+					ctx.stroke()
+				}
+			}
+			
+			// 绘制障碍/房间区域（淡色）
+			ctx.setFillStyle('rgba(255, 180, 180, 0.25)')
+			for (let y = 0; y < this.gridHeight; y++) {
+				for (let x = 0; x < this.gridWidth; x++) {
+					if (this.gridMatrix[y][x] === 1) {
+						ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight)
 					}
 				}
 			}
 			
-			// 绘制路径
-			if (this.path && this.path.length > 0) {
-				console.log('绘制路径，路径点数:', this.path.length)
-				ctx.setStrokeStyle('#52C41A')
-				ctx.setLineWidth(4)
+			// 只绘制从当前位置到下一步节点的路径段（简化显示，避免整条路径太乱）
+			let pathToDraw = []
+			
+			if (this.currentStep && this.currentStep.fromNodeId && this.currentStep.toNodeId) {
+				// 只绘制当前这一步的路径
+				const currentStepPath = this.generatePathFromSteps([this.currentStep])
+				if (currentStepPath && currentStepPath.length > 0) {
+					pathToDraw = currentStepPath
+					console.log('绘制当前步骤路径，点数:', pathToDraw.length, '从', this.currentStep.fromNodeName, '到', this.currentStep.toNodeName)
+				}
+			} else if (this.path && this.path.length > 0) {
+				// 如果没有当前步骤，回退到显示完整路径（但这种情况应该很少）
+				pathToDraw = this.path
+				console.log('绘制完整路径，路径点数:', pathToDraw.length)
+			}
+			
+			if (pathToDraw && pathToDraw.length > 0) {
+				const gradient = ctx.createLinearGradient(0, 0, this.canvasWidth, this.canvasHeight)
+				gradient.addColorStop(0, '#52C41A')
+				gradient.addColorStop(0.5, '#13C2C2')
+				gradient.addColorStop(1, '#1890FF')
+				ctx.setStrokeStyle(gradient)
+				ctx.setLineWidth(5)
+				const canSetShadow = typeof ctx.setShadow === 'function'
+				if (canSetShadow) {
+					ctx.setShadow(0, 0, 8, 'rgba(19, 194, 194, 0.35)')
+				}
 				ctx.beginPath()
 				
-				for (let i = 0; i < this.path.length; i++) {
-					const point = this.path[i]
+				for (let i = 0; i < pathToDraw.length; i++) {
+					const point = pathToDraw[i]
 					const x = point.x * cellWidth + cellWidth / 2
 					const y = point.y * cellHeight + cellHeight / 2
 					
@@ -886,8 +1224,94 @@ export default {
 				}
 				
 				ctx.stroke()
+				if (canSetShadow) {
+					ctx.setShadow(0, 0, 0, 'rgba(0,0,0,0)')
+				}
 			} else {
-				console.warn('没有路径数据')
+				console.warn('没有路径数据可绘制')
+			}
+			
+			// ========= 绘制关键节点和可视化辅助元素 =========
+			
+			// 高亮“下一步要到达的节点”（当前指引的目标点）
+			// 但不要和箭头位置重合
+			if (this.currentStep && this.currentStep.toNodeId && this.nodes && this.nodes.length > 0) {
+				const nextNode = this.nodes.find(n => n.nodeId === this.currentStep.toNodeId)
+				if (nextNode && nextNode.x !== undefined && nextNode.y !== undefined) {
+					// 检查是否和当前箭头位置重合
+					let isOverlapping = false
+					if (this.isRealTimeMode && this.currentLocation) {
+						const dx = Math.abs(nextNode.x - this.currentLocation.x)
+						const dy = Math.abs(nextNode.y - this.currentLocation.y)
+						// 如果距离小于2个网格单位，认为是重合
+						if (dx < 2 && dy < 2) {
+							isOverlapping = true
+						}
+					}
+					
+					// 只有不重合时才画黄圈
+					if (!isOverlapping) {
+						const nx = nextNode.x * cellWidth + cellWidth / 2
+						const ny = nextNode.y * cellHeight + cellHeight / 2
+						
+						// 使用黄色描边圈出下一步节点
+						ctx.setStrokeStyle('#FAAD14')
+						ctx.setLineWidth(3)
+						ctx.beginPath()
+						ctx.arc(nx, ny, 14, 0, Math.PI * 2)
+						ctx.stroke()
+					}
+				}
+			}
+			
+			// 在地图上标出少量关键节点名称（防止文字重叠）
+			if (this.nodes && this.nodes.length > 0) {
+				const focusIds = new Set()
+				if (this.targetNode && this.targetNode.nodeId) focusIds.add(this.targetNode.nodeId)
+				if (this.currentNode && this.currentNode.nodeId) focusIds.add(this.currentNode.nodeId)
+				if (this.currentStep && this.currentStep.toNodeId) focusIds.add(this.currentStep.toNodeId)
+				if (this.currentStep && this.currentStep.fromNodeId) focusIds.add(this.currentStep.fromNodeId)
+				if (this.startNode && this.startNode.nodeId) focusIds.add(this.startNode.nodeId)
+				
+				ctx.setFontSize(11)
+				
+				this.nodes.forEach(node => {
+					if (node.x === undefined || node.y === undefined) return
+					
+					const name = node.name || ''
+					const isFocus = focusIds.has(node.nodeId)
+					const isAnchor = !isFocus && name && (
+						name.includes('门诊大厅') ||
+						name.includes('分诊台') ||
+						name.includes('电梯') ||
+						name.includes('楼梯')
+					)
+					
+					// 只绘制当前相关节点 + 少量核心锚点，避免全屏文字
+					if (!isFocus && !isAnchor) return
+					
+					const cx = node.x * cellWidth + cellWidth / 2
+					const cy = node.y * cellHeight + cellHeight / 2
+					
+					const label = name
+					const textWidth = label.length * 11
+					const paddingX = 6
+					const paddingY = 3
+					const bw = textWidth + paddingX * 2
+					const bh = 18
+					const bx = cx - bw / 2
+					const by = cy - 24
+					
+					// 背景气泡
+					ctx.setFillStyle(isFocus ? 'rgba(0, 0, 0, 0.75)' : 'rgba(255, 255, 255, 0.9)')
+					ctx.fillRect(bx, by, bw, bh)
+					
+					// 文本
+					ctx.setFillStyle(isFocus ? '#FFFFFF' : '#333333')
+					ctx.setTextAlign('center')
+					ctx.fillText(label, cx, by + bh - 5)
+					ctx.setTextAlign('left')
+				})
 			}
 			
 			// 箭头将在最后绘制（在所有元素之后），确保在最上层
@@ -901,20 +1325,34 @@ export default {
 				ctx.beginPath()
 				ctx.arc(centerX, centerY, 8, 0, Math.PI * 2)
 				ctx.fill()
+				
+				ctx.setFontSize(12)
+				ctx.setTextAlign('center')
+				ctx.setFillStyle('#0b4991')
+				ctx.fillText('起点', centerX, centerY - 12)
+				ctx.setTextAlign('left')
 			}
 			
 			// 绘制终点
 			if (this.targetNode) {
+				const targetX = this.targetNode.x * cellWidth + cellWidth / 2
+				const targetY = this.targetNode.y * cellHeight + cellHeight / 2
 				ctx.setFillStyle('#FF4D4F')
 				ctx.beginPath()
 				ctx.arc(
-					this.targetNode.x * cellWidth + cellWidth / 2,
-					this.targetNode.y * cellHeight + cellHeight / 2,
+					targetX,
+					targetY,
 					10,
 					0,
 					Math.PI * 2
 				)
 				ctx.fill()
+				
+				ctx.setFontSize(12)
+				ctx.setTextAlign('center')
+				ctx.setFillStyle('#B50B27')
+				ctx.fillText(`终点 · ${this.targetNode.name || ''}`, targetX, targetY - 14)
+				ctx.setTextAlign('left')
 			}
 			
 			// 计算到终点的距离（在绘制箭头之前）
@@ -1030,6 +1468,12 @@ export default {
 				
 				ctx.restore() // 恢复状态
 				
+				ctx.setFontSize(12)
+				ctx.setTextAlign('center')
+				ctx.setFillStyle('#FF4D4F')
+				ctx.fillText('当前位置', centerX, centerY - arrowSize - 6)
+				ctx.setTextAlign('left')
+				
 					console.log('[绘制箭头] 箭头绘制完成，位置:', { centerX, centerY }, '尺寸:', arrowSize, '朝向:', this.locationHeading.toFixed(1) + '°')
 				} else {
 					console.warn('[绘制箭头] ⚠️ 实时定位模式已开启，但还没有位置数据')
@@ -1039,6 +1483,51 @@ export default {
 			ctx.draw(false, () => {
 				console.log('Canvas绘制完成')
 			})
+		},
+		
+		drawFloorLayout(ctx, cellWidth, cellHeight) {
+			if (!this.floorLayouts) return
+			const layout = this.floorLayouts[this.currentFloor]
+			if (!layout) return
+			
+			ctx.save()
+			
+			if (layout.corridors) {
+				layout.corridors.forEach(zone => {
+					ctx.setFillStyle(zone.color || 'rgba(255,255,255,0.9)')
+					ctx.fillRect(
+						zone.x * cellWidth,
+						zone.y * cellHeight,
+						zone.width * cellWidth,
+						zone.height * cellHeight
+					)
+				})
+			}
+			
+			if (layout.rooms) {
+				layout.rooms.forEach(room => {
+					ctx.setFillStyle(room.color || 'rgba(255,255,255,0.65)')
+					ctx.fillRect(
+						room.x * cellWidth,
+						room.y * cellHeight,
+						room.width * cellWidth,
+						room.height * cellHeight
+					)
+					if (room.label) {
+						ctx.setFontSize(12)
+						ctx.setTextAlign('center')
+						ctx.setFillStyle('rgba(0, 0, 0, 0.45)')
+						ctx.fillText(
+							room.label,
+							(room.x + room.width / 2) * cellWidth,
+							(room.y + room.height / 2) * cellHeight + 4
+						)
+						ctx.setTextAlign('left')
+					}
+				})
+			}
+			
+			ctx.restore()
 		},
 		
 		// 真机调试：已禁用动画模式，只使用GPS定位
@@ -1546,7 +2035,7 @@ export default {
 							console.warn('[定位] ⚠️ GPS坐标几乎没有变化，可能是：')
 							console.warn('   1. 室内GPS信号不好，精度不够')
 							console.warn('   2. 手机真的没移动（静止状态）')
-							console.warn('   3. 建议使用"测试模式"进行调试')
+							console.warn('   3. 建议使用"扫码定位"或"选择位置"功能')
 						}
 					} else {
 						// 首次定位
@@ -1820,13 +2309,13 @@ export default {
 				网格尺寸: { width: this.gridWidth, height: this.gridHeight }
 			})
 			
-			return { x: gridX, y: gridY }
-		},
-		
-		/**
-		 * 切换实时定位模式
-		 */
-		toggleRealTimeLocation() {
+		return { x: gridX, y: gridY }
+	},
+	
+	/**
+	 * 切换实时定位模式
+	 */
+	toggleRealTimeLocation() {
 			if (this.isRealTimeMode) {
 				this.stopLocationTracking()
 			} else {
@@ -1938,6 +2427,15 @@ export default {
 			// 停止旧的监听器（如果存在）
 			this.stopCompassListener()
 			
+			// 某些平台需要显式启动指南针
+			if (typeof uni.startCompass === 'function') {
+				uni.startCompass({
+					fail: (err) => {
+						console.warn('[方向传感器] startCompass失败:', err)
+					}
+				})
+			}
+			
 			// 定义方向变化回调函数（添加节流，避免更新太频繁）
 			let lastHeadingUpdate = 0
 			const compassCallback = (res) => {
@@ -1982,6 +2480,9 @@ export default {
 				}
 				this.compassListener = null
 			}
+			if (typeof uni.stopCompass === 'function') {
+				uni.stopCompass()
+			}
 		},
 		
 		/**
@@ -1992,30 +2493,25 @@ export default {
 			console.log('[选择位置] nodes数量:', this.nodes ? this.nodes.length : 0)
 			console.log('[选择位置] nodes数据:', JSON.stringify(this.nodes, null, 2))
 			
-			// 检查nodes是否已加载
-			if (!this.nodes || this.nodes.length === 0) {
-				console.warn('[选择位置] nodes数据为空，使用默认节点')
-				// 如果nodes为空，使用默认节点
-				this.nodes = [
-					{nodeId: 1, name: "医院大门", x: 20, y: 29, locationId: null},
-					{nodeId: 2, name: "分诊台", x: 20, y: 20, locationId: null},
-					{nodeId: 3, name: "电梯口", x: 35, y: 20, locationId: null},
-					{nodeId: 4, name: "内科诊室", x: 5, y: 10, locationId: 1},
-					{nodeId: 5, name: "外科诊室", x: 5, y: 5, locationId: 2}
-				]
-			}
-			
-			// 如果只有一个节点，也添加默认节点
-			if (this.nodes.length === 1) {
-				console.warn('[选择位置] 只有一个节点，添加默认节点')
-				this.nodes = [
-					{nodeId: 1, name: "医院大门", x: 20, y: 29, locationId: null},
-					{nodeId: 2, name: "分诊台", x: 20, y: 20, locationId: null},
-					{nodeId: 3, name: "电梯口", x: 35, y: 20, locationId: null},
-					{nodeId: 4, name: "内科诊室", x: 5, y: 10, locationId: 1},
-					{nodeId: 5, name: "外科诊室", x: 5, y: 5, locationId: 2}
-				]
-			}
+		// 检查nodes是否已加载
+		if (!this.nodes || this.nodes.length === 0) {
+			console.error('[选择位置] ❌ 错误：nodes数据为空！无法选择位置')
+			uni.showModal({
+				title: '无可用位置',
+				content: '地图节点数据未加载，请返回重试。\n\n如果问题持续，请联系管理员检查数据库配置。',
+				showCancel: false,
+				confirmText: '返回',
+				success: () => {
+					uni.navigateBack()
+				}
+			})
+			return
+		}
+		
+		// 如果只有很少的节点，给出警告
+		if (this.nodes.length < 3) {
+			console.warn('[选择位置] ⚠️ 警告：只有' + this.nodes.length + '个节点，数据可能不完整')
+		}
 			
 			// 停止所有定位，确保可以操作
 			this.stopLocationTracking()
@@ -2105,7 +2601,7 @@ export default {
 		},
 		
 		/**
-		 * 扫码定位
+		 * 扫码定位（改进版：从后端API获取完整节点信息，包括楼层）
 		 */
 		async scanLocationCode() {
 			try {
@@ -2115,24 +2611,109 @@ export default {
 				
 				console.log('扫码结果:', res)
 				
-				// 解析二维码内容（假设格式：HOSPITAL_NODE_{nodeId}）
-				const content = res.result
+				// 解析二维码内容（格式：HOSPITAL_NODE_{nodeId}）
+				const content = res.result.trim()
 				const match = content.match(/HOSPITAL_NODE[_\s]?(\d+)/i)
 				
-				if (match) {
+				if (!match) {
+					throw new Error('二维码格式不正确，应为：HOSPITAL_NODE_数字')
+				}
+				
+				const qrcodeContent = content
+				
+				// 调用后端API获取节点完整信息（包括楼层、坐标等）
+				try {
+					const scanResponse = await scanQRCode(qrcodeContent)
+					
+					console.log('后端扫码API响应:', scanResponse)
+					
+					if (scanResponse && scanResponse.code === '200') {
+						const nodeData = scanResponse.data
+						
+						// 获取节点的完整信息
+						const nodeId = nodeData.nodeId
+						const nodeName = nodeData.nodeName
+						const floorLevel = nodeData.floorLevel
+						const coordinatesX = nodeData.coordinatesX
+						const coordinatesY = nodeData.coordinatesY
+						
+						console.log('节点信息:', {
+							nodeId,
+							nodeName,
+							floorLevel,
+							coordinatesX,
+							coordinatesY
+						})
+						
+						// 转换为网格坐标（如果后端返回的是实际坐标，需要转换）
+						// 这里假设后端返回的坐标就是网格坐标
+						const gridX = Math.round(coordinatesX)
+						const gridY = Math.round(coordinatesY)
+						
+						// 更新当前节点信息
+						this.currentNode = {
+							nodeId,
+							name: nodeName,
+							floorLevel,
+							x: gridX,
+							y: gridY
+						}
+						
+						// 切换到对应楼层
+						if (floorLevel && floorLevel !== this.currentFloor) {
+							this.switchFloor(floorLevel)
+						}
+						
+						// 更新当前位置
+						this.startNode = {
+							x: gridX,
+							y: gridY,
+							nodeId: nodeId,
+							name: nodeName
+						}
+						this.activateArrowMode(gridX, gridY)
+					
+					// 更新状态
+					this.locationStatus = `📍 ${nodeName} (${floorLevel}楼)`
+					
+					// 确保目标节点已加载，然后计算路径
+					if (!this.targetNode || !this.targetNode.nodeId) {
+						console.log('扫码定位：目标节点未加载，先加载目标节点')
+						// 如果目标节点还没加载，先加载它
+						await this.loadTargetNode()
+					}
+					
+					// 重新计算路径（从扫码位置到目的地）
+					console.log('扫码定位：开始计算路径', {
+						起点: this.startNode,
+						终点: this.targetNode
+					})
+					await this.calculatePath()
+						
+						uni.showToast({
+							title: `定位成功：${nodeName}`,
+							icon: 'success',
+							duration: 2000
+						})
+						
+					} else {
+						throw new Error(scanResponse.data.message || '后端API返回错误')
+					}
+					
+				} catch (apiError) {
+					console.error('调用后端API失败，尝试本地查找:', apiError)
+					
+					// 如果API失败，尝试本地查找（降级方案）
 					const nodeId = parseInt(match[1])
 					const node = this.nodes.find(n => n.nodeId === nodeId)
 					
 					if (node) {
-						this.currentLocation = { x: node.x, y: node.y }
-						// 扫码定位时，浮点数坐标就是网格中心（整数坐标 + 0.5）
-						this.currentLocationFloat = { x: node.x + 0.5, y: node.y + 0.5 }
-						this.startNode = this.currentLocation
+						this.startNode = {
+							...node
+						}
+						this.activateArrowMode(node.x, node.y)
 						this.locationStatus = `扫码定位: ${node.name}`
-						this.calculatePath()
-						
-						// 停止实时定位
-						this.stopLocationTracking()
+						await this.calculatePath()
 						
 						uni.showToast({
 							title: `定位到${node.name}`,
@@ -2141,152 +2722,250 @@ export default {
 					} else {
 						throw new Error('未找到对应的位置节点')
 					}
-				} else {
-					throw new Error('二维码格式不正确')
 				}
+				
 			} catch (error) {
 				console.error('扫码失败:', error)
 				if (error.errMsg && !error.errMsg.includes('cancel')) {
 					uni.showToast({
-						title: '扫码失败',
-						icon: 'none'
+						title: error.message || '扫码失败',
+						icon: 'none',
+						duration: 2000
 					})
 				}
 			}
 		},
 		
 		/**
-		 * 切换测试模式（模拟GPS移动，用于调试）
+		 * 切换楼层
 		 */
-		toggleTestMode() {
-			if (this.isTestMode) {
-				this.stopTestMode()
-			} else {
-				this.startTestMode()
+	async switchFloor(floorLevel) {
+		if (this.currentFloor === floorLevel) {
+			return
+		}
+		
+		console.log(`切换楼层: ${this.currentFloor}楼 -> ${floorLevel}楼`)
+		this.currentFloor = floorLevel
+		
+		// 重新加载该楼层的地图数据
+		this.loading = true
+		try {
+			const configResponse = await getMapConfig(floorLevel)
+			console.log(`获取${floorLevel}楼地图配置:`, configResponse)
+			
+			if (configResponse && configResponse.code === '200' && configResponse.data) {
+				const config = configResponse.data
+				if (config.grid) {
+					this.gridMatrix = config.grid.gridMatrix
+					this.nodes = config.nodes || []
+					console.log(`${floorLevel}楼地图加载成功，节点数:`, this.nodes.length)
+				}
 			}
+		} catch (error) {
+			console.error(`加载${floorLevel}楼地图失败:`, error)
+			uni.showToast({
+				title: '切换楼层失败',
+				icon: 'none'
+			})
+			return
+		} finally {
+			this.loading = false
+		}
+		
+		// 更新背景图片路径
+		this.showBackgroundImage = true
+		// 背景图片路径：/static/images/hospital_floor_{floorLevel}.jpg
+		
+		// 重新绘制地图
+		this.$nextTick(() => {
+			this.drawMap()
+		})
+		
+		uni.showToast({
+			title: `已切换到${floorLevel}楼`,
+			icon: 'success'
+		})
+	},
+		
+		/**
+		 * 根据楼层过滤节点
+		 */
+		filterNodesByFloor(floorLevel) {
+			// 从所有节点中筛选出当前楼层的节点
+			// 注意：这里需要从后端重新加载该楼层的节点
+			// 或者在前端过滤已有的nodes数组
+			console.log(`过滤${floorLevel}楼的节点`)
 		},
 		
 		/**
-		 * 启动测试模式（模拟GPS移动）
+		 * 从导航步骤生成路径点（用于绘制）
 		 */
-		startTestMode() {
-			console.log('[测试模式] 启动GPS模拟移动')
+		generatePathFromSteps(steps) {
+			// 根据后端返回的steps生成路径点
+			// 如果节点距离很近，直接用直线；否则用A*生成细颗粒度路径
+			if (!steps || steps.length === 0) {
+				return []
+			}
 			
-			// 如果还没有基准坐标，使用当前GPS坐标或真实GPS坐标
-			if (!this.testBaseLocation) {
-				if (this.lastGpsLocation) {
-					this.testBaseLocation = { ...this.lastGpsLocation }
+			const path = []
+			const astar = this.gridMatrix ? new SimpleAStar(this.gridMatrix) : null
+			
+			for (const step of steps) {
+				const fromNode = this.nodes.find(n => n.nodeId === step.fromNodeId)
+				const toNode = this.nodes.find(n => n.nodeId === step.toNodeId)
+				if (!fromNode || !toNode) {
+					console.warn('找不到节点:', { fromNodeId: step.fromNodeId, toNodeId: step.toNodeId })
+					continue
+				}
+				
+				// 计算节点间距离
+				const dx = Math.abs(toNode.x - fromNode.x)
+				const dy = Math.abs(toNode.y - fromNode.y)
+				const distance = Math.sqrt(dx * dx + dy * dy)
+				
+				// 如果节点很近（距离<3）或没有网格数据，直接用直线
+				if (distance < 3 || !astar) {
+					if (path.length === 0) {
+						path.push({ x: fromNode.x, y: fromNode.y })
+					}
+					path.push({ x: toNode.x, y: toNode.y })
+					continue
+				}
+				
+				// 否则用A*生成细颗粒度路径
+				const segment = astar.findPath(fromNode.x, fromNode.y, toNode.x, toNode.y)
+				if (!segment || segment.length === 0) {
+					// A*失败，回退到直线
+					if (path.length === 0) {
+						path.push({ x: fromNode.x, y: fromNode.y })
+					}
+					path.push({ x: toNode.x, y: toNode.y })
+					continue
+				}
+				
+				// 首段保留起点，后续段去掉第一个点，避免重复
+				if (path.length === 0) {
+					path.push(...segment)
 				} else {
-					// 使用你的真实GPS坐标（从日志中获取）
-					// lat: 39.95140082465278, lng: 116.34481391059028
-					this.testBaseLocation = {
-						lat: 39.95140082465278,
-						lng: 116.34481391059028
+					path.push(...segment.slice(1))
+				}
+			}
+			
+			return path
+		},
+		
+		/**
+		 * 更新到下一步（当患者到达某个节点时调用）
+		 */
+		moveToNextStep() {
+			if (this.currentStepIndex < this.navigationSteps.length - 1) {
+				this.currentStepIndex++
+				this.currentStep = this.navigationSteps[this.currentStepIndex]
+				this.nextStep = this.currentStepIndex < this.navigationSteps.length - 1 
+					? this.navigationSteps[this.currentStepIndex + 1] 
+					: null
+				
+				// 如果下一步有楼层变化，切换楼层
+				if (this.currentStep && this.currentStep.toFloor) {
+					this.switchFloor(this.currentStep.toFloor)
+				}
+				
+				// 更新起点为当前到达的节点，并确保箭头模式保持激活
+				if (this.currentStep && this.currentStep.toNodeId) {
+					const toNode = this.nodes.find(n => n.nodeId === this.currentStep.toNodeId)
+					if (toNode) {
+						this.startNode = {
+							x: toNode.x,
+							y: toNode.y,
+							nodeId: toNode.nodeId,
+							name: toNode.name
+						}
+						
+						// 更新箭头位置到新节点，并确保箭头模式保持激活
+						this.activateArrowMode(toNode.x, toNode.y)
+						
+						// 同时更新currentNode信息
+						this.currentNode = {
+							nodeId: toNode.nodeId,
+							name: toNode.name,
+							floorLevel: toNode.floorLevel || this.currentFloor,
+							x: toNode.x,
+							y: toNode.y
+						}
+						
+						console.log('✅ 已到达节点，箭头移动到新位置:', {
+							节点: toNode.name,
+							坐标: `(${toNode.x}, ${toNode.y})`,
+							箭头模式: this.isRealTimeMode,
+							指南针监听: !!this.compassListener
+						})
 					}
 				}
-			}
-			
-			// 如果mapBounds未初始化，使用测试基准坐标初始化
-			if (!this.mapBounds) {
-				console.log('[测试模式] mapBounds未初始化，使用测试基准坐标初始化')
-				this.mapBounds = {
-					minLat: this.testBaseLocation.lat - this.mapBoundsOffset,
-					maxLat: this.testBaseLocation.lat + this.mapBoundsOffset,
-					minLng: this.testBaseLocation.lng - this.mapBoundsOffset,
-					maxLng: this.testBaseLocation.lng + this.mapBoundsOffset
+				
+				// 重新计算剩余距离
+				let remaining = 0
+				for (let i = this.currentStepIndex; i < this.navigationSteps.length; i++) {
+					remaining += this.navigationSteps[i].distance || 0
 				}
-				console.log('[测试模式] mapBounds已设置:', this.mapBounds)
-			}
-			
-			// 确保实时定位模式开启
-			if (!this.isRealTimeMode) {
-				this.isRealTimeMode = true
-			}
-			
-			this.isTestMode = true
-			this.testMoveStep = 0
-			
-			// 立即初始化一次位置（让箭头立即显示）
-			const initialLocation = {
-				latitude: this.testBaseLocation.lat,
-				longitude: this.testBaseLocation.lng,
-				accuracy: 5,
-				heading: 0
-			}
-			console.log('[测试模式] 初始化位置:', initialLocation)
-			this.processLocationUpdate(initialLocation)
-			
-			// 确保地图立即重绘（使用nextTick确保DOM更新）
-			this.$nextTick(() => {
-				console.log('[测试模式] 强制重绘地图，当前状态:', {
-					isRealTimeMode: this.isRealTimeMode,
-					currentLocationFloat: this.currentLocationFloat,
-					locationHeading: this.locationHeading
-				})
-				if (this.isRealTimeMode) {
+				this.remainingDistance = Math.round(remaining)
+				
+				// 重新生成路径（从新位置到终点）
+				if (this.navigationSteps && this.navigationSteps.length > 0) {
+					// 只取剩余的步骤
+					const remainingSteps = this.navigationSteps.slice(this.currentStepIndex)
+					this.path = this.generatePathFromSteps(remainingSteps)
+					
+					// 如果路径生成失败，至少保证起点和终点
+					if (!this.path || this.path.length === 0) {
+						if (this.startNode && this.targetNode) {
+							this.path = [
+								{ x: this.startNode.x, y: this.startNode.y },
+								{ x: this.targetNode.x, y: this.targetNode.y }
+							]
+						}
+					}
+				}
+				
+				// 重新绘制地图
+				this.$nextTick(() => {
 					this.drawMap()
-				}
-			})
-			
-			// 每500ms模拟一次GPS移动（小范围移动，便于调试）
-			this.testMoveTimer = setInterval(() => {
-				this.testMoveStep++
-				
-				// 模拟圆形移动（让箭头在地图上画圆）
-				// 适配1平方米范围：半径0.000003度（约0.33米），在约1.2平方米范围内移动
-				const angle = (this.testMoveStep * 5) * Math.PI / 180 // 每步转5度
-				const radius = 0.000003 // 半径0.000003度（约0.33米），适合1平方米范围
-				
-				// 计算新的GPS坐标
-				const testLat = this.testBaseLocation.lat + radius * Math.sin(angle)
-				const testLng = this.testBaseLocation.lng + radius * Math.cos(angle)
-				
-				console.log('[测试模式] 模拟GPS移动:', {
-					步数: this.testMoveStep,
-					角度: (angle * 180 / Math.PI).toFixed(1) + '°',
-					GPS: { lat: testLat, lng: testLng }
 				})
-				
-				// 模拟GPS定位结果
-				const mockLocation = {
-					latitude: testLat,
-					longitude: testLng,
-					accuracy: 5, // 模拟精度5米
-					heading: (this.testMoveStep * 5) % 360 // 模拟朝向
-				}
-				
-				// 直接调用GPS处理逻辑（不经过真实的getLocation）
-				this.processLocationUpdate(mockLocation)
-			}, 500) // 每500ms移动一次
-			
-			uni.showToast({
-				title: '测试模式已开启',
-				icon: 'success',
-				duration: 1500
-			})
-		},
-		
-		/**
-		 * 停止测试模式
-		 */
-		stopTestMode() {
-			if (this.testMoveTimer) {
-				clearInterval(this.testMoveTimer)
-				this.testMoveTimer = null
+
+				// 更新箭头朝向（指向下一步）
+				this.updateArrowHeading()
+			} else {
+				// 到达终点
+				this.currentStep = null
+				this.nextStep = null
+				uni.showToast({
+					title: '🎉 已到达目的地！',
+					icon: 'success',
+					duration: 2000
+				})
 			}
-			this.isTestMode = false
-			this.testMoveStep = 0
-			console.log('[测试模式] 已停止GPS模拟移动')
+		},
+		
+		/**
+		 * 标记已到达当前节点
+		 */
+		markAsArrived() {
+			if (!this.currentStep) {
+				return
+			}
 			
-			uni.showToast({
-				title: '测试模式已停止',
-				icon: 'none',
-				duration: 1500
+			uni.showModal({
+				title: '确认到达',
+				content: `您已到达 ${this.currentStep.toNodeName} 吗？`,
+				success: (res) => {
+					if (res.confirm) {
+						this.moveToNextStep()
+					}
+				}
 			})
 		},
 		
 		/**
-		 * 处理位置更新（用于测试模式和真实GPS定位）
+		 * 处理位置更新（用于真实GPS定位）
 		 */
 		processLocationUpdate(location) {
 			// 将GPS坐标转换为地图网格坐标（整数，用于路径规划）
@@ -2371,9 +3050,8 @@ export default {
 				}
 				
 				// 无论位置是否变化，都强制重绘地图（确保箭头位置和朝向实时更新）
-				// 在测试模式下，即使坐标变化很小，也强制重绘
 				if (this.isRealTimeMode) {
-					console.log('[位置更新] 强制重绘地图，箭头位置:', JSON.stringify(gridPosFloat), '朝向:', this.locationHeading.toFixed(1) + '°', '测试模式:', this.isTestMode)
+					console.log('[位置更新] 强制重绘地图，箭头位置:', JSON.stringify(gridPosFloat), '朝向:', this.locationHeading.toFixed(1) + '°')
 					// 立即重绘，不使用nextTick，让箭头实时移动
 					this.drawMap()
 				} else {
@@ -2382,65 +3060,19 @@ export default {
 			}
 		},
 		
-		/**
-		 * 手动移动箭头（用于调试）
-		 */
-		manualMoveArrow() {
-			console.log('[手动移动] 手动移动箭头')
-			
-			// 确保实时定位模式开启
-			if (!this.isRealTimeMode) {
-				this.isRealTimeMode = true
-			}
-			
-			// 获取当前位置（或使用起点）
-			const currentPos = this.currentLocationFloat || 
-							  (this.currentLocation ? { x: this.currentLocation.x + 0.5, y: this.currentLocation.y + 0.5 } : null) ||
-							  (this.startNode ? { x: this.startNode.x + 0.5, y: this.startNode.y + 0.5 } : { x: 20, y: 20 })
-			
-			// 向右移动0.5个网格单位
-			const newFloatPos = {
-				x: currentPos.x + 0.5,
-				y: currentPos.y
-			}
-			
-			console.log('[手动移动] 移动箭头:', {
-				旧位置: currentPos,
-				新位置: newFloatPos
-			})
-			
-			// 更新浮点数坐标
-			this.currentLocationFloat = newFloatPos
-			
-			// 更新整数坐标
-			this.currentLocation = {
-				x: Math.floor(newFloatPos.x),
-				y: Math.floor(newFloatPos.y)
-			}
-			
-			// 更新起点
-			this.startNode = this.currentLocation
-			
-			// 重新计算路径
-			this.calculatePath()
-			
-			// 强制重绘地图
-			this.drawMap()
-			
-			uni.showToast({
-				title: '箭头已移动',
-				icon: 'success',
-				duration: 1000
-			})
-		}
 	}
 }
 </script>
 
 <style lang="scss" scoped>
+.page-scroll {
+	height: 100vh;
+}
+
 .container {
 	width: 100%;
-	height: 100vh;
+	/* 使用最小高度而不是固定高度，让页面可以滚动 */
+	min-height: 100vh;
 	background-color: #f7fafc;
 	display: flex;
 	flex-direction: column;
@@ -2472,6 +3104,55 @@ export default {
 .info-value {
 	font-size: 30rpx;
 	color: #333;
+	font-weight: 600;
+}
+
+.floor-selector {
+	display: flex;
+	align-items: center;
+	margin-bottom: 16rpx;
+	padding: 16rpx;
+	background: #f5f5f5;
+	border-radius: 8rpx;
+}
+
+.floor-buttons {
+	display: flex;
+	gap: 12rpx;
+	flex: 1;
+}
+
+.floor-btn {
+	padding: 12rpx 24rpx;
+	background: #fff;
+	border: 2rpx solid #ddd;
+	border-radius: 8rpx;
+	font-size: 28rpx;
+	color: #666;
+	text-align: center;
+	transition: all 0.3s;
+}
+
+.floor-btn.active {
+	background: #1890ff;
+	border-color: #1890ff;
+	color: #fff;
+	font-weight: 600;
+}
+
+.floor-label {
+	position: absolute;
+	top: 20rpx;
+	right: 20rpx;
+	background: rgba(24, 144, 255, 0.9);
+	padding: 12rpx 24rpx;
+	border-radius: 20rpx;
+	z-index: 10;
+}
+
+.floor-text {
+	font-size: 28rpx;
+	color: #fff;
 	font-weight: 600;
 }
 
@@ -2563,11 +3244,14 @@ export default {
 }
 
 .map-container {
-	flex: 1;
+	width: 100%;
+	height: 900rpx;
 	position: relative;
 	overflow: hidden;
-	background-color: #f0f0f0;
-	background-image: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+	background-image: linear-gradient(135deg, #eef5ff 0%, #dfefff 100%);
+	border-radius: 24rpx;
+	box-shadow: 0 24rpx 48rpx rgba(42, 130, 228, 0.12);
+	margin-top: 24rpx;
 }
 
 .background-image {
@@ -2587,7 +3271,83 @@ export default {
 	width: 100%;
 	height: 100%;
 	z-index: 10;
-	background-color: rgba(240, 240, 240, 0.5); /* 轻微背景色，确保Canvas可见 */
+	background-color: rgba(240, 240, 240, 0.25);
+}
+
+.map-legend {
+	margin: 16rpx 0 0;
+	padding: 16rpx 20rpx;
+	background: #ffffff;
+	border-radius: 14rpx;
+	box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.08);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16rpx;
+}
+
+.legend-item {
+	display: flex;
+	align-items: center;
+	gap: 8rpx;
+	min-width: 45%;
+}
+
+.legend-text {
+	font-size: 24rpx;
+	color: #4a4a4a;
+}
+
+.legend-dot {
+	width: 16rpx;
+	height: 16rpx;
+	border-radius: 50%;
+}
+
+.legend-dot.current {
+	background: #FF4D4F;
+}
+
+.legend-dot.next {
+	border: 3rpx solid #FAAD14;
+	width: 18rpx;
+	height: 18rpx;
+	border-radius: 50%;
+}
+
+.legend-dot.destination {
+	background: #FF7875;
+	box-shadow: 0 0 6rpx rgba(255, 120, 117, 0.6);
+}
+
+.legend-line.path {
+	width: 32rpx;
+	height: 4rpx;
+	border-radius: 4rpx;
+	background: linear-gradient(90deg, #52C41A, #13C2C2);
+}
+
+.legend-block.obstacle {
+	width: 20rpx;
+	height: 14rpx;
+	border-radius: 2rpx;
+	background: rgba(255, 153, 153, 0.45);
+}
+
+.floor-label {
+	position: absolute;
+	top: 20rpx;
+	right: 20rpx;
+	background: rgba(24, 144, 255, 0.9);
+	padding: 12rpx 24rpx;
+	border-radius: 20rpx;
+	z-index: 20;
+	box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.15);
+}
+
+.floor-text {
+	font-size: 28rpx;
+	color: #fff;
+	font-weight: 600;
 }
 
 .debug-info {
@@ -2624,6 +3384,77 @@ export default {
 .loading-text {
 	font-size: 32rpx;
 	color: #666;
+}
+
+.navigation-guide {
+	margin-top: 20rpx;
+	padding: 24rpx;
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	border-radius: 16rpx;
+	box-shadow: 0 4rpx 12rpx rgba(102, 126, 234, 0.3);
+}
+
+.guide-header {
+	display: flex;
+	align-items: center;
+	margin-bottom: 16rpx;
+}
+
+.guide-icon {
+	font-size: 36rpx;
+	margin-right: 12rpx;
+}
+
+.guide-title {
+	font-size: 32rpx;
+	color: #ffffff;
+	font-weight: 600;
+}
+
+.guide-content {
+	margin-bottom: 12rpx;
+}
+
+.guide-text {
+	font-size: 30rpx;
+	color: #ffffff;
+	line-height: 1.6;
+	font-weight: 500;
+}
+
+.guide-detail {
+	font-size: 24rpx;
+	color: rgba(255, 255, 255, 0.9);
+	margin-bottom: 16rpx;
+}
+
+.guide-actions {
+	margin-top: 16rpx;
+}
+
+.arrived-btn {
+	width: 100%;
+	padding: 16rpx;
+	background: rgba(255, 255, 255, 0.2);
+	border: 2rpx solid rgba(255, 255, 255, 0.5);
+	border-radius: 12rpx;
+	color: #ffffff;
+	font-size: 28rpx;
+	font-weight: 600;
+}
+
+.next-step-hint {
+	margin-top: 16rpx;
+	padding: 16rpx 20rpx;
+	background: #FFF7E6;
+	border-left: 4rpx solid #FFA500;
+	border-radius: 8rpx;
+}
+
+.hint-text {
+	font-size: 26rpx;
+	color: #AD6800;
+	line-height: 1.5;
 }
 </style>
 

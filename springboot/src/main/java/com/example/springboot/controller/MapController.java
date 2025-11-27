@@ -6,9 +6,11 @@ import com.example.springboot.dto.map.MapNodeDTO;
 import com.example.springboot.service.MapService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/map")
+@CrossOrigin(origins = "*")
 public class MapController {
     
     private final MapService mapService;
@@ -27,16 +30,17 @@ public class MapController {
     }
     
     /**
-     * 获取地图配置
+     * 获取地图配置（支持指定楼层）
      * 返回网格数据和所有节点信息
      * 
+     * @param floorLevel 楼层号（可选，默认1楼）
      * @return 地图配置响应
      */
     @GetMapping("/config")
-    public ResponseEntity<Result> getMapConfig() {
+    public ResponseEntity<Result> getMapConfig(@RequestParam(required = false, defaultValue = "1") Integer floorLevel) {
         try {
-            System.out.println("[MapController] 收到获取地图配置请求");
-            MapConfigResponse config = mapService.getMapConfig();
+            System.out.println("[MapController] 收到获取地图配置请求，楼层: " + floorLevel);
+            MapConfigResponse config = mapService.getMapConfig(floorLevel);
             System.out.println("[MapController] 地图配置获取成功，准备返回");
             System.out.println("[MapController] 配置数据: grid=" + (config.getGrid() != null) + ", nodes=" + (config.getNodes() != null ? config.getNodes().size() : 0));
             return ResponseEntity.ok(Result.success(config));
