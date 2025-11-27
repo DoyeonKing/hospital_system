@@ -26,3 +26,4 @@ MODIFY COLUMN `qrcode_content` VARCHAR(255) NULL COMMENT '二维码内容（格�
 
 
 
+
