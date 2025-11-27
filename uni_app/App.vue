@@ -4,13 +4,13 @@
 		
 		onLaunch: function() {
 			console.log('App Launch')
-			// 启动候补通知监听
-			this.startWaitlistNotificationCheck()
+			// 启动候补通知监听（后端未启动时暂时禁用）
+			// this.startWaitlistNotificationCheck()
 		},
 		onShow: function() {
 			console.log('App Show')
-			// 应用显示时启动候补通知监听
-			this.startWaitlistNotificationCheck()
+			// 应用显示时启动候补通知监听（后端未启动时暂时禁用）
+			// this.startWaitlistNotificationCheck()
 		},
 		onHide: function() {
 			console.log('App Hide')
@@ -82,6 +82,11 @@
 						}
 					}
 				} catch (error) {
+					// 后端未启动时的错误，静默处理，不显示给用户
+					if (error.errMsg && error.errMsg.includes('CONNECTION_REFUSED')) {
+						console.log('后端服务未启动，跳过候补通知检查')
+						return
+					}
 					console.error('检查候补通知失败:', error)
 				}
 			},

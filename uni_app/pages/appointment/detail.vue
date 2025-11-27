@@ -37,6 +37,10 @@
 					<text class="label">医生：</text>
 					<text class="value">{{ appointment.doctorName }}</text>
 				</view>
+				<view class="info-row" v-if="appointment.clinicRoom">
+					<text class="label">诊室：</text>
+					<text class="value">{{ appointment.clinicRoom }}</text>
+				</view>
 				<view class="info-row">
 					<text class="label">就诊时间：</text>
 					<text class="value">{{ formatDateTime(appointment.scheduleTime) }}</text>
@@ -665,9 +669,9 @@ onUnload() {
 					return
 				}
 				
-				// 跳转到简化版导航页面，传递预约ID
+				// 跳转到导航页面，传递预约ID
 				uni.navigateTo({
-					url: `/pages/navigation/navigation-simple?appointmentId=${this.appointmentId}`
+					url: `/pages/navigation/index?appointmentId=${this.appointmentId}`
 				})
 			},
 			

@@ -24,7 +24,7 @@
 			</view>
 		</view>
 
-		<!-- 主要功能入口（2x2网格布局） -->
+		<!-- 主要功能入口（2x3网格布局） -->
 		<view class="main-functions">
 			<view class="function-card card-1" @click="navigateToDepartments">
 				<view class="icon-wrapper">
@@ -40,14 +40,21 @@
 				<text class="function-title">我的预约</text>
 			</view>
 			
-			<view class="function-card card-3" @click="navigateToProfile">
+			<view class="function-card card-3" @click="navigateToNavigation">
+				<view class="icon-wrapper">
+					<view class="function-icon">🗺️</view>
+				</view>
+				<text class="function-title">院内导航</text>
+			</view>
+			
+			<view class="function-card card-4" @click="navigateToProfile">
 				<view class="icon-wrapper">
 					<view class="function-icon">👤</view>
 				</view>
 				<text class="function-title">个人中心</text>
 			</view>
 			
-			<view class="function-card card-4" @click="showContactInfo">
+			<view class="function-card card-5" @click="showContactInfo">
 				<view class="icon-wrapper">
 					<view class="function-icon">📞</view>
 				</view>
@@ -622,9 +629,36 @@
 			
 			// 导航到个人中心
 			navigateToProfile() {
-				uni.switchTab({
+				uni.navigateTo({
 					url: '/pages/profile/profile'
 				})
+			},
+			
+			// 导航到院内导航页面
+			navigateToNavigation() {
+				// 显示加载中提示
+				uni.showLoading({
+					title: '加载中...',
+					mask: true
+				});
+				
+				// 添加短暂延迟确保UI响应
+				setTimeout(() => {
+					uni.navigateTo({
+						url: '/pages/navigation/index',
+						success: () => {
+							uni.hideLoading();
+						},
+						fail: (err) => {
+							console.error('导航失败:', err);
+							uni.hideLoading();
+							uni.showToast({
+								title: '导航失败，请稍后重试',
+								icon: 'none'
+							});
+						}
+					});
+				}, 50);
 			},
 			
 			// 导航到候补列表（优先跳转到 notified 状态的候补详情）

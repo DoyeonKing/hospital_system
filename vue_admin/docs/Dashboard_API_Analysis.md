@@ -370,3 +370,9 @@ const top5 = Object.entries(departmentBusy)
 
 可以按照类似的模式实现数据大屏的统计接口。
 
+
+
+
+
+
+

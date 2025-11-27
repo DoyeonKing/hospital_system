@@ -94,6 +94,42 @@
 			}
 		},
 		{
+			"path": "pages/navigation/index",
+			"style": {
+				"navigationBarTitleText": "院内导航",
+				"navigationBarBackgroundColor": "#4FD9C3",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F8F8F8"
+			}
+		},
+		{
+			"path": "pages/navigation/NavigationMain",
+			"style": {
+				"navigationBarTitleText": "导航",
+				"navigationBarBackgroundColor": "#4FD9C3",
+				"navigationBarTextStyle": "white",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/navigation/ScanCode",
+			"style": {
+				"navigationBarTitleText": "扫码定位",
+				"navigationBarBackgroundColor": "#4FD9C3",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F8F8F8"
+			}
+		},
+		{
+			"path": "pages/navigation/LocationSelect",
+			"style": {
+				"navigationBarTitleText": "选择位置",
+				"navigationBarBackgroundColor": "#4FD9C3",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F8F8F8"
+			}
+		},
+		{
 			"path": "pages/payment/payment",
 			"style": {
 				"navigationBarTitleText": "支付挂号费",

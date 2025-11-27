@@ -42,7 +42,9 @@ public class ScheduleController {
     public ResponseEntity<Page<ScheduleResponse>> getSchedules(
             @RequestParam(required = false) Integer departmentId,
             @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
+            @RequestParam(required = false) String endDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
 
         try {
             System.out.println("=== 后端接收到的请求参数 ===");
@@ -52,6 +54,7 @@ public class ScheduleController {
                     + (startDate != null ? startDate.getClass().getSimpleName() : "null") + ")");
             System.out.println("endDate: " + endDate + " (类型: "
                     + (endDate != null ? endDate.getClass().getSimpleName() : "null") + ")");
+            System.out.println("page: " + page + ", size: " + size);
             System.out.println("=============================");
 
             ScheduleListRequest request = new ScheduleListRequest();
@@ -75,14 +78,23 @@ public class ScheduleController {
                 }
             }
 
+            // 创建分页参数
+            Pageable pageable = PageRequest.of(page, size);
             System.out.println("准备调用服务层...");
-            Page<ScheduleResponse> schedules = scheduleService.getSchedules(request);
+            Page<ScheduleResponse> schedules = scheduleService.getSchedules(request, pageable);
             System.out.println("查询结果: " + schedules.getTotalElements() + " 条记录");
             return ResponseEntity.ok(schedules);
         } catch (Exception e) {
             System.err.println("查询排班数据时发生错误:");
+            System.err.println("错误类型: " + e.getClass().getName());
+            System.err.println("错误消息: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.err.println("根本原因: " + e.getCause().getMessage());
+                System.err.println("根本原因类型: " + e.getCause().getClass().getName());
+            }
             e.printStackTrace();
-            return ResponseEntity.status(500).build();
+            // 抛出异常让 GlobalExceptionHandler 处理，这样前端可以看到详细错误信息
+            throw new RuntimeException("查询排班数据失败: " + e.getMessage(), e);
         }
     }
 
@@ -148,8 +160,14 @@ public class ScheduleController {
             return ResponseEntity.ok(schedules);
         } catch (Exception e) {
             System.err.println("查询所有排班记录时发生错误: " + e.getMessage());
+            System.err.println("错误类型: " + e.getClass().getName());
+            if (e.getCause() != null) {
+                System.err.println("根本原因: " + e.getCause().getMessage());
+                System.err.println("根本原因类型: " + e.getCause().getClass().getName());
+            }
             e.printStackTrace();
-            return ResponseEntity.status(500).build();
+            // 抛出异常让 GlobalExceptionHandler 处理，这样前端可以看到详细错误信息
+            throw new RuntimeException("查询排班数据失败: " + e.getMessage(), e);
         }
     }
     

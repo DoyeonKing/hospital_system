@@ -1,122 +1,154 @@
-// 路径：src/main/java/com/example/springboot/service/LocationService.java
 package com.example.springboot.service;
 
 import com.example.springboot.dto.location.LocationResponse;
 import com.example.springboot.entity.Department;
 import com.example.springboot.entity.Location;
+import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.DepartmentRepository;
 import com.example.springboot.repository.LocationRepository;
 import com.example.springboot.repository.ScheduleRepository;
-import com.example.springboot.exception.ResourceNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class LocationService {
 
-    @Autowired
-    private LocationRepository locationRepository;
-
-    @Autowired
-    private DepartmentRepository departmentRepository;
-    
-    @Autowired
-    private ScheduleRepository scheduleRepository;
+    private final LocationRepository locationRepository;
+    private final DepartmentRepository departmentRepository;
+    private final ScheduleRepository scheduleRepository;
 
     /**
-     * 根据科室ID获取所有门诊室名称
-     * 
-     * @param departmentId 科室ID
-     * @return 门诊室名称列表
-     */
-    public List<String> getLocationNamesByDepartmentId(Integer departmentId) {
-        // 查询该科室下的所有门诊室
-        List<Location> locations = locationRepository.findByDepartmentDepartmentId(departmentId);
-
-        // 提取locationName并返回
-        return locations.stream()
-                .map(Location::getLocationName)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 根据科室ID获取所有门诊室完整信息
-     * 
-     * @param departmentId 科室ID
-     * @return 门诊室完整信息列表
-     */
-    public List<LocationResponse> getLocationsByDepartmentId(Integer departmentId) {
-        // 查询该科室下的所有门诊室
-        return locationRepository.findByDepartmentDepartmentId(departmentId).stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 为指定科室创建新地点
-     * 
-     * @param departmentId 科室ID
-     * @param locationData 地点信息
-     * @return 创建成功的地点
+     * 创建地点
      */
     @Transactional
-    public Location createLocation(Integer departmentId, Map<String, Object> locationData) {
-        // 1. 验证科室是否存在
+    public Location createLocation(Location location) {
+        return locationRepository.save(location);
+    }
+
+    /**
+     * 为指定科室创建地点（从Map构建）
+     */
+    @Transactional
+    public Location createLocation(Integer departmentId, java.util.Map<String, Object> locationData) {
+        // 验证科室是否存在
         Department department = departmentRepository.findById(departmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("科室不存在，ID: " + departmentId));
 
-        // 2. 创建新地点实体
+        // 构建Location对象
         Location location = new Location();
         location.setDepartment(department);
         
-        // 3. 设置地点属性
         if (locationData.containsKey("locationName")) {
             location.setLocationName((String) locationData.get("locationName"));
         }
+        if (locationData.containsKey("floorLevel")) {
+            Object floorLevel = locationData.get("floorLevel");
+            if (floorLevel instanceof Integer) {
+                location.setFloorLevel((Integer) floorLevel);
+            } else if (floorLevel instanceof Number) {
+                location.setFloorLevel(((Number) floorLevel).intValue());
+            }
+        }
         if (locationData.containsKey("building")) {
             location.setBuilding((String) locationData.get("building"));
-        }
-        if (locationData.containsKey("floorLevel")) {
-            location.setFloorLevel(Integer.parseInt(locationData.get("floorLevel").toString()));
         }
         if (locationData.containsKey("roomNumber")) {
             location.setRoomNumber((String) locationData.get("roomNumber"));
         }
         if (locationData.containsKey("capacity")) {
-            location.setCapacity(Integer.parseInt(locationData.get("capacity").toString()));
+            Object capacity = locationData.get("capacity");
+            if (capacity instanceof Integer) {
+                location.setCapacity((Integer) capacity);
+            } else if (capacity instanceof Number) {
+                location.setCapacity(((Number) capacity).intValue());
+            }
+        }
+        if (locationData.containsKey("latitude")) {
+            Object latitude = locationData.get("latitude");
+            if (latitude != null) {
+                location.setLatitude(BigDecimal.valueOf(((Number) latitude).doubleValue()));
+            }
+        }
+        if (locationData.containsKey("longitude")) {
+            Object longitude = locationData.get("longitude");
+            if (longitude != null) {
+                location.setLongitude(BigDecimal.valueOf(((Number) longitude).doubleValue()));
+            }
+        }
+        if (locationData.containsKey("addressDetail")) {
+            location.setAddressDetail((String) locationData.get("addressDetail"));
         }
 
-        // 4. 保存并返回
         return locationRepository.save(location);
     }
 
     /**
-     * 删除指定地点
-     * 
-     * @param locationId 地点ID
+     * 更新地点
+     */
+    @Transactional
+    public Location updateLocation(Integer locationId, Location locationDetails) {
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new ResourceNotFoundException("地点不存在，ID: " + locationId));
+        
+        location.setLocationName(locationDetails.getLocationName());
+        location.setFloorLevel(locationDetails.getFloorLevel());
+        location.setBuilding(locationDetails.getBuilding());
+        location.setRoomNumber(locationDetails.getRoomNumber());
+        location.setCapacity(locationDetails.getCapacity());
+        
+        return locationRepository.save(location);
+    }
+
+    /**
+     * 根据ID获取地点
+     */
+    public Location getLocationById(Integer locationId) {
+        return locationRepository.findById(locationId)
+                .orElseThrow(() -> new ResourceNotFoundException("地点不存在，ID: " + locationId));
+    }
+
+    /**
+     * 获取所有地点
+     */
+    public List<Location> getAllLocations() {
+        return locationRepository.findAll();
+    }
+
+    /**
+     * 根据科室ID获取地点列表
+     */
+    public List<LocationResponse> getLocationsByDepartmentId(Integer departmentId) {
+        return locationRepository.findByDepartmentDepartmentId(departmentId)
+                .stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 根据科室ID获取地点名称列表
+     */
+    public List<String> getLocationNamesByDepartmentId(Integer departmentId) {
+        return locationRepository.findByDepartmentDepartmentId(departmentId)
+                .stream()
+                .map(Location::getLocationName)
+                .filter(name -> name != null && !name.trim().isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 删除地点
      */
     @Transactional
     public void deleteLocation(Integer locationId) {
-        // 1. 验证地点是否存在
         Location location = locationRepository.findById(locationId)
                 .orElseThrow(() -> new ResourceNotFoundException("地点不存在，ID: " + locationId));
-
-        // 2. 检查地点是否在未来的排班中被使用
-        long futureScheduleCount = scheduleRepository.countFutureSchedulesByLocation(
-            locationId,
-            LocalDate.now()
-        );
-        if (futureScheduleCount > 0) {
-            throw new RuntimeException("该地点在 " + futureScheduleCount + " 个未来的排班中被使用，无法删除。请先删除或调整相关排班。");
-        }
-
-        // 3. 删除地点
         locationRepository.delete(location);
     }
 
@@ -147,7 +179,11 @@ public class LocationService {
         response.setBuilding(location.getBuilding());
         response.setRoomNumber(location.getRoomNumber());
         response.setCapacity(location.getCapacity());
-        response.setMapNodeId(location.getMapNodeId());
+        if (location.getMapNode() != null) {
+            response.setMapNodeId(location.getMapNode().getNodeId().longValue());
+        } else {
+            response.setMapNodeId(null);
+        }
         
         if (location.getDepartment() != null) {
             response.setDepartmentId(location.getDepartment().getDepartmentId());

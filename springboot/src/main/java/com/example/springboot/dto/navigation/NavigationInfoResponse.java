@@ -1,20 +1,25 @@
-package com.example.springboot.dto.location;
+package com.example.springboot.dto.navigation;
 
 import lombok.Data;
 
+/**
+ * 导航信息响应DTO
+ */
 @Data
-public class LocationResponse {
+public class NavigationInfoResponse {
     private Integer locationId;
     private String locationName;
-    private Integer departmentId;
-    private String departmentName;
-    private Integer floorLevel;
     private String building;
+    private Integer floorLevel;
     private String roomNumber;
-    private Integer capacity;
     private Double latitude;
     private Double longitude;
     private String addressDetail;
-    private Long mapNodeId;
+    private Integer mapNodeId;
 }
+
+
+
+
+
 

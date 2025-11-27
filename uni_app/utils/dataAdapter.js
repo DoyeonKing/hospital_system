@@ -105,6 +105,7 @@ export function adaptAppointment(appointment) {
 		doctorId: schedule.doctorId,
 		doctorName: schedule.doctorName || '',
 		doctorTitle: schedule.doctorTitle || '',
+		clinicRoom: appointment.clinicRoom || schedule.location || schedule.clinicRoom || schedule.roomNumber || schedule.room || '', // 从appointment或schedule.location获取诊室信息
 		scheduleTime: scheduleTime,
 		scheduleEndTime: scheduleEndTime,
 		appointmentTime: appointment.createdAt || '',

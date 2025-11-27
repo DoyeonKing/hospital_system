@@ -335,6 +335,33 @@ public class DepartmentService {
     }
 
     /**
+     * 获取热门科室列表
+     * 返回所有父科室（排除ID=999的未分配科室），作为热门科室
+     * 
+     * @return 热门科室列表（父科室列表）
+     */
+    @Transactional(readOnly = true)
+    public List<DepartmentResponseDTO> getPopularDepartments() {
+        // 获取所有父科室（排除ID=999）
+        List<ParentDepartment> parentDepartments = parentDepartmentRepository.findAll()
+                .stream()
+                .filter(parent -> !parent.getParentDepartmentId().equals(999))
+                .toList();
+        
+        // 转换为 DepartmentResponseDTO（只包含父科室信息）
+        return parentDepartments.stream()
+                .map(parent -> {
+                    DepartmentResponseDTO dto = new DepartmentResponseDTO();
+                    dto.setDepartmentId(parent.getParentDepartmentId());
+                    dto.setName(parent.getName());
+                    dto.setDescription(parent.getDescription());
+                    // 父科室没有 parentDepartmentName
+                    return dto;
+                })
+                .toList();
+    }
+
+    /**
      * 获取科室树形结构数据（排除ID=999的未分配科室）
      * 
      * @return 树形结构的科室数据

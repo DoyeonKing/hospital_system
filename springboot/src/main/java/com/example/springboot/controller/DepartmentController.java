@@ -149,6 +149,22 @@ public class DepartmentController {
     }
 
     /**
+     * 获取热门科室列表
+     * 使用 GET /api/departments/popular
+     * 
+     * @return 热门科室列表（父科室列表）
+     */
+    @GetMapping("/popular")
+    public ResponseEntity<?> getPopularDepartments() {
+        try {
+            List<DepartmentResponseDTO> popularDepartments = departmentService.getPopularDepartments();
+            return new ResponseEntity<>(popularDepartments, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("查询热门科室时发生错误: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * 测试接口 - 验证路由是否正常工作
      * 使用 GET /api/departments/test-unassigned
      * 

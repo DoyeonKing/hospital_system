@@ -171,6 +171,28 @@
 			} catch (error) {
 				uni.hideLoading();
 				console.error('登录请求失败:', error);
+				
+				// 检查是否是连接失败（后端未启动）
+				if (error.errMsg && error.errMsg.includes('CONNECTION_REFUSED')) {
+					uni.showModal({
+						title: '无法连接服务器',
+						content: '后端服务器未启动。\n\n你可以：\n1. 启动后端服务器后重试\n2. 使用测试模式跳过登录（仅开发环境）',
+						confirmText: '测试模式',
+						cancelText: '取消',
+						success: (res) => {
+							if (res.confirm) {
+								// 测试模式：直接进入首页
+								this.enterTestMode();
+							}
+						}
+					});
+				} else {
+					uni.showToast({
+						title: '登录失败，请检查网络连接',
+						icon: 'none',
+						duration: 2000
+					});
+				}
 			}
 			},
 			
