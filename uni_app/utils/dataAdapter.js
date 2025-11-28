@@ -67,8 +67,10 @@ export function adaptAppointment(appointment) {
 		'CANCELLED': 'cancelled',
 		'no_show': 'cancelled',
 		'NO_SHOW': 'cancelled',
-		'pending_payment': 'pending',
-		'PENDING_PAYMENT': 'pending'
+		'pending_payment': 'pending_payment',
+		'PENDING_PAYMENT': 'pending_payment',
+		'pending': 'pending',
+		'PENDING': 'pending'
 	}
 	
 	// 处理状态：后端可能返回枚举值（字符串）或枚举对象
@@ -112,26 +114,28 @@ export function adaptAppointment(appointment) {
 		queueNumber: appointment.appointmentNumber,
 		appointmentNumber: appointment.appointmentNumber,
 		patientName: patient.fullName || patient.name || '',
-			patientId: patient.patientId || patient.id,
-			// 直接添加location字段，方便访问
+		patientId: patient.patientId || patient.id,
+		// 直接添加location字段，方便访问
+		location: schedule.location || '',
+		locationId: schedule.locationId || null,
+		fee: parseFloat(schedule.fee || 0),
+		paymentDeadline: appointment.paymentDeadline || '',
+		// 保留schedule对象以便访问locationId等字段
+		schedule: {
+			scheduleId: schedule.scheduleId,
+			locationId: schedule.locationId,
 			location: schedule.location || '',
-			locationId: schedule.locationId || null,
-			// 保留schedule对象以便访问locationId等字段
-			schedule: {
-				scheduleId: schedule.scheduleId,
-				locationId: schedule.locationId,
-				location: schedule.location || '',
-				departmentId: schedule.departmentId,
-				departmentName: schedule.departmentName,
-				doctorId: schedule.doctorId,
-				doctorName: schedule.doctorName,
-				doctorTitle: schedule.doctorTitle,
-				scheduleDate: schedule.scheduleDate,
-				slotName: schedule.slotName,
-				startTime: schedule.startTime,
-				endTime: schedule.endTime,
-				fee: schedule.fee
-			}
+			departmentId: schedule.departmentId,
+			departmentName: schedule.departmentName,
+			doctorId: schedule.doctorId,
+			doctorName: schedule.doctorName,
+			doctorTitle: schedule.doctorTitle,
+			scheduleDate: schedule.scheduleDate,
+			slotName: schedule.slotName,
+			startTime: schedule.startTime,
+			endTime: schedule.endTime,
+			fee: schedule.fee
+		}
 	}
 	
 	console.log('[数据适配] 适配后数据:', JSON.stringify(adapted, null, 2))

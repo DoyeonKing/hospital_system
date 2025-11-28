@@ -2,6 +2,7 @@ package com.example.springboot.entity; // 包名调整
 
 import com.example.springboot.entity.enums.PatientStatus; // 导入路径调整
 import com.example.springboot.entity.enums.PatientType;   // 导入路径调整
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
@@ -28,6 +29,7 @@ public class Patient {
     private PatientType patientType; // 患者类型
 
     @Column(name = "password_hash", nullable = false)
+    @JsonIgnore
     private String passwordHash; // 哈希加盐后的密码
 
     @Column(name = "full_name", nullable = false, length = 100)
@@ -49,6 +51,7 @@ public class Patient {
     private LocalDateTime updatedAt; // 信息最后更新时间
 
     @OneToOne(mappedBy = "patient", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private PatientProfile patientProfile;
 
     // Bi-directional relationship with Appointments
