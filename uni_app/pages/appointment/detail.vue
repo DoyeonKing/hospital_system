@@ -65,8 +65,21 @@
 				</view>
 			</view>
 			
-			<!-- 签到二维码（已确认且未过期状态显示） -->
-			<view class="qr-code-card" v-if="isConfirmedStatus(appointment.status) && !isExpiredStatus(appointment)">
+			<!-- 待支付提示卡片 -->
+			<view class="payment-pending-card" v-if="isPendingPaymentStatus(appointment.status)">
+				<view class="payment-icon">💰</view>
+				<view class="payment-content">
+					<text class="payment-title">待支付</text>
+					<text class="payment-desc">请尽快完成支付以确认预约</text>
+					<text class="payment-fee">挂号费：¥{{ appointment.fee || 0 }}</text>
+					<text class="payment-deadline" v-if="appointment.paymentDeadline">
+						支付截止：{{ formatDateTime(appointment.paymentDeadline) }}
+					</text>
+				</view>
+			</view>
+			
+			<!-- 签到二维码（已支付且未过期状态显示，排除待支付状态） -->
+			<view class="qr-code-card" v-if="isConfirmedStatus(appointment.status) && !isPendingPaymentStatus(appointment.status) && !isExpiredStatus(appointment)">
 				<view class="qr-title">
 					<text class="qr-icon">📱</text>
 					<text class="qr-text">签到二维码</text>
@@ -97,17 +110,24 @@
 			
 			<!-- 操作按钮 -->
 			<view class="action-section" v-if="!isCancelledStatus(appointment.status)">
-				<button class="home-btn" @click="handleBackToHome">返回主页</button>
-				<!-- 已预约/待支付状态且未过期：显示取消预约按钮 -->
-				<button class="cancel-btn" v-if="canCancelAppointment(appointment.status)" @click="handleCancel">取消预约</button>
-				<button class="view-btn" v-if="isCompletedStatus(appointment.status) && !isConfirmedStatus(appointment.status)" @click="handleBackToHome">查看其他预约</button>
+				<!-- 待支付状态：显示支付和取消按钮 -->
+				<view class="button-row" v-if="isPendingPaymentStatus(appointment.status)">
+					<button class="pay-btn-half" @click="handlePayment">立即支付</button>
+					<button class="cancel-btn-half" @click="handleCancel">取消预约</button>
+				</view>
+				<!-- 其他状态：显示返回主页和取消按钮 -->
+				<view class="button-row" v-else>
+					<button class="home-btn" @click="handleBackToHome">返回主页</button>
+					<button class="cancel-btn" v-if="canCancelAppointment(appointment.status)" @click="handleCancel">取消预约</button>
+					<button class="view-btn" v-if="isCompletedStatus(appointment.status) && !isConfirmedStatus(appointment.status)" @click="handleBackToHome">查看其他预约</button>
+				</view>
 			</view>
 		</view>
 	</view>
 </template>
 
 <script>
-	import { getAppointmentDetail, cancelAppointment, getAppointmentQrCode } from '../../api/appointment.js'
+	import { getAppointmentDetail, cancelAppointment, getAppointmentQrCode, payForAppointment } from '../../api/appointment.js'
 	import { mockPatientInfo } from '../../api/mockData.js'
 	
 	export default {
@@ -118,6 +138,12 @@
 			patientInfo: {},
 			qrCodeUrl: '',
 			qrToken: '',
+			paymentMethods: [
+				{ value: 'wechat', name: '微信支付', icon: '💚' },
+				{ value: 'alipay', name: '支付宝', icon: '🔵' },
+				{ value: 'balance', name: '校园卡余额', icon: '💳' }
+			],
+			selectedPaymentMethod: 'wechat',
 			refreshTimer: null,      // 刷新定时器
 			countdownTimer: null,    // 倒计时定时器
 			refreshCountdown: 0,     // 刷新倒计时
@@ -214,14 +240,18 @@ onUnload() {
 					isExpiredStatus: this.isExpiredStatus(this.appointment)
 				})
 				
-				// 加载预约详情后，生成二维码并启动自动刷新
-				console.log('[前端] 准备生成二维码并启动自动刷新')
-				this.generateQRCode().then(() => {
-					console.log('[前端] 二维码生成完成，启动自动刷新')
-					this.startAutoRefresh()
-				}).catch(error => {
-					console.error('[前端] 二维码生成失败:', error)
-				})
+				// 只有已支付状态才生成二维码（排除待支付状态）
+				if (this.isConfirmedStatus(this.appointment.status) && !this.isPendingPaymentStatus(this.appointment.status)) {
+					console.log('[前端] 准备生成二维码并启动自动刷新')
+					this.generateQRCode().then(() => {
+						console.log('[前端] 二维码生成完成，启动自动刷新')
+						this.startAutoRefresh()
+					}).catch(error => {
+						console.error('[前端] 二维码生成失败:', error)
+					})
+				} else {
+					console.log('[前端] 当前状态不需要生成二维码 - status:', this.appointment.status)
+				}
 			} else {
 				console.error('[前端] 预约详情加载失败 - 响应码:', response?.code, ', 响应消息:', response?.msg)
 				throw new Error(response?.msg || '加载预约详情失败')
@@ -508,8 +538,8 @@ onUnload() {
 			},
 			
 			// 判断是否为已确认状态（兼容大小写）
-			// 包括：confirmed, scheduled, pending_payment（待支付状态也可以取消）
-			// 注意：CHECKED_IN（已签到）也算已确认状态，因为已签到可以显示二维码
+			// 包括：confirmed, scheduled, checked_in（已支付的状态）
+			// 注意：不包括 pending_payment（待支付状态不显示二维码）
 			isConfirmedStatus(status) {
 				if (!status) {
 					console.log('[detail isConfirmedStatus] status 为空')
@@ -518,10 +548,7 @@ onUnload() {
 				const statusLower = status.toLowerCase()
 				const result = statusLower === 'confirmed' || 
 					   statusLower === 'scheduled' || 
-					   statusLower === 'pending_payment' ||
-					   statusLower === 'pending' ||
-					   statusLower === 'checked_in' ||
-					   statusLower === 'CHECKED_IN'
+					   statusLower === 'checked_in'
 				console.log('[detail isConfirmedStatus] 状态:', status, '转换为:', statusLower, '结果:', result)
 				return result
 			},
@@ -543,6 +570,13 @@ onUnload() {
 				if (!status) return false
 				const statusLower = status.toLowerCase()
 				return statusLower === 'pending' || statusLower === 'pending_payment'
+			},
+			
+			// 判断是否为待支付状态（用于显示支付按钮）
+			isPendingPaymentStatus(status) {
+				if (!status) return false
+				const statusLower = status.toLowerCase()
+				return statusLower === 'pending_payment'
 			},
 			
 			// 判断是否可以取消预约（已取消状态、已签到状态和已过期的预约不能取消）
@@ -590,6 +624,80 @@ onUnload() {
 				const hours = date.getHours().toString().padStart(2, '0')
 				const minutes = date.getMinutes().toString().padStart(2, '0')
 				return `${month}月${day}日 ${hours}:${minutes}`
+			},
+			
+			// 处理支付
+			async handlePayment() {
+				if (!this.appointmentId) {
+					uni.showToast({
+						title: '预约信息不完整',
+						icon: 'none'
+					})
+					return
+				}
+				
+				// 显示支付方式选择
+				uni.showActionSheet({
+					itemList: this.paymentMethods.map(m => m.icon + ' ' + m.name),
+					success: async (res) => {
+						const selectedMethod = this.paymentMethods[res.tapIndex]
+						this.selectedPaymentMethod = selectedMethod.value
+						
+						// 确认支付
+						uni.showModal({
+							title: '确认支付',
+							content: `使用${selectedMethod.name}支付 ¥${this.appointment.fee || 0}？`,
+							success: async (modalRes) => {
+								if (modalRes.confirm) {
+									await this.processPayment()
+								}
+							}
+						})
+					}
+				})
+			},
+			
+			// 处理支付流程
+			async processPayment() {
+				uni.showLoading({ title: '支付中...' })
+				
+				try {
+					console.log('开始支付，appointmentId:', this.appointmentId)
+					
+					const response = await payForAppointment(this.appointmentId, {
+						paymentMethod: this.selectedPaymentMethod,
+						transactionId: 'TXN' + Date.now()
+					})
+					
+					console.log('支付完整响应:', JSON.stringify(response, null, 2))
+					
+					// 检查响应
+					if (response && (response.code === '200' || response.appointmentId)) {
+						uni.hideLoading()
+						
+						// 显示支付成功
+						uni.showToast({
+							title: '支付成功',
+							icon: 'success',
+							duration: 2000
+						})
+						
+						// 延迟刷新页面，显示二维码
+						setTimeout(() => {
+							this.loadAppointmentDetail()
+						}, 2000)
+					} else {
+						throw new Error(response?.msg || response?.message || '支付失败')
+					}
+				} catch (error) {
+					console.error('支付失败:', error)
+					uni.hideLoading()
+					uni.showToast({
+						title: error.message || '支付失败，请重试',
+						icon: 'none',
+						duration: 2000
+					})
+				}
 			},
 			
 			async handleCancel() {
@@ -888,8 +996,12 @@ onUnload() {
 		padding: 30rpx;
 		background: #ffffff;
 		box-shadow: 0 -2rpx 12rpx rgba(0, 0, 0, 0.08);
+	}
+
+	.button-row {
 		display: flex;
 		gap: 20rpx;
+		width: 100%;
 	}
 
 	.home-btn {
@@ -912,6 +1024,40 @@ onUnload() {
 		color: #DC2626;
 		font-size: 32rpx;
 		font-weight: 600;
+	}
+
+	/* 待支付状态的并排按钮 */
+	.pay-btn-half {
+		flex: 1;
+		height: 96rpx;
+		background: linear-gradient(135deg, #52C41A 0%, #73D13D 100%);
+		border: none;
+		border-radius: 50rpx;
+		color: #ffffff;
+		font-size: 32rpx;
+		font-weight: 600;
+		box-shadow: 0 4rpx 12rpx rgba(82, 196, 26, 0.3);
+	}
+
+	.pay-btn-half:active {
+		opacity: 0.8;
+		transform: scale(0.98);
+	}
+
+	.cancel-btn-half {
+		flex: 1;
+		height: 96rpx;
+		background: #FFF5F5;
+		border: 2rpx solid #FED7D7;
+		border-radius: 50rpx;
+		color: #DC2626;
+		font-size: 32rpx;
+		font-weight: 600;
+	}
+
+	.cancel-btn-half:active {
+		opacity: 0.8;
+		transform: scale(0.98);
 	}
 
 	.view-btn {
@@ -964,4 +1110,53 @@ onUnload() {
 		color: #AD6800;
 		line-height: 1.5;
 	}
+
+	/* 待支付卡片样式 */
+	.payment-pending-card {
+		background: linear-gradient(135deg, #E6F7FF 0%, #BAE7FF 100%);
+		border: 2rpx solid #91D5FF;
+		border-radius: 20rpx;
+		padding: 30rpx;
+		margin-bottom: 20rpx;
+		display: flex;
+		align-items: center;
+		gap: 20rpx;
+	}
+
+	.payment-icon {
+		font-size: 48rpx;
+	}
+
+	.payment-content {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 8rpx;
+	}
+
+	.payment-title {
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #1890FF;
+	}
+
+	.payment-desc {
+		font-size: 26rpx;
+		color: #0050B3;
+		line-height: 1.5;
+	}
+
+	.payment-fee {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #FF4D4F;
+		margin-top: 8rpx;
+	}
+
+	.payment-deadline {
+		font-size: 24rpx;
+		color: #FA8C16;
+		margin-top: 4rpx;
+	}
+
 </style>

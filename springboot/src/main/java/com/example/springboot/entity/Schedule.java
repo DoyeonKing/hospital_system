@@ -53,6 +53,16 @@ public class Schedule {
 
     private String remarks; // 特别的排班要求或备注信息
 
+    // ===== 加号虚拟号源相关字段 =====
+    @Column(name = "is_add_on_slot")
+    private Boolean isAddOnSlot = false; // 是否为加号虚拟号源
+
+    @Column(name = "reserved_for_patient_id")
+    private Long reservedForPatientId; // 预留给指定患者ID（加号专用）
+
+    @Column(name = "slot_application_id")
+    private Integer slotApplicationId; // 关联的加号申请ID
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
