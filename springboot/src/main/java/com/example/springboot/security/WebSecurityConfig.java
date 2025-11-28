@@ -51,17 +51,17 @@ public class WebSecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 💡 关键修复点：将所有前端应用的地址都添加到允许列表中
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:5174", "http://localhost:5175"));
+        // 💡 允许所有来源（包括null，用于本地文件访问）
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
 
         // 允许常用方法 (GET, POST, PUT, DELETE, OPTIONS)
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 
         // 允许所有请求头
         configuration.setAllowedHeaders(Arrays.asList("*"));
 
-        // 允许发送 Cookie 或认证信息
-        configuration.setAllowCredentials(true);
+        // 允许发送 Cookie 或认证信息（使用setAllowedOriginPatterns时必须设为true才能工作）
+        configuration.setAllowCredentials(false);  // 使用通配符时设为false
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         // 对所有路径生效

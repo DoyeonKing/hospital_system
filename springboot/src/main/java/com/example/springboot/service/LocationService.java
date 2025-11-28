@@ -121,6 +121,17 @@ public class LocationService {
     }
 
     /**
+     * 获取所有地点
+     * 
+     * @return 所有地点列表
+     */
+    public List<LocationResponse> getAllLocations() {
+        return locationRepository.findAll().stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 获取所有未分配科室的地点
      * 
      * @return 未分配地点列表

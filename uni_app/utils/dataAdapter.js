@@ -116,7 +116,26 @@ export function adaptAppointment(appointment) {
 		patientName: patient.fullName || patient.name || '',
 		patientId: patient.patientId || patient.id,
 		fee: parseFloat(schedule.fee || 0),
-		paymentDeadline: appointment.paymentDeadline || ''
+		paymentDeadline: appointment.paymentDeadline || '',
+			// 直接添加location字段，方便访问
+			location: schedule.location || '',
+			locationId: schedule.locationId || null,
+			// 保留schedule对象以便访问locationId等字段
+			schedule: {
+				scheduleId: schedule.scheduleId,
+				locationId: schedule.locationId,
+				location: schedule.location || '',
+				departmentId: schedule.departmentId,
+				departmentName: schedule.departmentName,
+				doctorId: schedule.doctorId,
+				doctorName: schedule.doctorName,
+				doctorTitle: schedule.doctorTitle,
+				scheduleDate: schedule.scheduleDate,
+				slotName: schedule.slotName,
+				startTime: schedule.startTime,
+				endTime: schedule.endTime,
+				fee: schedule.fee
+			}
 	}
 	
 	console.log('[数据适配] 适配后数据:', JSON.stringify(adapted, null, 2))
@@ -185,7 +204,8 @@ function adaptSingleSchedule(schedule) {
 		slotName: schedule.slotName || '',
 		startTime: schedule.startTime,
 		endTime: schedule.endTime,
-		location: schedule.location || '',
+		location: schedule.location || schedule.locationName || '',
+		locationId: schedule.locationId || null,
 		fee: parseFloat(schedule.fee || 0),
 		totalSlots: schedule.totalSlots || 0,
 		bookedSlots: schedule.bookedSlots || 0,

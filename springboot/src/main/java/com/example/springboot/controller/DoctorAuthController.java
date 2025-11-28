@@ -9,10 +9,12 @@ import com.example.springboot.service.DoctorService;
 import com.example.springboot.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/doctor/auth") // 专为医生身份认证设置的路径
+@CrossOrigin(origins = "*")
 public class DoctorAuthController {
 
     private final DoctorService doctorService;

@@ -41,6 +41,10 @@
 					<text class="label">就诊时间：</text>
 					<text class="value">{{ formatDateTime(appointment.scheduleTime) }}</text>
 				</view>
+				<view class="info-row" v-if="getLocationName(appointment)">
+					<text class="label">就诊地点：</text>
+					<text class="value">{{ getLocationName(appointment) }}</text>
+				</view>
 				<view class="info-row" v-if="isConfirmedStatus(appointment.status) && (appointment.queueNumber || appointment.appointmentNumber)">
 					<text class="label">排队号：</text>
 					<text class="value queue-number">第{{ appointment.queueNumber || appointment.appointmentNumber }}号</text>
@@ -698,6 +702,22 @@ onUnload() {
 						duration: 2000
 					})
 				}
+			// 获取地点名称
+			getLocationName(appointment) {
+				if (!appointment) return ''
+				
+				// 优先从schedule.location获取
+				if (appointment.schedule && appointment.schedule.location) {
+					return appointment.schedule.location
+				}
+				
+				// 如果没有，尝试从其他字段获取
+				if (appointment.location) {
+					return appointment.location
+				}
+				
+				// 如果都没有，返回空字符串（不显示）
+				return ''
 			},
 			
 			async handleCancel() {
@@ -773,10 +793,23 @@ onUnload() {
 					return
 				}
 				
-				// 跳转到简化版导航页面，传递预约ID
+				// 优先使用schedule中的locationId
+				let locationId = null
+				if (this.appointment && this.appointment.schedule && this.appointment.schedule.locationId) {
+					locationId = this.appointment.schedule.locationId
+				}
+				
+				// 如果有locationId，直接传递；否则传递appointmentId让导航页自己获取
+				if (locationId) {
 				uni.navigateTo({
-					url: `/pages/navigation/navigation-simple?appointmentId=${this.appointmentId}`
+						url: `/pages/navigation/index?locationId=${locationId}`
+					})
+				} else {
+					// 传递appointmentId，导航页会调用API获取locationId
+					uni.navigateTo({
+						url: `/pages/navigation/index?appointmentId=${this.appointmentId}`
 				})
+				}
 			},
 			
 			handleBackToHome() {
