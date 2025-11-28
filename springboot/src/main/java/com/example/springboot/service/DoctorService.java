@@ -7,10 +7,13 @@ import com.example.springboot.dto.doctor.DoctorChangePasswordRequest;
 import com.example.springboot.dto.doctor.DoctorResponse;
 import com.example.springboot.dto.doctor.DoctorUpdateInfoRequest;
 import com.example.springboot.entity.Doctor;
+import com.example.springboot.entity.LeaveRequest;
+import com.example.springboot.entity.Schedule;
 import com.example.springboot.entity.enums.DoctorStatus;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.DoctorRepository;
+import com.example.springboot.repository.LeaveRequestRepository;
 import com.example.springboot.repository.ScheduleRepository;
 import com.example.springboot.util.PasswordEncoderUtil;
 import org.springframework.beans.BeanUtils;
@@ -34,13 +37,16 @@ public class DoctorService {
     private final PasswordEncoderUtil passwordEncoderUtil;
     private final DepartmentRepository departmentRepository;
     private final ScheduleRepository scheduleRepository;
+    private final LeaveRequestRepository leaveRequestRepository;
 
     public DoctorService(DoctorRepository doctorRepository, PasswordEncoderUtil passwordEncoderUtil,
-            DepartmentRepository departmentRepository, ScheduleRepository scheduleRepository) { // 【修改构造函数】
+            DepartmentRepository departmentRepository, ScheduleRepository scheduleRepository,
+            LeaveRequestRepository leaveRequestRepository) {
         this.doctorRepository = doctorRepository;
         this.passwordEncoderUtil = passwordEncoderUtil;
         this.departmentRepository = departmentRepository;
         this.scheduleRepository = scheduleRepository;
+        this.leaveRequestRepository = leaveRequestRepository;
     }
 
 
@@ -524,5 +530,75 @@ public class DoctorService {
         String newPasswordHash = passwordEncoderUtil.encodePassword(request.getNewPassword());
         doctor.setPasswordHash(newPasswordHash);
         doctorRepository.save(doctor);
+    }
+
+    /**
+     * 获取医生在指定时间段的排班和请假信息
+     * 用于替班医生选择时的悬停显示
+     * 
+     * @param doctorId 医生ID
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @return 包含排班和请假信息的Map
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getDoctorScheduleAndLeave(Integer doctorId, LocalDate startDate, LocalDate endDate) {
+        // 1. 验证医生是否存在
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new ResourceNotFoundException("医生不存在，ID: " + doctorId));
+        
+        // 2. 获取排班信息
+        List<Schedule> schedules = scheduleRepository.findByDoctorAndScheduleDateBetween(
+                doctor, startDate, endDate);
+        
+        // 3. 获取请假信息
+        List<LeaveRequest> leaveRequests = leaveRequestRepository.findByDoctor(doctor);
+        
+        // 4. 过滤请假记录（只保留与查询时间段有交集的记录）
+        List<LeaveRequest> filteredLeaves = leaveRequests.stream()
+                .filter(leave -> {
+                    LocalDate leaveStart = leave.getStartTime().toLocalDate();
+                    LocalDate leaveEnd = leave.getEndTime().toLocalDate();
+                    // 检查是否有时间交集
+                    return !(leaveEnd.isBefore(startDate) || leaveStart.isAfter(endDate));
+                })
+                .toList();
+        
+        // 5. 转换为简化的DTO格式
+        List<Map<String, Object>> scheduleDTOs = schedules.stream()
+                .map(schedule -> {
+                    Map<String, Object> dto = new HashMap<>();
+                    dto.put("scheduleId", schedule.getScheduleId());
+                    dto.put("scheduleDate", schedule.getScheduleDate().toString());
+                    dto.put("slotName", schedule.getSlot() != null ? schedule.getSlot().getSlotName() : "");
+                    dto.put("startTime", schedule.getSlot() != null ? schedule.getSlot().getStartTime().toString() : "");
+                    dto.put("endTime", schedule.getSlot() != null ? schedule.getSlot().getEndTime().toString() : "");
+                    dto.put("status", schedule.getStatus().toString());
+                    dto.put("bookedSlots", schedule.getBookedSlots());
+                    dto.put("totalSlots", schedule.getTotalSlots());
+                    return dto;
+                })
+                .toList();
+        
+        List<Map<String, Object>> leaveDTOs = filteredLeaves.stream()
+                .map(leave -> {
+                    Map<String, Object> dto = new HashMap<>();
+                    dto.put("requestId", leave.getRequestId());
+                    dto.put("startTime", leave.getStartTime().toString());
+                    dto.put("endTime", leave.getEndTime().toString());
+                    dto.put("status", leave.getStatus().toString());
+                    dto.put("reason", leave.getReason());
+                    return dto;
+                })
+                .toList();
+        
+        // 6. 构建返回结果
+        Map<String, Object> result = new HashMap<>();
+        result.put("schedules", scheduleDTOs);
+        result.put("leaves", leaveDTOs);
+        result.put("doctorName", doctor.getFullName());
+        result.put("doctorTitle", doctor.getTitle());
+        
+        return result;
     }
 }

@@ -117,10 +117,13 @@ public class AppointmentService {
         Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + request.getScheduleId()));
 
+        System.out.println("创建预约检查 - scheduleId: " + request.getScheduleId() + ", patientId: " + request.getPatientId() + ", bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
+        
         if (schedule.getStatus() != ScheduleStatus.available) {
             throw new BadRequestException("Schedule is not active for booking.");
         }
         if (schedule.getBookedSlots() >= schedule.getTotalSlots()) {
+            System.out.println("创建预约失败 - 号源已满: bookedSlots(" + schedule.getBookedSlots() + ") >= totalSlots(" + schedule.getTotalSlots() + ")");
             throw new BadRequestException("No available slots for this schedule.");
         }
         if (schedule.getScheduleDate().isBefore(java.time.LocalDate.now()) ||
@@ -148,6 +151,64 @@ public class AppointmentService {
         return convertToResponseDto(appointmentRepository.save(appointment));
     }
 
+    /**
+     * 创建现场挂号预约（分诊台辅助患者挂号）
+     * 与普通预约的区别：isWalkIn=true, appointmentType=WALK_IN
+     */
+    @Transactional
+    public AppointmentResponse createWalkInAppointment(AppointmentCreateRequest request) {
+        Patient patient = patientRepository.findById(request.getPatientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id " + request.getPatientId()));
+
+        // Check patient status
+        if (patient.getStatus() == PatientStatus.deleted) {
+            throw new BadRequestException("患者已删除，无法创建预约");
+        }
+
+        // Check patient blacklist status
+        if (patient.getPatientProfile() != null && patient.getPatientProfile().getBlacklistStatus() == BlacklistStatus.blacklisted) {
+            throw new BadRequestException("Patient is blacklisted and cannot make appointments.");
+        }
+
+        Schedule schedule = scheduleRepository.findById(request.getScheduleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + request.getScheduleId()));
+
+        if (schedule.getStatus() != ScheduleStatus.available) {
+            throw new BadRequestException("Schedule is not active for booking.");
+        }
+        if (schedule.getBookedSlots() >= schedule.getTotalSlots()) {
+            throw new BadRequestException("No available slots for this schedule.");
+        }
+        if (schedule.getScheduleDate().isBefore(java.time.LocalDate.now()) ||
+                (schedule.getScheduleDate().isEqual(java.time.LocalDate.now()) && schedule.getSlot().getEndTime().isBefore(java.time.LocalTime.now()))) {
+            throw new BadRequestException("Cannot book past or ongoing schedules.");
+        }
+
+        // Check if patient already has an active appointment for this schedule (excluding cancelled appointments)
+        if (appointmentRepository.existsByPatientAndScheduleAndStatusNotCancelled(patient, schedule)) {
+            throw new BadRequestException("Patient already has an appointment for this schedule.");
+        }
+
+        Appointment appointment = new Appointment();
+        appointment.setPatient(patient);
+        appointment.setSchedule(schedule);
+        appointment.setAppointmentNumber(getNextAppointmentNumberForRebooking(schedule, patient));
+        appointment.setStatus(AppointmentStatus.scheduled); // 现场挂号创建后为已预约状态
+        appointment.setPaymentStatus(PaymentStatus.unpaid); // 现场挂号需要现场缴费，初始为未支付
+        appointment.setIsWalkIn(true); // 标记为现场挂号
+        appointment.setAppointmentType(AppointmentType.WALK_IN); // 设置预约类型为现场挂号
+        appointment.setCreatedAt(LocalDateTime.now());
+
+        // 增加排班的已预约数
+        schedule.setBookedSlots(schedule.getBookedSlots() + 1);
+        scheduleRepository.save(schedule);
+
+        logger.info("现场挂号创建成功 - 预约ID: {}, 患者: {}, 排班ID: {}", 
+                appointment.getAppointmentId(), patient.getFullName(), schedule.getScheduleId());
+
+        return convertToResponseDto(appointmentRepository.save(appointment));
+    }
+
     @Transactional
     public AppointmentResponse updateAppointment(Integer id, AppointmentUpdateRequest request) {
         Appointment existingAppointment = appointmentRepository.findById(id)
@@ -164,42 +225,52 @@ public class AppointmentService {
             // Handle specific status transitions and logic
             if (newStatus == AppointmentStatus.cancelled && originalStatus != AppointmentStatus.cancelled) {
                 // 如果是取消预约，需要减少排班的已预约数
-                Schedule schedule = existingAppointment.getSchedule();
-                if (schedule.getBookedSlots() > 0) {
-                    schedule.setBookedSlots(schedule.getBookedSlots() - 1);
+                // 刷新 schedule 对象，确保获取最新的 bookedSlots 值
+                Schedule schedule = scheduleRepository.findById(existingAppointment.getSchedule().getScheduleId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
+                
+                System.out.println("取消预约 - appointmentId: " + existingAppointment.getAppointmentId() + ", scheduleId: " + schedule.getScheduleId() + ", 取消前 bookedSlots: " + schedule.getBookedSlots());
+                
+                // 确保 bookedSlots 不会小于 0
+                int currentBookedSlots = schedule.getBookedSlots();
+                if (currentBookedSlots > 0) {
+                    schedule.setBookedSlots(currentBookedSlots - 1);
                     scheduleRepository.save(schedule);
-                    
-                    // 取消预约后，触发候补自动填充
-                    // 注意：这里 schedule.getBookedSlots() 已经是减少后的值了
-                    System.out.println("取消预约后，检查候补填充 - bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
-                    if (schedule.getBookedSlots() < schedule.getTotalSlots()) {
-                        // 有空余号源，尝试从候补队列中填充
-                        try {
-                            // 刷新 schedule 对象，确保获取最新的 bookedSlots 值
-                            schedule = scheduleRepository.findById(schedule.getScheduleId())
-                                    .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
-                            
-                            System.out.println("刷新后检查 - bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
-                            // 再次检查是否有空余号源（防止并发问题）
-                            if (schedule.getBookedSlots() < schedule.getTotalSlots()) {
-                                System.out.println("开始触发候补自动填充，scheduleId: " + schedule.getScheduleId());
-                                Appointment filledAppointment = waitlistService.createAppointmentFromWaitlist(schedule.getScheduleId());
-                                if (filledAppointment != null) {
-                                    System.out.println("候补填充成功，创建预约ID: " + filledAppointment.getAppointmentId());
-                                } else {
-                                    System.out.println("候补填充返回null，可能没有可用的候补或候补不符合条件");
-                                }
+                    System.out.println("取消预约后 - bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
+                } else {
+                    System.out.println("警告：取消预约时 bookedSlots 已经是 0 或负数(" + currentBookedSlots + ")，无法减少");
+                }
+                
+                // 取消预约后，触发候补自动填充
+                // 注意：这里 schedule.getBookedSlots() 已经是减少后的值了
+                System.out.println("取消预约后，检查候补填充 - bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
+                if (schedule.getBookedSlots() < schedule.getTotalSlots()) {
+                    // 有空余号源，尝试从候补队列中填充
+                    try {
+                        // 刷新 schedule 对象，确保获取最新的 bookedSlots 值
+                        schedule = scheduleRepository.findById(schedule.getScheduleId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
+                        
+                        System.out.println("刷新后检查 - bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
+                        // 再次检查是否有空余号源（防止并发问题）
+                        if (schedule.getBookedSlots() < schedule.getTotalSlots()) {
+                            System.out.println("开始触发候补自动填充，scheduleId: " + schedule.getScheduleId());
+                            Appointment filledAppointment = waitlistService.createAppointmentFromWaitlist(schedule.getScheduleId());
+                            if (filledAppointment != null) {
+                                System.out.println("候补填充成功，创建预约ID: " + filledAppointment.getAppointmentId());
                             } else {
-                                System.out.println("刷新后发现号源已满，跳过候补填充");
+                                System.out.println("候补填充返回null，可能没有可用的候补或候补不符合条件");
                             }
-                        } catch (Exception e) {
-                            // 候补填充失败不影响取消预约流程，只记录日志
-                            System.err.println("Failed to fill waitlist after appointment cancellation: " + e.getMessage());
-                            e.printStackTrace(); // 打印完整堆栈，便于调试
+                        } else {
+                            System.out.println("刷新后发现号源已满，跳过候补填充");
                         }
-                    } else {
-                        System.out.println("取消预约后号源仍满，无需候补填充");
+                    } catch (Exception e) {
+                        // 候补填充失败不影响取消预约流程，只记录日志
+                        System.err.println("Failed to fill waitlist after appointment cancellation: " + e.getMessage());
+                        e.printStackTrace(); // 打印完整堆栈，便于调试
                     }
+                } else {
+                    System.out.println("取消预约后号源仍满，无需候补填充");
                 }
             } else if (newStatus == AppointmentStatus.NO_SHOW && originalStatus != AppointmentStatus.NO_SHOW) {
                 // 如果是爽约，增加患者爽约次数并检查是否加入黑名单
@@ -434,6 +505,54 @@ public class AppointmentService {
         }
         
         return response;
+    }
+
+    /**
+     * 退款接口
+     * 只有已支付的预约才能退款
+     * 退款时会同时取消预约，并恢复号源（如果预约未取消）
+     */
+    @Transactional
+    public AppointmentResponse refundAppointment(Integer appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id " + appointmentId));
+
+        // 检查支付状态
+        if (appointment.getPaymentStatus() != PaymentStatus.paid) {
+            throw new BadRequestException("只有已支付的预约才能退款，当前支付状态：" + appointment.getPaymentStatus());
+        }
+
+        // 检查预约状态（已完成的预约不能退款）
+        if (appointment.getStatus() == AppointmentStatus.completed) {
+            throw new BadRequestException("已完成的预约不能退款");
+        }
+
+        // 检查是否已签到（已签到的预约不能退款）
+        if (appointment.getCheckInTime() != null) {
+            throw new BadRequestException("已签到的预约不能退款");
+        }
+
+        // 更新支付状态为已退款
+        appointment.setPaymentStatus(PaymentStatus.refunded);
+        appointment.setUpdatedAt(LocalDateTime.now());
+        
+        // 如果预约未取消，则同时取消预约（退款即取消）
+        // 取消预约会自动处理号源恢复和候补填充
+        if (appointment.getStatus() != AppointmentStatus.cancelled) {
+            AppointmentUpdateRequest updateRequest = new AppointmentUpdateRequest();
+            updateRequest.setStatus(AppointmentStatus.cancelled);
+            updateRequest.setPaymentStatus(PaymentStatus.refunded);
+            // 调用 updateAppointment 来取消预约，这会自动处理号源恢复和候补填充
+            return updateAppointment(appointmentId, updateRequest);
+        }
+        
+        // 如果预约已经取消，只需要更新支付状态
+        appointmentRepository.save(appointment);
+
+        logger.info("退款成功 - 预约ID: {}, 患者: {}, 退款时间: {}", 
+                appointmentId, appointment.getPatient().getFullName(), appointment.getUpdatedAt());
+
+        return convertToResponseDto(appointment);
     }
 
     private int getNextAppointmentNumberForRebooking(Schedule schedule, Patient patient) {
@@ -883,8 +1002,8 @@ public class AppointmentService {
             } else {
                 normalAppointments.add(appointment);
             }
-        }
-        
+            }
+            
         // 对正常预约和现场挂号进行排序
         normalAppointments.sort((a1, a2) -> {
             // 1. 预约优先于现场挂号
@@ -915,10 +1034,10 @@ public class AppointmentService {
                 Integer num2 = a2.getRealTimeQueueNumber();
                 if (num1 != null && num2 != null) {
                     return Integer.compare(num1, num2);
-                }
+            }
                 // 如果实时候诊序号为空，按签到时间排序
                 if (a1.getCheckInTime() != null && a2.getCheckInTime() != null) {
-                    return a1.getCheckInTime().compareTo(a2.getCheckInTime());
+            return a1.getCheckInTime().compareTo(a2.getCheckInTime());
                 }
             }
             

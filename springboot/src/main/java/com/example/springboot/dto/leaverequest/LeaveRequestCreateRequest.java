@@ -27,4 +27,7 @@ public class LeaveRequestCreateRequest {
 
     @NotBlank(message = "申请事由不能为空")
     private String reason;
+
+    // 请假证明文件URL（可选）
+    private String proofDocumentUrl;
 }

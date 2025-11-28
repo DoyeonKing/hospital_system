@@ -345,7 +345,7 @@ onUnload() {
 				const isConfirmed = this.isConfirmedStatus(this.appointment.status)
 				const isExpired = this.isExpiredStatus(this.appointment)
 				console.log('[前端] 自动刷新检查 - 预约状态:', this.appointment.status, ', isConfirmed:', isConfirmed, ', isExpired:', isExpired)
-
+				
 				// 只有已确认且未过期的预约才启动刷新
 				if (!isConfirmed || isExpired) {
 					console.warn('[前端] 不满足自动刷新条件，取消启动')

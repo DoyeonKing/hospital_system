@@ -21,6 +21,7 @@ public class ScheduleResponse {
     private String location;
     private Integer totalSlots;
     private Integer bookedSlots;
+    private Integer remainingSlots; // 剩余号源数（totalSlots - bookedSlots）
     private java.math.BigDecimal fee;
     private String status;
     private String remarks;
@@ -47,6 +48,10 @@ public class ScheduleResponse {
         response.setScheduleDate(schedule.getScheduleDate());
         response.setTotalSlots(schedule.getTotalSlots());
         response.setBookedSlots(schedule.getBookedSlots());
+        // 计算剩余号源数（包含锁定的候补号源）
+        if (schedule.getTotalSlots() != null && schedule.getBookedSlots() != null) {
+            response.setRemainingSlots(Math.max(0, schedule.getTotalSlots() - schedule.getBookedSlots()));
+        }
         response.setFee(schedule.getFee());
         response.setStatus(schedule.getStatus() != null ? schedule.getStatus().name() : null);
         response.setRemarks(schedule.getRemarks());

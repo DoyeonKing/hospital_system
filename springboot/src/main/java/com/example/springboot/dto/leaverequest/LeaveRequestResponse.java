@@ -16,6 +16,7 @@ public class LeaveRequestResponse {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private String reason;
+    private String proofDocumentUrl; // 请假证明文件URL
     private LeaveRequestStatus status;
     private AdminResponse approver; // 审批管理员信息
     private String approverComments;

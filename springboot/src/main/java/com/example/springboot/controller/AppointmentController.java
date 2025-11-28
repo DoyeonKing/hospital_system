@@ -67,6 +67,14 @@ public class AppointmentController {
     }
 
     /**
+     * 现场挂号（分诊台辅助患者挂号）
+     */
+    @PostMapping("/walk-in")
+    public ResponseEntity<AppointmentResponse> createWalkInAppointment(@RequestBody AppointmentCreateRequest request) {
+        return ResponseEntity.ok(appointmentService.createWalkInAppointment(request));
+    }
+
+    /**
      * 取消预约
      */
     @PutMapping("/{appointmentId}/cancel")

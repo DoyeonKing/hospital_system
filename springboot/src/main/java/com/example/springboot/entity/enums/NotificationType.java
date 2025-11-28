@@ -6,6 +6,9 @@ public enum NotificationType {
     cancellation,           // 取消通知
     waitlist_available,      // 候补可用
     schedule_change,         // 排班变更
-    system_notice           // 系统通知
+    schedule_cancelled,      // 排班取消
+    system_notice,          // 系统通知
+    leave_approved,         // 请假批准
+    leave_rejected          // 请假拒绝
 }
 

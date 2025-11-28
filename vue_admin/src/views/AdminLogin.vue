@@ -128,8 +128,16 @@ const handleLogin = async () => {
     if (response.code === '200' || response.code === 200) {
       // 保存登录信息到store
       const loginData = response.data
-      adminStore.loginSuccess(response.data, {
-        adminId: loginForm.adminId
+      console.log('登录响应数据:', loginData)
+      
+      // 从 userInfo 中提取管理员信息
+      const adminInfo = loginData.userInfo || {}
+      console.log('管理员信息:', adminInfo)
+      
+      adminStore.loginSuccess(adminInfo, {
+        adminId: adminInfo.adminId,
+        username: adminInfo.username,
+        fullName: adminInfo.fullName
       })
 
       ElMessage.success('登录成功')

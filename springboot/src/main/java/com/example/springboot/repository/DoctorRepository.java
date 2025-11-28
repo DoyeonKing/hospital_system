@@ -1,5 +1,6 @@
 package com.example.springboot.repository;
 
+import com.example.springboot.entity.Department;
 import com.example.springboot.entity.Doctor;
 import com.example.springboot.entity.enums.DoctorStatus;
 import org.apache.ibatis.annotations.Param;
@@ -35,6 +36,9 @@ public interface DoctorRepository extends JpaRepository<Doctor, Integer>, JpaSpe
     
     // 根据科室ID和状态查找医生
     List<Doctor> findByDepartmentDepartmentIdAndStatus(Integer departmentId, DoctorStatus status);
+    
+    // 根据科室和状态查找医生
+    List<Doctor> findByDepartmentAndStatus(Department department, DoctorStatus status);
 
     boolean existsByPhoneNumberAndIdentifierNot(String phoneNumber, String identifier);
 }

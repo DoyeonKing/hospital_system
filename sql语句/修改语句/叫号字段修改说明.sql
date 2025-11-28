@@ -77,3 +77,4 @@ WHERE (`is_walk_in` = 0 OR `is_walk_in` IS NULL) AND `appointment_type` IS NULL;
 
 
 
+

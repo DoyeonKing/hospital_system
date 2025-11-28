@@ -14,6 +14,7 @@ public class DoctorResponse {
     private String fullName;
     private String phoneNumber;
     private String title;
+    private Integer titleLevel; // 职称等级：0-主任医师，1-副主任医师，2-主治医师
     private String specialty;
     private String bio;
     private String photoUrl;

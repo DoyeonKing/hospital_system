@@ -71,6 +71,8 @@ export const useDoctorStore = defineStore('doctor', {
                 identifier: basicLoginInfoFromLogin.identifier,
                 token: basicLoginInfoFromLogin.token || '',
                 loginTime: new Date().toISOString(),
+                doctorId: String(info.doctorId || ''),
+                name: info.name || ''
             };
             this.loggedInDoctorBasicInfo = basicInfo;
 

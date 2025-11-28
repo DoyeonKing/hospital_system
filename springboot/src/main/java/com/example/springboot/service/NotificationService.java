@@ -112,6 +112,146 @@ public class NotificationService {
     }
 
     /**
+     * 发送请假批准通知
+     */
+    @Transactional
+    public NotificationResponse sendLeaveApprovedNotification(Integer doctorId, Integer leaveRequestId,
+                                                              String startTime, String endTime,
+                                                              String approverComments) {
+        NotificationCreateRequest request = new NotificationCreateRequest();
+        request.setUserId(doctorId);
+        request.setUserType(UserType.doctor);
+        request.setType(NotificationType.leave_approved);
+        request.setTitle("请假申请已批准");
+        
+        String content = String.format("您的请假申请已批准！\n请假时间：%s 至 %s", startTime, endTime);
+        if (approverComments != null && !approverComments.trim().isEmpty()) {
+            content += "\n审批意见：" + approverComments;
+        }
+        
+        request.setContent(content);
+        request.setRelatedEntity("leave_request");
+        request.setRelatedId(leaveRequestId);
+        request.setPriority(NotificationPriority.high);
+
+        return createNotification(request);
+    }
+
+    /**
+     * 发送请假拒绝通知
+     */
+    @Transactional
+    public NotificationResponse sendLeaveRejectedNotification(Integer doctorId, Integer leaveRequestId,
+                                                              String startTime, String endTime,
+                                                              String approverComments) {
+        NotificationCreateRequest request = new NotificationCreateRequest();
+        request.setUserId(doctorId);
+        request.setUserType(UserType.doctor);
+        request.setType(NotificationType.leave_rejected);
+        request.setTitle("请假申请已拒绝");
+        
+        String content = String.format("您的请假申请已被拒绝\n请假时间：%s 至 %s", startTime, endTime);
+        if (approverComments != null && !approverComments.trim().isEmpty()) {
+            content += "\n拒绝理由：" + approverComments;
+        }
+        
+        request.setContent(content);
+        request.setRelatedEntity("leave_request");
+        request.setRelatedId(leaveRequestId);
+        request.setPriority(NotificationPriority.high);
+
+        return createNotification(request);
+    }
+
+    /**
+     * 发送医生替换通知（给患者）
+     */
+    @Transactional
+    public NotificationResponse sendDoctorChangeNotification(Integer patientId, Integer appointmentId,
+                                                             String originalDoctorName, String newDoctorName,
+                                                             String departmentName, String scheduleDate, 
+                                                             String slotName, String locationName) {
+        NotificationCreateRequest request = new NotificationCreateRequest();
+        request.setUserId(patientId);
+        request.setUserType(UserType.patient);
+        request.setType(NotificationType.schedule_change);
+        request.setTitle("就诊医生变更通知");
+        
+        String content = String.format("由于原医生 %s 请假，您的预约医生已变更为 %s\n" +
+                "科室：%s\n" +
+                "就诊时间：%s %s\n" +
+                "就诊地点：%s\n" +
+                "如有疑问，请联系医院。给您带来不便，敬请谅解！", 
+                originalDoctorName, newDoctorName, departmentName, scheduleDate, slotName, locationName);
+        
+        request.setContent(content);
+        request.setRelatedEntity("appointment");
+        request.setRelatedId(appointmentId);
+        request.setPriority(NotificationPriority.high);
+
+        return createNotification(request);
+    }
+
+    /**
+     * 发送排班取消通知（给患者）
+     */
+    @Transactional
+    public NotificationResponse sendScheduleCancelledNotification(Integer patientId, Integer appointmentId,
+                                                                  String doctorName, String departmentName,
+                                                                  String scheduleDate, String slotName) {
+        NotificationCreateRequest request = new NotificationCreateRequest();
+        request.setUserId(patientId);
+        request.setUserType(UserType.patient);
+        request.setType(NotificationType.schedule_cancelled);
+        request.setTitle("预约已取消");
+        
+        String content = String.format("由于医生 %s 请假且无法安排替班，您的预约已被取消\n" +
+                "科室：%s\n" +
+                "原就诊时间：%s %s\n" +
+                "您的挂号费用将原路退回。\n" +
+                "如需重新预约，请联系医院。给您带来不便，敬请谅解！", 
+                doctorName, departmentName, scheduleDate, slotName);
+        
+        request.setContent(content);
+        request.setRelatedEntity("appointment");
+        request.setRelatedId(appointmentId);
+        request.setPriority(NotificationPriority.urgent);
+
+        return createNotification(request);
+    }
+
+    /**
+     * 发送医生降级退款通知（给患者）
+     */
+    @Transactional
+    public NotificationResponse sendDoctorDowngradeRefundNotification(Integer patientId, Integer appointmentId,
+                                                                       String originalDoctorName, String originalTitle,
+                                                                       String newDoctorName, String newTitle,
+                                                                       String departmentName, String scheduleDate,
+                                                                       String slotName, Double refundAmount) {
+        NotificationCreateRequest request = new NotificationCreateRequest();
+        request.setUserId(patientId);
+        request.setUserType(UserType.patient);
+        request.setType(NotificationType.schedule_change);
+        request.setTitle("医生变更及退款通知");
+        
+        String content = String.format("由于原医生 %s（%s）请假，您的预约医生已变更为 %s（%s）\n" +
+                "科室：%s\n" +
+                "就诊时间：%s %s\n" +
+                "由于替班医生职称降级，差额挂号费 %.2f 元将原路退回。\n" +
+                "如有疑问，请联系医院。给您带来不便，敬请谅解！", 
+                originalDoctorName, originalTitle, newDoctorName, newTitle,
+                departmentName, scheduleDate, slotName, refundAmount);
+        
+        request.setContent(content);
+        request.setRelatedEntity("appointment");
+        request.setRelatedId(appointmentId);
+        request.setPriority(NotificationPriority.high);
+
+        return createNotification(request);
+    }
+
+    /**
      * 获取用户通知列表
      */
     @Transactional(readOnly = true)
