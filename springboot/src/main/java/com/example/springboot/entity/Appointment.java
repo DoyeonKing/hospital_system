@@ -79,6 +79,10 @@ public class Appointment {
     @Column(name = "is_add_on")
     private Boolean isAddOn = false; // 是否加号
 
+    // ===== 加号支付截止时间字段 =====
+    @Column(name = "payment_deadline")
+    private LocalDateTime paymentDeadline; // 支付截止时间（加号专用，类似候补的notification_sent_at）
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt; // 预约生成时间

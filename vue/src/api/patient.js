@@ -34,3 +34,21 @@ export function getPatientProfile(patientId) {
         method: 'get'
     });
 }
+
+/**
+ * 搜索患者（根据姓名）
+ * @param {string} name - 患者姓名
+ * @param {Object} params - 额外参数
+ */
+export function searchPatientsByName(name, params = {}) {
+    return request({
+        url: '/api/patients/search',
+        method: 'get',
+        params: {
+            name,
+            page: 0,
+            size: 20,
+            ...params
+        }
+    });
+}
