@@ -7,6 +7,10 @@
           <h2>医院后台管理系统</h2>
         </div>
         <div class="header-right">
+          <el-button type="primary" @click="handleExportPDF" size="small" :loading="exporting">
+            <el-icon><Download /></el-icon>
+            导出报表
+          </el-button>
           <el-button type="danger" @click="handleExit" size="small">
             <el-icon><Close /></el-icon>
             退出大屏
@@ -235,14 +239,19 @@ import {
   UserFilled,
   Close,
   OfficeBuilding,
-  DataAnalysis
+  DataAnalysis,
+  Download
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import doctorImage from '@/assets/doctor.jpg'
 import BackButton from '@/components/BackButton.vue'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const activeTab = ref('overview')
+const exporting = ref(false)
 
 // Mock 数据
 const mockData = reactive({
@@ -779,6 +788,227 @@ const resizeAllCharts = () => {
 // 退出大屏
 const handleExit = () => {
   router.push('/')
+}
+
+// 导出PDF
+const handleExportPDF = async () => {
+  exporting.value = true
+  try {
+    ElMessage.info('正在生成报表，请稍候...')
+    
+    // 等待所有图表渲染完成
+    await nextTick()
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // 获取要导出的内容区域（不包括顶部导航和返回按钮）
+    const contentWrapper = document.querySelector('.content-wrapper')
+    const welcomeBanner = document.querySelector('.welcome-banner')
+    
+    if (!contentWrapper) {
+      ElMessage.error('未找到要导出的内容')
+      return
+    }
+
+    // 使用html2canvas分别捕获横幅和内容区域
+    let bannerCanvas = null
+    if (welcomeBanner) {
+      bannerCanvas = await html2canvas(welcomeBanner, {
+        backgroundColor: null,
+        scale: 2,
+        useCORS: true,
+        logging: false
+      })
+    }
+
+    const contentCanvas = await html2canvas(contentWrapper, {
+      backgroundColor: '#f7fafc',
+      scale: 2, // 提高清晰度
+      useCORS: true,
+      logging: false
+    })
+
+    // 使用A3横向页面，更大尺寸
+    const pdf = new jsPDF('l', 'mm', 'a3') // A3横向: 420mm x 297mm
+    const pdfWidth = pdf.internal.pageSize.getWidth() // 420mm
+    const pdfHeight = pdf.internal.pageSize.getHeight() // 297mm
+    
+    const margin = 15 // 边距
+    const availableWidth = pdfWidth - margin * 2 // 390mm
+    const now = new Date()
+    const dateStr = now.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+
+    // 创建标题和时间的canvas（避免中文乱码）
+    const titleCanvas = document.createElement('canvas')
+    titleCanvas.width = availableWidth * 2 // 提高清晰度
+    titleCanvas.height = 80 // 增加高度，确保标题和时间不重叠
+    const titleCtx = titleCanvas.getContext('2d')
+    
+    // 设置背景
+    titleCtx.fillStyle = '#ffffff'
+    titleCtx.fillRect(0, 0, titleCanvas.width, titleCanvas.height)
+    
+    // 绘制标题
+    titleCtx.fillStyle = '#303133'
+    titleCtx.font = 'bold 36px Arial, "Microsoft YaHei", "SimHei", sans-serif'
+    titleCtx.textAlign = 'center'
+    titleCtx.textBaseline = 'top'
+    const titleY = 10 // 标题Y位置
+    titleCtx.fillText('医院运营数据中心报表', titleCanvas.width / 2, titleY)
+    
+    // 绘制生成时间（在标题下方，留出足够间距）
+    titleCtx.fillStyle = '#606266'
+    titleCtx.font = '20px Arial, "Microsoft YaHei", "SimHei", sans-serif'
+    titleCtx.textBaseline = 'top'
+    const timeY = titleY + 50 // 时间Y位置，确保在标题下方有足够间距
+    titleCtx.fillText(`生成时间: ${dateStr}`, titleCanvas.width / 2, timeY)
+    
+    // 将标题canvas转换为图片并添加到PDF
+    const titleImgData = titleCanvas.toDataURL('image/png', 1.0)
+    const titleImgHeight = 25 // PDF中的高度（mm），增加高度以容纳两行文字
+    pdf.addImage(
+      titleImgData,
+      'PNG',
+      margin,
+      margin,
+      availableWidth,
+      titleImgHeight,
+      undefined,
+      'FAST'
+    )
+
+    let currentY = margin + titleImgHeight + 10 // 起始Y位置
+
+    // 添加横幅（如果有）
+    if (bannerCanvas) {
+      // 计算横幅的缩放比例，保持宽高比
+      const bannerScale = availableWidth / bannerCanvas.width
+      const bannerImgWidth = availableWidth
+      const bannerImgHeight = bannerCanvas.height * bannerScale
+      
+      const bannerImgData = bannerCanvas.toDataURL('image/png', 1.0)
+      pdf.addImage(
+        bannerImgData,
+        'PNG',
+        margin,
+        currentY,
+        bannerImgWidth,
+        bannerImgHeight,
+        undefined,
+        'FAST'
+      )
+      currentY += bannerImgHeight + 10
+    }
+
+    // 计算内容区域的缩放比例，保持宽高比
+    const contentScale = availableWidth / contentCanvas.width
+    const contentImgWidth = availableWidth
+    const contentImgHeight = contentCanvas.height * contentScale
+
+    // 如果内容高度超过一页，需要分页
+    const maxPageHeight = pdfHeight - currentY - margin
+    const contentImgData = contentCanvas.toDataURL('image/png', 1.0)
+    
+    let heightLeft = contentImgHeight
+    let position = 0
+
+    while (heightLeft > 0) {
+      if (position > 0) {
+        pdf.addPage()
+        currentY = margin
+      }
+
+      const pageHeight = Math.min(heightLeft, maxPageHeight)
+      
+      // 计算源图片的裁剪位置和高度
+      const sourceY = (position / contentImgHeight) * contentCanvas.height
+      const sourceHeight = (pageHeight / contentImgHeight) * contentCanvas.height
+      
+      // 创建临时canvas来裁剪当前页的内容
+      const tempCanvas = document.createElement('canvas')
+      tempCanvas.width = contentCanvas.width
+      tempCanvas.height = Math.ceil(sourceHeight)
+      const tempCtx = tempCanvas.getContext('2d')
+      
+      // 绘制裁剪后的内容
+      tempCtx.drawImage(
+        contentCanvas,
+        0, Math.floor(sourceY), contentCanvas.width, Math.ceil(sourceHeight),
+        0, 0, contentCanvas.width, Math.ceil(sourceHeight)
+      )
+      
+      const pageImgData = tempCanvas.toDataURL('image/png', 1.0)
+      const pageImgHeight = (tempCanvas.height * contentScale)
+      
+      pdf.addImage(
+        pageImgData,
+        'PNG',
+        margin,
+        currentY,
+        contentImgWidth,
+        pageImgHeight,
+        undefined,
+        'FAST'
+      )
+
+      heightLeft -= maxPageHeight
+      position += maxPageHeight
+    }
+
+    // 生成文件名（使用英文避免编码问题，但可以在下载时显示中文）
+    const tabNames = {
+      overview: '运营总览',
+      doctors: '医生资源分析',
+      patients: '患者群体画像'
+    }
+    const tabNameEn = {
+      overview: 'OperationsOverview',
+      doctors: 'DoctorResources',
+      patients: 'PatientProfile'
+    }
+    const tabName = tabNames[activeTab.value] || '报表'
+    const tabNameEnValue = tabNameEn[activeTab.value] || 'Report'
+    
+    // 生成文件名（使用英文避免编码问题）
+    const fileName = `HospitalDataReport_${tabNameEnValue}_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.pdf`
+    
+    // 使用 Blob 和 URL 来支持中文文件名
+    const pdfBlob = pdf.output('blob')
+    const url = URL.createObjectURL(pdfBlob)
+    const link = document.createElement('a')
+    link.href = url
+    
+    // 尝试使用中文文件名，如果浏览器不支持会自动回退
+    try {
+      // 使用 decodeURIComponent 和 encodeURIComponent 来处理中文
+      link.download = `医院运营数据报表_${tabName}_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.pdf`
+    } catch (e) {
+      // 如果中文文件名失败，使用英文文件名
+      link.download = fileName
+    }
+    
+    // 触发下载
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    // 清理 URL 对象
+    setTimeout(() => {
+      URL.revokeObjectURL(url)
+    }, 100)
+    
+    ElMessage.success('报表导出成功')
+  } catch (error) {
+    console.error('导出PDF失败:', error)
+    ElMessage.error('导出失败: ' + (error.message || '请重试'))
+  } finally {
+    exporting.value = false
+  }
 }
 
 // 使用 ResizeObserver 监听图表容器大小变化
