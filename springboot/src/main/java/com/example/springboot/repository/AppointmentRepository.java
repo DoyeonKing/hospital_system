@@ -3,6 +3,7 @@ package com.example.springboot.repository;
 import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.Schedule;
+import com.example.springboot.entity.enums.AppointmentStatus;
 import org.apache.ibatis.annotations.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -12,6 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 @Repository
 public interface AppointmentRepository extends JpaRepository<Appointment, Integer> {
@@ -33,6 +35,31 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     long countBySchedule(Schedule schedule);
     List<Appointment> findByScheduleScheduleDateAndScheduleSlotStartTimeBeforeAndStatus(
             java.time.LocalDate scheduleDate, java.time.LocalTime checkInTime, com.example.springboot.entity.enums.AppointmentStatus status);
+
+    /**
+     * 统计指定日期的预约总数（按排班日期计算）
+     */
+    long countBySchedule_ScheduleDate(LocalDate scheduleDate);
+
+    /**
+     * 统计指定日期、指定状态的预约数量（用于当前候诊人数等）
+     */
+    long countByStatusAndSchedule_ScheduleDate(AppointmentStatus status, LocalDate scheduleDate);
+
+    /**
+     * 查询指定创建时间范围内的预约记录
+     */
+    List<Appointment> findByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+    /**
+     * 查询指定排班日期的所有预约
+     */
+    List<Appointment> findBySchedule_ScheduleDate(LocalDate scheduleDate);
+
+    /**
+     * 查询排班日期在指定范围内的所有预约
+     */
+    List<Appointment> findBySchedule_ScheduleDateBetween(LocalDate startDate, LocalDate endDate);
     // 添加复杂查询方法 - 查询患者所有未完成、未取消的预约（排班结束时间还没到的）
     // 判断逻辑：排班日期在今天之后，或者排班日期是今天但结束时间在今天之后
     @Query("SELECT a FROM Appointment a WHERE a.patient = :patient " +
@@ -101,4 +128,101 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     List<Appointment> findByScheduleAndStatus(
             @Param("schedule") Schedule schedule, 
             @Param("status") com.example.springboot.entity.enums.AppointmentStatus status);
+
+    /**
+     * 统计指定创建时间范围内的预约数量
+     */
+    long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+    /**
+     * 统计指定状态的预约数量
+     */
+    long countByStatusIn(List<AppointmentStatus> statuses);
+
+    /**
+     * 统计今天或未来的候诊人数（已签到但未就诊，或已预约但未就诊）
+     */
+    @Query("SELECT COUNT(a) FROM Appointment a " +
+           "WHERE a.status IN :statuses " +
+           "AND a.schedule.scheduleDate >= :today")
+    long countPendingPatientsByStatusInAndScheduleDateAfter(
+            @Param("statuses") List<AppointmentStatus> statuses,
+            @Param("today") LocalDate today);
+
+    /**
+     * 统计已签到且未完成的总人数（不管日期）
+     * CHECKED_IN 状态本身就是已签到但未完成，所以只需要统计状态为 CHECKED_IN 的预约
+     */
+    @Query("SELECT COUNT(a) FROM Appointment a " +
+           "WHERE a.status = com.example.springboot.entity.enums.AppointmentStatus.CHECKED_IN")
+    long countCheckedInAndNotCompleted();
+
+    /**
+     * 按日期范围分组统计预约数量
+     */
+    @Query("SELECT DATE(a.createdAt) as date, COUNT(a) as count " +
+           "FROM Appointment a " +
+           "WHERE a.createdAt BETWEEN :start AND :end " +
+           "GROUP BY DATE(a.createdAt) " +
+           "ORDER BY DATE(a.createdAt)")
+    List<Map<String, Object>> countByDateRangeGroupByDate(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
+    /**
+     * 按支付状态分组统计
+     */
+    @Query("SELECT a.paymentStatus as status, COUNT(a) as count " +
+           "FROM Appointment a " +
+           "GROUP BY a.paymentStatus")
+    List<Map<String, Object>> countByPaymentStatus();
+
+    /**
+     * 按科室统计预约数量 Top 5
+     */
+    @Query("SELECT d.name as name, COUNT(a) as count " +
+           "FROM Appointment a " +
+           "JOIN a.schedule s " +
+           "JOIN s.doctor doc " +
+           "JOIN doc.department d " +
+           "GROUP BY d.departmentId, d.name " +
+           "ORDER BY COUNT(a) DESC")
+    List<Map<String, Object>> countByDepartmentTop5();
+
+    /**
+     * 按医生统计预约数量 Top 5
+     */
+    @Query("SELECT doc.fullName as name, d.name as department, COUNT(a) as count " +
+           "FROM Appointment a " +
+           "JOIN a.schedule s " +
+           "JOIN s.doctor doc " +
+           "JOIN doc.department d " +
+           "GROUP BY doc.doctorId, doc.fullName, d.name " +
+           "ORDER BY COUNT(a) DESC")
+    List<Map<String, Object>> countByDoctorTop5();
+
+    /**
+     * 按时间段统计预约数量（所有历史数据）
+     */
+    @Query("SELECT CONCAT(ts.startTime, '-', ts.endTime) as time, COUNT(a) as count " +
+           "FROM Appointment a " +
+           "JOIN a.schedule s " +
+           "JOIN s.slot ts " +
+           "GROUP BY ts.slotId, ts.startTime, ts.endTime " +
+           "ORDER BY ts.startTime")
+    List<Map<String, Object>> countByTimeSlot();
+
+    /**
+     * 按时间段统计指定日期范围内的预约数量
+     */
+    @Query("SELECT CONCAT(ts.startTime, '-', ts.endTime) as time, COUNT(a) as count " +
+           "FROM Appointment a " +
+           "JOIN a.schedule s " +
+           "JOIN s.slot ts " +
+           "WHERE s.scheduleDate BETWEEN :startDate AND :endDate " +
+           "GROUP BY ts.slotId, ts.startTime, ts.endTime " +
+           "ORDER BY ts.startTime")
+    List<Map<String, Object>> countByTimeSlotAndDateRange(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }

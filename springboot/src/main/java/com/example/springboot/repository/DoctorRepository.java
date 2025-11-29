@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -41,4 +42,19 @@ public interface DoctorRepository extends JpaRepository<Doctor, Integer>, JpaSpe
     List<Doctor> findByDepartmentAndStatus(Department department, DoctorStatus status);
 
     boolean existsByPhoneNumberAndIdentifierNot(String phoneNumber, String identifier);
+
+    long countByStatusNot(DoctorStatus status);
+
+    List<Doctor> findByStatusNot(DoctorStatus status);
+
+    /**
+     * 按职称等级分组统计医生数量
+     */
+    @Query("SELECT d.titleLevel as level, COUNT(d) as count " +
+           "FROM Doctor d " +
+           "WHERE d.status != com.example.springboot.entity.enums.DoctorStatus.deleted " +
+           "AND d.titleLevel IS NOT NULL " +
+           "GROUP BY d.titleLevel " +
+           "ORDER BY d.titleLevel")
+    List<Map<String, Object>> countByTitleLevel();
 }

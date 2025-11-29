@@ -217,7 +217,27 @@
 
               <el-card class="chart-card">
                 <template #header>
-                  <div class="card-header">就诊时段热力图</div>
+                  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>就诊时段热力图</span>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                      <el-date-picker
+                        v-model="timeSlotDateRange"
+                        type="daterange"
+                        range-separator="至"
+                        start-placeholder="起始日期"
+                        end-placeholder="结束日期"
+                        format="YYYY-MM-DD"
+                        value-format="YYYY-MM-DD"
+                        size="small"
+                        style="width: 280px;"
+                        @change="handleTimeSlotDateChange"
+                      />
+                      <el-button type="primary" size="small" @click="refreshTimeSlotChart">
+                        <el-icon><Refresh /></el-icon>
+                        刷新
+                      </el-button>
+                    </div>
+                  </div>
                 </template>
                 <div id="timeSlotChart" class="chart"></div>
               </el-card>
@@ -240,7 +260,8 @@ import {
   Close,
   OfficeBuilding,
   DataAnalysis,
-  Download
+  Download,
+  Refresh
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import doctorImage from '@/assets/doctor.jpg'
@@ -248,76 +269,42 @@ import BackButton from '@/components/BackButton.vue'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import { ElMessage } from 'element-plus'
+import { getOverviewStats, getDoctorsStats, getPatientsStats } from '@/api/dashboard'
 
 const router = useRouter()
 const activeTab = ref('overview')
 const exporting = ref(false)
+const loading = ref(false)
+// 就诊时段热力图日期范围
+const timeSlotDateRange = ref(null)
 
-// Mock 数据
+// 数据
 const mockData = reactive({
   overview: {
-    todayAppointments: 128,
-    activeDoctorsToday: 24,
-    pendingPatients: 15,
-    totalPatients: 3450,
-    last7DaysDates: ['11-16', '11-17', '11-18', '11-19', '11-20', '11-21', '11-22'],
-    last7DaysCounts: [120, 132, 101, 134, 90, 230, 210],
-    paymentStatus: [
-      { name: '已支付', value: 245 },
-      { name: '待支付', value: 38 },
-      { name: '退款', value: 12 }
-    ]
+    todayAppointments: 0,
+    activeDoctorsToday: 0,
+    pendingPatients: 0,
+    totalPatients: 0,
+    last7DaysDates: [],
+    last7DaysCounts: [],
+    paymentStatus: []
   },
   doctors: {
-    totalDoctors: 156,
-    todayLeaveCount: 8,
-    totalDepartments: 12,
-    titleDistribution: [
-      { name: 'Chief Physician', value: 28 },
-      { name: 'Associate Chief Physician', value: 45 },
-      { name: 'Attending Physician', value: 58 },
-      { name: 'Resident Physician', value: 25 }
-    ],
-    departmentBusy: [
-      { name: 'Internal Medicine', value: 342 },
-      { name: 'Surgery', value: 298 },
-      { name: 'Pediatrics', value: 267 },
-      { name: 'Orthopedics', value: 189 },
-      { name: 'Cardiology', value: 156 }
-    ],
-    doctorWorkload: [
-      { name: 'Dr. Zhang Wei', department: 'Internal Medicine', value: 89 },
-      { name: 'Dr. Li Ming', department: 'Surgery', value: 76 },
-      { name: 'Dr. Wang Fang', department: 'Pediatrics', value: 68 },
-      { name: 'Dr. Liu Gang', department: 'Orthopedics', value: 54 },
-      { name: 'Dr. Chen Yu', department: 'Cardiology', value: 47 }
-    ]
+    totalDoctors: 0,
+    todayLeaveCount: 0,
+    totalDepartments: 0,
+    titleDistribution: [],
+    departmentBusy: [],
+    doctorWorkload: []
   },
   patients: {
-    monthlyNewRegistrations: 287,
-    studentTeacherRatio: '4.3:1',
-    totalNoShows: 156,
-    last30DaysDates: Array.from({ length: 30 }, (_, i) => {
-      const date = new Date()
-      date.setDate(date.getDate() - (29 - i))
-      return `${date.getMonth() + 1}-${date.getDate()}`
-    }),
-    last30DaysCounts: Array.from({ length: 30 }, () => Math.floor(Math.random() * 20) + 5),
-    patientType: [
-      { name: 'Student', value: 2800 },
-      { name: 'Teacher', value: 650 }
-    ],
-    timeSlotData: [
-      { time: '08:00-09:00', count: 45 },
-      { time: '09:00-10:00', count: 78 },
-      { time: '10:00-11:00', count: 92 },
-      { time: '11:00-12:00', count: 65 },
-      { time: '12:00-13:00', count: 28 },
-      { time: '13:00-14:00', count: 38 },
-      { time: '14:00-15:00', count: 56 },
-      { time: '15:00-16:00', count: 72 },
-      { time: '16:00-17:00', count: 48 }
-    ]
+    monthlyNewRegistrations: 0,
+    studentTeacherRatio: '0:0',
+    totalNoShows: 0,
+    last30DaysDates: [],
+    last30DaysCounts: [],
+    patientType: [],
+    timeSlotData: []
   }
 })
 
@@ -749,27 +736,6 @@ const initPatientsCharts = () => {
   })
 }
 
-// 处理 Tab 切换
-const handleTabChange = (tabName) => {
-  nextTick(() => {
-    // 延迟初始化图表，确保 DOM 已渲染
-    setTimeout(() => {
-      switch (tabName) {
-        case 'overview':
-          initOverviewCharts()
-          break
-        case 'doctors':
-          initDoctorsCharts()
-          break
-        case 'patients':
-          initPatientsCharts()
-          break
-      }
-      // 触发所有图表 resize
-      resizeAllCharts()
-    }, 100)
-  })
-}
 
 // 处理窗口大小变化
 const handleResize = () => {
@@ -1041,13 +1007,235 @@ const setupResizeObserver = () => {
 
 let resizeObserver = null
 
-onMounted(() => {
-  // 初始化第一个 Tab 的图表
+// 加载数据
+const loadOverviewData = async () => {
+  try {
+    loading.value = true
+    console.log('开始加载运营总览数据...')
+    const response = await getOverviewStats()
+    console.log('运营总览API响应:', response)
+    console.log('响应类型:', typeof response)
+    console.log('响应是否为对象:', response && typeof response === 'object')
+    
+    // Spring Boot 直接返回数据，不是包装在 data 中
+    const data = response || {}
+    console.log('解析后的数据:', data)
+    
+    mockData.overview.todayAppointments = data.todayAppointments ?? 0
+    mockData.overview.activeDoctorsToday = data.activeDoctorsToday ?? 0
+    mockData.overview.pendingPatients = data.pendingPatients ?? 0
+    mockData.overview.totalPatients = data.totalPatients ?? 0
+    mockData.overview.last7DaysDates = data.last7DaysDates || []
+    mockData.overview.last7DaysCounts = data.last7DaysCounts || []
+    mockData.overview.paymentStatus = data.paymentStatus || []
+    
+    console.log('更新后的运营总览数据:', mockData.overview)
+    console.log('今日挂号量:', mockData.overview.todayAppointments)
+    console.log('今日出诊医生:', mockData.overview.activeDoctorsToday)
+    console.log('当前候诊人数:', mockData.overview.pendingPatients)
+    console.log('累计注册用户:', mockData.overview.totalPatients)
+  } catch (error) {
+    console.error('加载运营总览数据失败:', error)
+    console.error('错误详情:', {
+      message: error.message,
+      response: error.response,
+      request: error.request,
+      config: error.config
+    })
+    
+    let errorMsg = '加载数据失败'
+    if (error.response) {
+      errorMsg = `后端错误 (${error.response.status}): ${error.response.data?.message || error.response.statusText}`
+    } else if (error.request) {
+      errorMsg = '无法连接到后端服务，请检查：1. 后端服务是否启动 2. 后端地址是否为 http://localhost:8080'
+    } else {
+      errorMsg = error.message || '未知错误'
+    }
+    
+    ElMessage.error(errorMsg)
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadDoctorsData = async () => {
+  try {
+    loading.value = true
+    const response = await getDoctorsStats()
+    console.log('医生资源分析API响应:', response)
+    // Spring Boot 直接返回数据，不是包装在 data 中
+    const data = response || {}
+    mockData.doctors.totalDoctors = data.totalDoctors || 0
+    mockData.doctors.todayLeaveCount = data.todayLeaveCount || 0
+    mockData.doctors.totalDepartments = data.totalDepartments || 0
+    mockData.doctors.titleDistribution = data.titleDistribution || []
+    mockData.doctors.departmentBusy = data.departmentBusy || []
+    mockData.doctors.doctorWorkload = (data.doctorWorkload || []).map(item => ({
+      name: item.name,
+      department: item.department,
+      value: item.value
+    }))
+    console.log('更新后的医生资源分析数据:', mockData.doctors)
+  } catch (error) {
+    console.error('加载医生资源分析数据失败:', error)
+    ElMessage.error('加载数据失败: ' + (error.message || '请检查后端服务'))
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadPatientsData = async () => {
+  try {
+    loading.value = true
+    // 获取日期范围参数
+    const startDate = timeSlotDateRange.value && timeSlotDateRange.value.length > 0 ? timeSlotDateRange.value[0] : null
+    const endDate = timeSlotDateRange.value && timeSlotDateRange.value.length > 1 ? timeSlotDateRange.value[1] : null
+    const response = await getPatientsStats(startDate, endDate)
+    console.log('患者群体画像API响应:', response)
+    // Spring Boot 直接返回数据，不是包装在 data 中
+    const data = response || {}
+    mockData.patients.monthlyNewRegistrations = data.monthlyNewRegistrations || 0
+    mockData.patients.studentTeacherRatio = data.studentTeacherRatio || '0:0'
+    mockData.patients.totalNoShows = data.totalNoShows || 0
+    mockData.patients.last30DaysDates = data.last30DaysDates || []
+    mockData.patients.last30DaysCounts = (data.last30DaysCounts || []).map(count => Number(count))
+    mockData.patients.patientType = data.patientType || []
+    mockData.patients.timeSlotData = (data.timeSlotData || []).map(item => ({
+      time: item.time,
+      count: item.count
+    }))
+    console.log('更新后的患者群体画像数据:', mockData.patients)
+  } catch (error) {
+    console.error('加载患者群体画像数据失败:', error)
+    ElMessage.error('加载数据失败: ' + (error.message || '请检查后端服务'))
+  } finally {
+    loading.value = false
+  }
+}
+
+// 处理就诊时段日期范围变化
+const handleTimeSlotDateChange = () => {
+  // 日期变化时自动刷新图表
+  refreshTimeSlotChart()
+}
+
+// 刷新就诊时段热力图
+const refreshTimeSlotChart = async () => {
+  try {
+    loading.value = true
+    // 只刷新就诊时段数据
+    const startDate = timeSlotDateRange.value && timeSlotDateRange.value.length > 0 ? timeSlotDateRange.value[0] : null
+    const endDate = timeSlotDateRange.value && timeSlotDateRange.value.length > 1 ? timeSlotDateRange.value[1] : null
+    const response = await getPatientsStats(startDate, endDate)
+    const data = response || {}
+    mockData.patients.timeSlotData = (data.timeSlotData || []).map(item => ({
+      time: item.time,
+      count: item.count
+    }))
+    // 只更新就诊时段图表
+    nextTick(() => {
+      setTimeout(() => {
+        initChart('timeSlotChart', {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' }
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            top: '10%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'category',
+            data: mockData.patients.timeSlotData.map(d => d.time),
+            axisLine: { lineStyle: { color: '#4a5568' } },
+            axisLabel: { color: '#718096', rotate: 45 }
+          },
+          yAxis: {
+            type: 'value',
+            axisLine: { lineStyle: { color: '#4a5568' } },
+            axisLabel: { color: '#718096' },
+            splitLine: { lineStyle: { color: '#e2e8f0', type: 'dashed' } }
+          },
+          series: [
+            {
+              name: '挂号量',
+              type: 'bar',
+              data: mockData.patients.timeSlotData.map(d => d.count),
+              itemStyle: {
+                color: function (params) {
+                  const colors = [
+                    ['#4299e1', '#3182ce'],
+                    ['#48bb78', '#38a169'],
+                    ['#f59e0b', '#d97706'],
+                    ['#f56565', '#e53e3e']
+                  ]
+                  const colorIndex = Math.floor(params.dataIndex / 3) % colors.length
+                  return new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                    { offset: 0, color: colors[colorIndex][0] },
+                    { offset: 1, color: colors[colorIndex][1] }
+                  ])
+                }
+              },
+              label: {
+                show: true,
+                position: 'top',
+                color: '#2d3748'
+              }
+            }
+          ]
+        })
+      }, 100)
+    })
+    ElMessage.success('数据已刷新')
+  } catch (error) {
+    console.error('刷新就诊时段数据失败:', error)
+    ElMessage.error('刷新失败: ' + (error.message || '请检查后端服务'))
+  } finally {
+    loading.value = false
+  }
+}
+
+// 处理 Tab 切换
+const handleTabChange = (tabName) => {
   nextTick(() => {
+    // 延迟初始化图表，确保 DOM 已渲染
     setTimeout(() => {
-      initOverviewCharts()
-      resizeObserver = setupResizeObserver()
-    }, 300)
+      switch (tabName) {
+        case 'overview':
+          loadOverviewData().then(() => {
+            initOverviewCharts()
+          })
+          break
+        case 'doctors':
+          loadDoctorsData().then(() => {
+            initDoctorsCharts()
+          })
+          break
+        case 'patients':
+          loadPatientsData().then(() => {
+            initPatientsCharts()
+          })
+          break
+      }
+      // 触发所有图表 resize
+      resizeAllCharts()
+    }, 100)
+  })
+}
+
+onMounted(() => {
+  // 初始化第一个 Tab 的数据和图表
+  loadOverviewData().then(() => {
+    nextTick(() => {
+      setTimeout(() => {
+        initOverviewCharts()
+        resizeObserver = setupResizeObserver()
+      }, 300)
+    })
   })
 
   window.addEventListener('resize', handleResize)
