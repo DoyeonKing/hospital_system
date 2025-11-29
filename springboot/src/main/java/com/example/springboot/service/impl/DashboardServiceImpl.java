@@ -228,17 +228,10 @@ public class DashboardServiceImpl implements DashboardService {
         // 2. 师生比例系数（学生:教师，排除deleted状态的患者）
         long studentCount = patientRepository.countByStatusNotAndPatientType(PatientStatus.deleted, PatientType.student);
         long teacherCount = patientRepository.countByStatusNotAndPatientType(PatientStatus.deleted, PatientType.teacher);
-        System.out.println("师生比例计算 - 学生数（非deleted）: " + studentCount + ", 教师数（非deleted）: " + teacherCount);
-        String ratio;
-        if (teacherCount > 0) {
-            double ratioValue = (double) studentCount / teacherCount;
-            ratio = String.format("%.1f:1", ratioValue);
-            System.out.println("师生比例: " + ratio + " (计算值: " + ratioValue + ", 表示每1个教师对应" + ratioValue + "个学生)");
-        } else {
-            ratio = studentCount + ":0";
-            System.out.println("师生比例: " + ratio + " (无教师)");
-        }
-        response.setStudentTeacherRatio(ratio);
+        long staffCount = patientRepository.countByStatusNotAndPatientType(PatientStatus.deleted, PatientType.staff);
+        System.out.println("人群比例计算 - 教师: " + teacherCount + ", 职工: " + staffCount + ", 学生: " + studentCount);
+        String ratio = teacherCount + ":" + staffCount + ":" + studentCount;
+        response.setTeacherStaffStudentRatio(ratio);
 
         // 3. 累计爽约次数
         long totalNoShows = patientProfileRepository.sumNoShowCount();
@@ -274,15 +267,20 @@ public class DashboardServiceImpl implements DashboardService {
 
         // 5. 患者类型构成
         List<SimpleNameValue> patientType = new ArrayList<>();
+        SimpleNameValue teacher = new SimpleNameValue();
+        teacher.setName("教师");
+        teacher.setValue(teacherCount);
+        patientType.add(teacher);
+        
+        SimpleNameValue staff = new SimpleNameValue();
+        staff.setName("职工");
+        staff.setValue(staffCount);
+        patientType.add(staff);
+        
         SimpleNameValue student = new SimpleNameValue();
         student.setName("学生");
         student.setValue(studentCount);
         patientType.add(student);
-        
-        SimpleNameValue teacher = new SimpleNameValue();
-        teacher.setName("教职工");
-        teacher.setValue(teacherCount);
-        patientType.add(teacher);
         response.setPatientType(patientType);
 
         // 6. 就诊时段热力图（按日期范围统计，如果未指定则统计所有数据）
