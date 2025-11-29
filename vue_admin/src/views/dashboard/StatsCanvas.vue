@@ -183,8 +183,8 @@
                   <el-icon :size="40"><DataAnalysis /></el-icon>
                 </div>
                 <div class="stat-content">
-                  <div class="stat-label">师生比例系数</div>
-                  <div class="stat-value">{{ mockData.patients.studentTeacherRatio }}</div>
+                  <div class="stat-label">教师/职工/学生比例</div>
+                  <div class="stat-value">{{ mockData.patients.teacherStaffStudentRatio }}</div>
                 </div>
               </div>
 
@@ -278,6 +278,12 @@ const loading = ref(false)
 // 就诊时段热力图日期范围
 const timeSlotDateRange = ref(null)
 
+const getDefaultPatientType = () => ([
+  { name: '教师', value: 0 },
+  { name: '职工', value: 0 },
+  { name: '学生', value: 0 }
+])
+
 // 数据
 const mockData = reactive({
   overview: {
@@ -299,11 +305,11 @@ const mockData = reactive({
   },
   patients: {
     monthlyNewRegistrations: 0,
-    studentTeacherRatio: '0:0',
+    teacherStaffStudentRatio: '0:0:0',
     totalNoShows: 0,
     last30DaysDates: [],
     last30DaysCounts: [],
-    patientType: [],
+    patientType: getDefaultPatientType(),
     timeSlotData: []
   }
 })
@@ -623,6 +629,21 @@ const initPatientsCharts = () => {
   })
 
   // 患者类型构成图
+  const patientTypeColors = [
+    ['#667eea', '#764ba2'],
+    ['#f093fb', '#f5576c'],
+    ['#48bb78', '#38a169']
+  ]
+  const patientTypeData = mockData.patients.patientType.map((item, index) => ({
+    value: item.value,
+    name: item.name,
+    itemStyle: {
+      color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: patientTypeColors[index % patientTypeColors.length][0] },
+        { offset: 1, color: patientTypeColors[index % patientTypeColors.length][1] }
+      ])
+    }
+  }))
   initChart('patientTypeChart', {
     backgroundColor: 'transparent',
     tooltip: {
@@ -654,28 +675,7 @@ const initPatientsCharts = () => {
           fontSize: 14,
           fontWeight: 'bold'
         },
-        data: [
-          {
-            value: mockData.patients.patientType[0].value,
-            name: '学生',
-            itemStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: '#667eea' },
-                { offset: 1, color: '#764ba2' }
-              ])
-            }
-          },
-          {
-            value: mockData.patients.patientType[1].value,
-            name: '教职工',
-            itemStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: '#f093fb' },
-                { offset: 1, color: '#f5576c' }
-              ])
-            }
-          }
-        ]
+        data: patientTypeData
       }
     ]
   })
@@ -1095,11 +1095,11 @@ const loadPatientsData = async () => {
     // Spring Boot 直接返回数据，不是包装在 data 中
     const data = response || {}
     mockData.patients.monthlyNewRegistrations = data.monthlyNewRegistrations || 0
-    mockData.patients.studentTeacherRatio = data.studentTeacherRatio || '0:0'
+    mockData.patients.teacherStaffStudentRatio = data.teacherStaffStudentRatio || '0:0:0'
     mockData.patients.totalNoShows = data.totalNoShows || 0
     mockData.patients.last30DaysDates = data.last30DaysDates || []
     mockData.patients.last30DaysCounts = (data.last30DaysCounts || []).map(count => Number(count))
-    mockData.patients.patientType = data.patientType || []
+    mockData.patients.patientType = (data.patientType && data.patientType.length > 0) ? data.patientType : getDefaultPatientType()
     mockData.patients.timeSlotData = (data.timeSlotData || []).map(item => ({
       time: item.time,
       count: item.count

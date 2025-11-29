@@ -7,7 +7,7 @@ import java.util.List;
 @Data
 public class PatientsStatsResponse {
     private long monthlyNewRegistrations;
-    private String studentTeacherRatio;
+    private String teacherStaffStudentRatio;
     private long totalNoShows;
 
     private List<String> last30DaysDates;
