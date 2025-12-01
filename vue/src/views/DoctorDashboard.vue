@@ -170,6 +170,14 @@
                 <h4>休假申请</h4>
                 <p>提交和查看休假请求</p>
               </div>
+
+              <div class="function-card" @click="goToSlotApplication">
+                <div class="card-icon info">
+                  <el-icon :size="36"><DocumentAdd /></el-icon>
+                </div>
+                <h4>申请加号</h4>
+                <p>申请临时增加号源</p>
+              </div>
             </div>
           </div>
         </div>
@@ -262,7 +270,7 @@ import {
   UserFilled, Document, Calendar, DataAnalysis,
   User, Clock, Star, SwitchButton,
   OfficeBuilding, Phone, Edit, Key,
-  Plus, Bell, Box,
+  Plus, Bell, Box, DocumentAdd,
   Sunrise, Sunny // <-- 新增图标
 } from '@element-plus/icons-vue'
 import { useDoctorStore } from '@/stores/doctorStore'
@@ -620,6 +628,9 @@ const goToSchedule = () => {
 const goToLeaveRequest = () => {
   router.push('/leave-request')
 }
+const goToSlotApplication = () => {
+  router.push('/slot-application')
+}
 
 // --- 页面加载时 ---
 onMounted(() => {
@@ -870,6 +881,7 @@ onMounted(() => {
 .card-icon.success { background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); }
 .card-icon.danger { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #f56c6c; }
 .card-icon.warning { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #d9822b; }
+.card-icon.info { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #409eff; }
 .function-card h4 { font-size: 1.1rem; font-weight: 600; color: #2c3e50; margin: 0 0 8px 0; }
 .function-card p { font-size: 0.85rem; color: #909399; margin: 0; line-height: 1.4; }
 

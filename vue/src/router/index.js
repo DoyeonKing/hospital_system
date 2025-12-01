@@ -8,6 +8,7 @@ import DoctorDashboard from '@/views/DoctorDashboard.vue';
 import MySchedule from '@/views/MySchedule.vue';
 import PatientInfo from '@/views/PatientInfo.vue';
 import LeaveRequest from '@/views/LeaveRequest.vue'; // 导入休假页面
+import SlotApplication from '@/views/SlotApplication.vue'; // 导入加号申请页面
 const NotFoundView = () => import('../views/404.vue');
 
 const routes = [
@@ -49,6 +50,14 @@ const routes = [
         name: 'LeaveRequest',
         component: LeaveRequest,
         meta: { title: '休假申请', requiresAuth: true }
+    },
+
+    // 加号申请页面
+    {
+        path: '/slot-application',
+        name: 'SlotApplication',
+        component: SlotApplication,
+        meta: { title: '申请加号', requiresAuth: true }
     },
 
     // 根路径

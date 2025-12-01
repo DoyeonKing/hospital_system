@@ -49,6 +49,9 @@ import StatsCanvas from '@/views/dashboard/StatsCanvas.vue';
 import LeaveApproval from '@/views/LeaveApproval.vue';
 import SubstituteSelection from '@/views/SubstituteSelection.vue';
 
+// ===== 新增：导入加号审批页面组件 =====
+import SlotApproval from '@/views/SlotApproval.vue';
+
 // 通用视图组件导入
 const NotFoundView = () => import('../views/404.vue');
 
@@ -241,6 +244,15 @@ const routes = [
         name: 'SubstituteSelection',
         meta: { title: '替班医生选择', requiresAuth: true },
         component: SubstituteSelection
+    },
+    // =======================================================
+
+    // ===== 加号审批路由 =====
+    {
+        path: '/slot-approval',
+        name: 'SlotApproval',
+        meta: { title: '加号审批', requiresAuth: true },
+        component: SlotApproval
     },
     // =======================================================
 
