@@ -13,7 +13,9 @@ import com.example.springboot.repository.LocationRepository;
 import com.example.springboot.repository.ScheduleRepository;
 import com.example.springboot.repository.TimeSlotRepository;
 import com.example.springboot.service.ScheduleService;
+import com.example.springboot.service.WaitlistService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -42,6 +44,13 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Autowired
     private LocationRepository locationRepository;
+    
+    @Autowired
+    @Lazy  // 使用延迟加载避免循环依赖
+    private WaitlistService waitlistService;
+    
+    @Autowired
+    private com.example.springboot.repository.AppointmentRepository appointmentRepository;
 
 
     
@@ -77,7 +86,17 @@ public class ScheduleServiceImpl implements ScheduleService {
                 null, // 不筛选状态
                 pageable
         );
-        return schedulePage.map(ScheduleResponse::fromEntity);
+        
+        // 转换为响应DTO
+        // 注意：患者预约界面需要使用数据库中的 bookedSlots（包含锁定的候补号源）
+        // 这样当候补锁定了号源后，界面会正确显示"已约满"和"候补"按钮
+        return schedulePage.map(schedule -> {
+            ScheduleResponse response = ScheduleResponse.fromEntity(schedule);
+            // 直接使用数据库中的 bookedSlots（包含锁定的候补号源）
+            // 这样当候补锁定了号源后，bookedSlots = totalSlots，界面会显示"已约满"
+            response.setBookedSlots(schedule.getBookedSlots());
+            return response;
+        });
     }
 
     // 保留原有方法并复用新方法
@@ -94,7 +113,11 @@ public class ScheduleServiceImpl implements ScheduleService {
     public ScheduleResponse getScheduleById(Integer scheduleId) {
         Schedule schedule = scheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new RuntimeException("排班不存在"));
-        return ScheduleResponse.fromEntity(schedule);
+        ScheduleResponse response = ScheduleResponse.fromEntity(schedule);
+        // 动态统计实际有效预约数（排除已取消的）
+        long actualBookedCount = appointmentRepository.countByScheduleAndStatusNotCancelled(schedule);
+        response.setBookedSlots((int) actualBookedCount);
+        return response;
     }
     
     @Override
@@ -102,15 +125,52 @@ public class ScheduleServiceImpl implements ScheduleService {
         Schedule schedule = scheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new RuntimeException("排班不存在"));
         
+        // 记录原来的总号源数
+        Integer oldTotalSlots = schedule.getTotalSlots();
+        boolean slotsIncreased = false;
+        
         if (request.getTotalSlots() != null) {
             schedule.setTotalSlots(request.getTotalSlots());
+            // 检查号源是否增加
+            if (request.getTotalSlots() > oldTotalSlots) {
+                slotsIncreased = true;
+            }
         }
         if (request.getFee() != null) {
             schedule.setFee(request.getFee());
         }
         
         Schedule savedSchedule = scheduleRepository.save(schedule);
-        return ScheduleResponse.fromEntity(savedSchedule);
+        
+        // 如果号源数量增加了，尝试触发候补自动填充
+        if (slotsIncreased) {
+            System.out.println("号源数量从 " + oldTotalSlots + " 增加到 " + request.getTotalSlots() + "，触发候补填充");
+            try {
+                // 尝试填充多个候补（根据新增的号源数量）
+                int slotsToFill = request.getTotalSlots() - oldTotalSlots;
+                for (int i = 0; i < slotsToFill; i++) {
+                    // 检查是否还有空位
+                    Schedule refreshedSchedule = scheduleRepository.findById(scheduleId)
+                            .orElseThrow(() -> new RuntimeException("排班不存在"));
+                    if (refreshedSchedule.getBookedSlots() < refreshedSchedule.getTotalSlots()) {
+                        waitlistService.createAppointmentFromWaitlist(scheduleId);
+                    } else {
+                        System.out.println("号源已满，停止填充候补");
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("触发候补填充失败: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        
+        // 返回时使用动态统计的已预约数
+        ScheduleResponse response = ScheduleResponse.fromEntity(savedSchedule);
+        long actualBookedCount = appointmentRepository.countByScheduleAndStatusNotCancelled(savedSchedule);
+        response.setBookedSlots((int) actualBookedCount);
+        
+        return response;
     }
     
     @Override
@@ -120,15 +180,52 @@ public class ScheduleServiceImpl implements ScheduleService {
                     Schedule schedule = scheduleRepository.findById(updateItem.getScheduleId())
                             .orElseThrow(() -> new RuntimeException("排班不存在: " + updateItem.getScheduleId()));
                     
+                    // 记录原来的总号源数
+                    Integer oldTotalSlots = schedule.getTotalSlots();
+                    boolean slotsIncreased = false;
+                    
                     if (updateItem.getTotalSlots() != null) {
                         schedule.setTotalSlots(updateItem.getTotalSlots());
+                        // 检查号源是否增加
+                        if (updateItem.getTotalSlots() > oldTotalSlots) {
+                            slotsIncreased = true;
+                        }
                     }
                     if (updateItem.getFee() != null) {
                         schedule.setFee(updateItem.getFee());
                     }
                     
                     Schedule savedSchedule = scheduleRepository.save(schedule);
-                    return ScheduleResponse.fromEntity(savedSchedule);
+                    
+                    // 如果号源数量增加了，尝试触发候补自动填充
+                    if (slotsIncreased) {
+                        System.out.println("批量更新：号源数量从 " + oldTotalSlots + " 增加到 " + updateItem.getTotalSlots() + "，触发候补填充");
+                        try {
+                            // 尝试填充多个候补（根据新增的号源数量）
+                            int slotsToFill = updateItem.getTotalSlots() - oldTotalSlots;
+                            for (int i = 0; i < slotsToFill; i++) {
+                                // 检查是否还有空位
+                                Schedule refreshedSchedule = scheduleRepository.findById(updateItem.getScheduleId())
+                                        .orElseThrow(() -> new RuntimeException("排班不存在"));
+                                if (refreshedSchedule.getBookedSlots() < refreshedSchedule.getTotalSlots()) {
+                                    waitlistService.createAppointmentFromWaitlist(updateItem.getScheduleId());
+                                } else {
+                                    System.out.println("号源已满，停止填充候补");
+                                    break;
+                                }
+                            }
+                        } catch (Exception e) {
+                            System.err.println("批量更新：触发候补填充失败: " + e.getMessage());
+                            e.printStackTrace();
+                        }
+                    }
+                    
+                    // 返回时使用动态统计的已预约数
+                    ScheduleResponse response = ScheduleResponse.fromEntity(savedSchedule);
+                    long actualBookedCount = appointmentRepository.countByScheduleAndStatusNotCancelled(savedSchedule);
+                    response.setBookedSlots((int) actualBookedCount);
+                    
+                    return response;
                 })
                 .collect(Collectors.toList());
     }
@@ -239,7 +336,13 @@ public class ScheduleServiceImpl implements ScheduleService {
                 doctorId, start, end, pageable);
         
         // 转换为响应DTO
-        return schedulePage.map(ScheduleResponse::fromEntity);
+        // 注意：患者预约界面需要使用数据库中的 bookedSlots（包含锁定的候补号源）
+        return schedulePage.map(schedule -> {
+            ScheduleResponse response = ScheduleResponse.fromEntity(schedule);
+            // 直接使用数据库中的 bookedSlots（包含锁定的候补号源）
+            response.setBookedSlots(schedule.getBookedSlots());
+            return response;
+        });
     }
 }
 
