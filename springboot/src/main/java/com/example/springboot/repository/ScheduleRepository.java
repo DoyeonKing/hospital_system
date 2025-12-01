@@ -29,6 +29,9 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
     
     // 根据日期范围查找排班
     List<Schedule> findByScheduleDateBetween(LocalDate startDate, LocalDate endDate);
+
+    // 根据具体日期查找排班
+    List<Schedule> findByScheduleDate(LocalDate date);
     
     /**
      * 分页查询排班列表（含关联信息）
@@ -81,5 +84,24 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
                                                         @Param("startDate") LocalDate startDate,
                                                         @Param("endDate") LocalDate endDate,
                                                         Pageable pageable);
+
+    /**
+     * 统计指定日期的不重复医生数量
+     */
+    @Query("SELECT COUNT(DISTINCT s.doctor.doctorId) " +
+           "FROM Schedule s " +
+           "JOIN s.doctor d " +
+           "WHERE s.scheduleDate = :date " +
+           "AND s.status <> com.example.springboot.entity.enums.ScheduleStatus.cancelled")
+    long countDistinctDoctorsByScheduleDate(@Param("date") LocalDate date);
+    
+    /**
+     * 查询指定日期的所有有效排班（排除已取消）
+     */
+    @Query("SELECT s FROM Schedule s " +
+           "JOIN FETCH s.doctor d " +
+           "WHERE s.scheduleDate = :date " +
+           "AND s.status <> com.example.springboot.entity.enums.ScheduleStatus.cancelled")
+    List<Schedule> findActiveSchedulesByDate(@Param("date") LocalDate date);
 
 }
