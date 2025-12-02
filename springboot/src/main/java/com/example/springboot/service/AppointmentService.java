@@ -148,7 +148,50 @@ public class AppointmentService {
         schedule.setBookedSlots(schedule.getBookedSlots() + 1);
         scheduleRepository.save(schedule); // 保存更新后的排班信息
 
-        return convertToResponseDto(appointmentRepository.save(appointment));
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+
+        // 发送预约通知
+        try {
+            String departmentName = "未知科室";
+            String doctorName = "未知医生";
+            String scheduleDate = "";
+            String slotName = "";
+            String locationName = "";
+            
+            if (schedule != null) {
+                if (schedule.getDoctor() != null && schedule.getDoctor().getDepartment() != null) {
+                    departmentName = schedule.getDoctor().getDepartment().getName();
+                }
+                if (schedule.getDoctor() != null) {
+                    doctorName = schedule.getDoctor().getFullName();
+                }
+                if (schedule.getScheduleDate() != null) {
+                    scheduleDate = schedule.getScheduleDate().toString();
+                }
+                if (schedule.getSlot() != null) {
+                    slotName = schedule.getSlot().getSlotName();
+                }
+                if (schedule.getLocation() != null) {
+                    locationName = schedule.getLocation().getName();
+                }
+            }
+            
+            notificationService.sendAppointmentNotification(
+                    patient.getPatientId().intValue(),
+                    savedAppointment.getAppointmentId(),
+                    departmentName,
+                    doctorName,
+                    scheduleDate,
+                    slotName,
+                    locationName,
+                    savedAppointment.getAppointmentNumber()
+            );
+        } catch (Exception e) {
+            // 通知发送失败不影响预约创建流程，只记录日志
+            logger.error("发送预约通知失败 - 预约ID: {}, 错误: {}", savedAppointment.getAppointmentId(), e.getMessage());
+        }
+
+        return convertToResponseDto(savedAppointment);
     }
 
     /**
