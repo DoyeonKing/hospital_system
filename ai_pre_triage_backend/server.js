@@ -347,8 +347,41 @@ app.post('/api/pre-triage/recommend-doctor', async (req, res) => {
       return res.json([]);
     }
 
-    // 2. 构建 Prompt
-    const doctorList = doctors.map(d => 
+    // 1.5. 查询有排班的医生（当天及未来30天内有可用号源的排班）
+    const today = new Date().toISOString().split('T')[0]; // 获取今天的日期 YYYY-MM-DD
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 30); // 未来30天
+    const futureDateStr = futureDate.toISOString().split('T')[0];
+
+    const doctorIds = doctors.map(d => d.id);
+    if (doctorIds.length === 0) {
+      return res.json([]);
+    }
+
+    // 查询有可用排班的医生ID（有剩余号源且状态为available的排班）
+    const placeholders = doctorIds.map(() => '?').join(',');
+    const [schedules] = await pool.execute(
+      `SELECT DISTINCT doctor_id 
+       FROM schedules 
+       WHERE doctor_id IN (${placeholders})
+         AND schedule_date >= ?
+         AND schedule_date <= ?
+         AND status = 'available'
+         AND (total_slots - booked_slots) > 0`,
+      [...doctorIds, today, futureDateStr]
+    );
+
+    const availableDoctorIds = new Set(schedules.map(s => s.doctor_id));
+    
+    // 只保留有排班的医生
+    const doctorsWithSchedule = doctors.filter(d => availableDoctorIds.has(d.id));
+
+    if (doctorsWithSchedule.length === 0) {
+      return res.json([]);
+    }
+
+    // 2. 构建 Prompt（只使用有排班的医生）
+    const doctorList = doctorsWithSchedule.map(d => 
       `- ${d.name}（${d.title}）：${d.specialty || '暂无擅长描述'}`
     ).join('\n');
 
@@ -380,10 +413,10 @@ ${doctorList}
     try {
       result = parseJSONResponse(llmResponse);
     } catch (e) {
-      console.warn('JSON 解析失败，返回所有医生:', e.message);
-      // 降级：返回所有医生
+      console.warn('JSON 解析失败，返回所有有排班的医生:', e.message);
+      // 降级：返回所有有排班的医生
       result = {
-        recommended_doctors: doctors.map(d => ({
+        recommended_doctors: doctorsWithSchedule.map(d => ({
           id: d.id,
           name: d.name,
           title: d.title,
@@ -393,10 +426,10 @@ ${doctorList}
       };
     }
 
-    // 验证并补充医生信息
+    // 验证并补充医生信息（只保留有排班的医生）
     if (result.recommended_doctors && Array.isArray(result.recommended_doctors)) {
       result.recommended_doctors = result.recommended_doctors.map(rec => {
-        const doctor = doctors.find(d => d.id === rec.id || d.name === rec.name);
+        const doctor = doctorsWithSchedule.find(d => d.id === rec.id || d.name === rec.name);
         if (doctor) {
           return {
             id: doctor.id,
@@ -410,8 +443,8 @@ ${doctorList}
         return null;
       }).filter(Boolean);
     } else {
-      // 如果格式不对，返回所有医生
-      result.recommended_doctors = doctors.map(d => ({
+      // 如果格式不对，返回所有有排班的医生
+      result.recommended_doctors = doctorsWithSchedule.map(d => ({
         id: d.id,
         name: d.name,
         title: d.title,

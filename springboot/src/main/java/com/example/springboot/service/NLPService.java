@@ -410,8 +410,13 @@ public List<DoctorRecommendationWithSchedule> recommendDoctorsByDepartment(
     // 7. 查询医生排班、关联时段+诊室、计算剩余号源、生成可用排班列表
     enrichWithScheduleInfo(recommendations);
 
-    // 8. 生成终版医生推荐列表
-    List<DoctorRecommendationWithSchedule> result = recommendations.stream()
+    // 8. 过滤掉没有可用排班的医生（只保留有排班且至少有一个可用号源的医生）
+    List<DoctorRecommendationWithSchedule> filteredRecommendations = recommendations.stream()
+            .filter(rec -> rec.getAvailableSchedules() != null && !rec.getAvailableSchedules().isEmpty())
+            .collect(Collectors.toList());
+
+    // 9. 生成终版医生推荐列表
+    List<DoctorRecommendationWithSchedule> result = filteredRecommendations.stream()
             .limit(topN)
             .collect(Collectors.toList());
 
