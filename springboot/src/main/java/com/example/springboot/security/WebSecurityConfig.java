@@ -55,8 +55,12 @@ public class WebSecurityConfig {
         configuration.setAllowedOrigins(Arrays.asList(
             "http://localhost:8000",  // HTTP 服务器
             "http://localhost:3000",   // React 开发服务器
+            "http://localhost:5173",   // Vite 开发服务器（默认端口）
+            "http://localhost:5174",   // Vite 备用端口
             "http://127.0.0.1:8000",   // 备用地址
-            "http://127.0.0.1:3000"    // 备用地址
+            "http://127.0.0.1:3000",   // 备用地址
+            "http://127.0.0.1:5173",   // Vite 备用地址
+            "http://127.0.0.1:5174"    // Vite 备用地址
         ));
 
         // 允许常用方法 (GET, POST, PUT, DELETE, OPTIONS)
