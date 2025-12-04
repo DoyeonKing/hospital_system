@@ -200,4 +200,51 @@ public class DoctorController {
                     .body(Map.of("error", "获取医生信息失败: " + e.getMessage()));
         }
     }
+    
+    /**
+     * 根据患者姓名查询该患者在本科室的所有就诊记录
+     * 使用 GET /api/doctors/patient-history
+     * 
+     * @param doctorId 医生ID (用于获取科室信息)
+     * @param patientName 患者姓名
+     * @return 患者在该科室的就诊记录列表
+     */
+    @GetMapping("/patient-history")
+    public ResponseEntity<?> getPatientHistoryByName(
+            @RequestParam Integer doctorId,
+            @RequestParam String patientName) {
+        try {
+            System.out.println("=== 查询患者就诊记录 ===");
+            System.out.println("doctorId: " + doctorId);
+            System.out.println("patientName: " + patientName);
+            
+            // 获取医生信息以获取科室ID
+            Doctor doctor = doctorService.findDoctorById(doctorId)
+                    .orElseThrow(() -> new ResourceNotFoundException("医生不存在"));
+            
+            Integer departmentId = doctor.getDepartment().getDepartmentId();
+            System.out.println("departmentId: " + departmentId);
+            
+            // 查询该患者在该科室的所有就诊记录
+            List<Appointment> appointments = appointmentRepository.findByPatientNameAndDepartment(
+                    patientName, departmentId);
+            
+            System.out.println("查询到 " + appointments.size() + " 条就诊记录");
+            
+            // 转换为DTO
+            List<PatientAppointmentDTO> result = appointments.stream()
+                    .map(PatientAppointmentDTO::fromEntity)
+                    .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(result);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("查询患者就诊记录时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "查询患者就诊记录失败: " + e.getMessage()));
+        }
+    }
 }

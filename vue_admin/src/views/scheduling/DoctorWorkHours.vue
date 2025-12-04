@@ -21,7 +21,7 @@
         :closable="false"
         class="logic-hint"
         title="计算逻辑提示"
-        description="仅统计状态为 completed 且存在 check_in_time 的号源；同一医生同一天按时间排序，空档 ≥ 90 分钟自动切成多段；每段工时 = 首诊至末诊跨度并统一 +0.5h 缓冲，夜班判定基于 18:00 时间阈值。"
+        description="仅统计状态为 completed 且存在 check_in_time 的号源；同一医生同一天按时间排序，空档 ≥ 90 分钟自动切成多段；每段工时 = 首诊至末诊跨度并统一 +0.5h 缓冲，夜班判定：首诊时间 > 18:00（不含18:00整点）。"
         show-icon
       />
 

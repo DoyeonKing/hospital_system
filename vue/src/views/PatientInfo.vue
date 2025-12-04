@@ -39,9 +39,93 @@
         </el-button>
       </div>
 
-      <!-- 上午排班 -->
-      <div class="schedule-section">
-        <div class="section-header morning-header">
+      <!-- 患者历史记录查询 -->
+      <div class="history-search-section">
+        <div class="section-title-bar history-title-bar">
+          <div class="title-content">
+            <el-icon class="title-icon"><Search /></el-icon>
+            <span class="title-text">查询患者历史就诊记录</span>
+          </div>
+        </div>
+        <div class="history-search-toolbar">
+          <el-input
+              v-model="historySearchName"
+              placeholder="输入患者姓名查询本科室所有就诊记录"
+              class="history-search-input"
+              :prefix-icon="User"
+              @keyup.enter="searchPatientHistory"
+              clearable
+              @clear="clearHistorySearch"
+          />
+          <el-button
+              type="success"
+              :icon="Search"
+              @click="searchPatientHistory"
+              :loading="historyLoading">
+            查询历史记录
+          </el-button>
+        </div>
+
+        <!-- 历史记录结果 -->
+        <div v-if="historyRecords.length > 0" class="history-results">
+          <div class="history-header">
+            <h4>{{ historySearchName }} 在本科室的就诊记录 (共 {{ historyRecords.length }} 条)</h4>
+            <el-button size="small" @click="clearHistorySearch">清除</el-button>
+          </div>
+          <el-table
+              v-loading="historyLoading"
+              :data="historyRecords"
+              style="width: 100%;"
+              border
+              stripe
+              max-height="400"
+          >
+            <el-table-column type="index" label="序号" width="60" align="center" />
+            <el-table-column prop="scheduleDate" label="就诊日期" width="120" />
+            <el-table-column label="时间段" width="140">
+              <template #default="{ row }">
+                {{ row.startTime }} - {{ row.endTime }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="appointmentNumber" label="就诊序号" width="100" align="center" />
+            <el-table-column prop="status" label="状态" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="getStatusTag(row.status)" size="small">
+                  {{ formatStatus(row.status) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="patient.phoneNumber" label="手机号" width="130" />
+            <el-table-column label="过敏史" width="150">
+              <template #default="{ row }">
+                <el-tooltip effect="dark" :content="row.patient?.patientProfile?.allergies || '无'" placement="top">
+                  <span class="text-truncate">{{ row.patient?.patientProfile?.allergies || '无' }}</span>
+                </el-tooltip>
+              </template>
+            </el-table-column>
+            <el-table-column label="基础病史" min-width="180">
+              <template #default="{ row }">
+                <el-tooltip effect="dark" :content="row.patient?.patientProfile?.medicalHistory || '无'" placement="top">
+                  <span class="text-truncate">{{ row.patient?.patientProfile?.medicalHistory || '无' }}</span>
+                </el-tooltip>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+        <el-empty v-else-if="historySearched && historyRecords.length === 0" description="未找到该患者的就诊记录" :image-size="80" />
+      </div>
+
+      <!-- 排班信息 -->
+      <div class="schedule-wrapper">
+        <div class="section-title-bar schedule-title-bar">
+          <div class="title-content">
+            <span class="title-text">📋 今日排班信息</span>
+          </div>
+        </div>
+
+        <!-- 上午排班 -->
+        <div class="schedule-section">
+          <div class="section-header morning-header">
           <span class="section-title">🌅 上午排班</span>
           <span class="patient-count">{{ morningPatients.length }} 人</span>
         </div>
@@ -152,6 +236,7 @@
       </div>
 
       <el-empty v-if="!loading && allPatients.length === 0" description="当日暂无患者" :image-size="120" />
+      </div>
 
     </el-card>
   </div>
@@ -161,9 +246,9 @@
 import { ref, onMounted, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 // 【已修改】移除了 Edit 和 View
-import { Search, Refresh } from '@element-plus/icons-vue';
+import { Search, Refresh, User } from '@element-plus/icons-vue';
 import BackButton from '@/components/BackButton.vue';
-import { getTodaysPatients } from '@/api/patient';
+import { getTodaysPatients, getPatientHistoryByName } from '@/api/patient';
 import { useRouter } from 'vue-router';
 import { useDoctorStore } from '@/stores/doctorStore';
 
@@ -228,6 +313,12 @@ const loading = ref(false);
 const allPatients = ref([]);
 const selectedDate = ref(formatDateForAPI(new Date()));
 const searchQuery = ref('');
+
+// 历史记录查询相关状态
+const historySearchName = ref('');
+const historyRecords = ref([]);
+const historyLoading = ref(false);
+const historySearched = ref(false);
 
 // --- 计算属性：上午和下午患者 ---
 const morningPatients = computed(() => {
@@ -300,6 +391,56 @@ const handleSearch = () => {
   fetchPatients();
 };
 
+// --- 查询患者历史记录 ---
+const searchPatientHistory = async () => {
+  if (!historySearchName.value || historySearchName.value.trim() === '') {
+    ElMessage.warning('请输入患者姓名');
+    return;
+  }
+
+  historyLoading.value = true;
+  historySearched.value = true;
+
+  try {
+    const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'));
+    const doctorId = savedInfo?.doctorId || doctorStore.currentDoctorId;
+    
+    if (!doctorId) {
+      ElMessage.error('无法获取医生ID，请重新登录');
+      historyLoading.value = false;
+      return;
+    }
+
+    console.log('=== 查询患者历史记录 ===');
+    console.log('doctorId:', doctorId);
+    console.log('patientName:', historySearchName.value.trim());
+
+    const response = await getPatientHistoryByName(doctorId, historySearchName.value.trim());
+    console.log('历史记录响应:', response);
+
+    historyRecords.value = Array.isArray(response) ? response : [];
+    
+    if (historyRecords.value.length === 0) {
+      ElMessage.info('未找到该患者在本科室的就诊记录');
+    } else {
+      ElMessage.success(`查询到 ${historyRecords.value.length} 条就诊记录`);
+    }
+  } catch (error) {
+    console.error('查询历史记录失败:', error);
+    ElMessage.error('查询历史记录失败：' + (error.message || '未知错误'));
+    historyRecords.value = [];
+  } finally {
+    historyLoading.value = false;
+  }
+};
+
+// --- 清除历史记录查询 ---
+const clearHistorySearch = () => {
+  historySearchName.value = '';
+  historyRecords.value = [];
+  historySearched.value = false;
+};
+
 // --- 生命周期 ---
 onMounted(() => {
   fetchPatients();
@@ -345,9 +486,22 @@ onMounted(() => {
   font-weight: bold;
 }
 
+/* 排班包装器 */
+.schedule-wrapper {
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
 /* 排班区域样式 */
 .schedule-section {
-  margin-top: 24px;
+  margin-top: 20px;
+}
+
+.schedule-section:first-of-type {
+  margin-top: 0;
 }
 
 .section-header {
@@ -383,6 +537,81 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.8);
   border-radius: 12px;
   color: #606266;
+}
+
+/* 区块标题栏样式 */
+.section-title-bar {
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  border-left: 4px solid;
+}
+
+.history-title-bar {
+  background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%);
+  border-left-color: #00897b;
+}
+
+.schedule-title-bar {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  border-left-color: #f57c00;
+  margin-bottom: 24px;
+}
+
+.title-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-icon {
+  font-size: 20px;
+  color: #00897b;
+}
+
+.title-text {
+  font-size: 17px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+/* 历史记录查询样式 */
+.history-search-section {
+  margin-bottom: 48px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.history-search-toolbar {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  margin-bottom: 16px;
+}
+
+.history-search-input {
+  flex: 1;
+  max-width: 400px;
+}
+
+.history-results {
+  margin-top: 16px;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.history-header h4 {
+  margin: 0;
+  color: #303133;
+  font-size: 16px;
 }
 </style>
 

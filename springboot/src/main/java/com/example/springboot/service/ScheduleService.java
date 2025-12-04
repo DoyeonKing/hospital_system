@@ -59,4 +59,9 @@ public interface ScheduleService {
      * 根据医生ID和日期范围获取排班列表
      */
     Page<ScheduleResponse> getSchedulesByDoctorId(Integer doctorId, String startDate, String endDate, Pageable pageable);
+
+    /**
+     * 获取医生工时统计
+     */
+    List<WorkHoursResponse> getDoctorWorkHours(Integer doctorId, String startDate, String endDate);
 }

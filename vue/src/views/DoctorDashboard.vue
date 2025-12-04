@@ -147,14 +147,6 @@
                 <p>查看工作统计</p>
               </div>
 
-              <div class="function-card" @click="viewTodayAppointments">
-                <div class="card-icon primary">
-                  <el-icon :size="36"><Bell /></el-icon>
-                </div>
-                <h4>今日预约</h4>
-                <p>查看今日预约</p>
-              </div>
-
               <div class="function-card" @click="goToSchedule">
                 <div class="card-icon success">
                   <el-icon :size="36"><Calendar /></el-icon>
@@ -270,8 +262,8 @@ import {
   UserFilled, Document, Calendar, DataAnalysis,
   User, Clock, Star, SwitchButton,
   OfficeBuilding, Phone, Edit, Key,
-  Plus, Bell, Box, DocumentAdd,
-  Sunrise, Sunny // <-- 新增图标
+  Plus, Box, DocumentAdd,
+  Sunrise, Sunny
 } from '@element-plus/icons-vue'
 import { useDoctorStore } from '@/stores/doctorStore'
 import { getSchedulesByDoctorId } from '@/api/schedule'
@@ -610,17 +602,13 @@ const loadTodayStats = async () => {
   } finally {
     statsLoading.value = false;
   }
-};
+}
 
-// --- 功能导航方法 ---
 const goToPatientInfo = () => {
   router.push('/patient-info')
 }
 const goToStatistics = () => {
-  ElMessage.info('数据统计功能开发中...')
-}
-const viewTodayAppointments = () => {
-  ElMessage.info('今日预约功能开发中...')
+  router.push('/doctor-work-hours')
 }
 const goToSchedule = () => {
   router.push('/my-schedule')
@@ -659,10 +647,10 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 64px;
+  height: 56px;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 32px;
+  padding: 0 24px;
 }
 .logo-section {
   display: flex;
@@ -704,15 +692,14 @@ onMounted(() => {
 .main-content {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 32px;
+  padding: 16px 24px;
 }
 
-/* 【新增】标语卡片 */
+/* 标语卡片 */
 .banner-card {
-  height: 120px;
-  border-radius: 16px;
-  margin-bottom: 32px;
-  /* 【已修改】使用您 assets 目录下的图片 */
+  height: 80px;
+  border-radius: 12px;
+  margin-bottom: 16px;
   background-image: url('@/assets/7d5af898a55918db907cb51a56353c6b.jpg');
   background-size: cover;
   background-position: center;
@@ -730,32 +717,31 @@ onMounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.4); /* 40% 黑色遮罩 */
+  background-color: rgba(0, 0, 0, 0.4);
   z-index: 1;
 }
 .banner-text {
-  font-size: 2.5rem;
+  font-size: 1.8rem;
   font-weight: 600;
   color: #ffffff;
   z-index: 2;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
-
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
-  margin-bottom: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
 }
 .stat-card {
   background: #fff;
-  border-radius: 16px;
-  padding: 24px;
+  border-radius: 12px;
+  padding: 16px;
   display: flex;
   align-items: center;
-  gap: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.3s ease;
   border: 1px solid #f0f0f0;
 }
@@ -764,70 +750,69 @@ onMounted(() => {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 .stat-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
 }
-/* 【已修改】调整了图标对应的渐变色 */
 .stat-icon.patients { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
 .stat-icon.appointments { background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); }
 .stat-icon.records { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
 .stat-info { flex: 1; }
 .stat-label { font-size: 0.9rem; color: #909399; margin: 0 0 8px 0; }
-.stat-value { font-size: 2rem; font-weight: 600; color: #2c3e50; margin: 0; }
-.content-grid { display: grid; grid-template-columns: 380px 1fr; gap: 24px; }
-.left-column { display: flex; flex-direction: column; gap: 24px; }
+.stat-value { font-size: 1.6rem; font-weight: 600; color: #2c3e50; margin: 0; }
+.content-grid { display: grid; grid-template-columns: 320px 1fr; gap: 16px; }
+.left-column { display: flex; flex-direction: column; gap: 16px; }
 .doctor-info-card {
   background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   border: 1px solid #f0f0f0;
   overflow: hidden;
 }
 .card-header {
-  padding: 20px 24px;
+  padding: 12px 16px;
   border-bottom: 1px solid #f0f0f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.card-header h3 { margin: 0; font-size: 1.1rem; font-weight: 600; color: #2c3e50; }
-.doctor-profile { padding: 24px; text-align: center; }
-.doctor-avatar-large { margin-bottom: 20px; }
-.doctor-details h2 { font-size: 1.5rem; font-weight: 600; color: #2c3e50; margin: 0 0 16px 0; }
+.card-header h3 { margin: 0; font-size: 1rem; font-weight: 600; color: #2c3e50; }
+.doctor-profile { padding: 16px; text-align: center; }
+.doctor-avatar-large { margin-bottom: 12px; }
+.doctor-details h2 { font-size: 1.3rem; font-weight: 600; color: #2c3e50; margin: 0 0 12px 0; }
 .detail-item {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin: 10px 0;
+  gap: 6px;
+  margin: 6px 0;
   color: #606266;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
-.doctor-actions { display: flex; gap: 12px; margin-top: 24px; justify-content: center; }
+.doctor-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: center; }
 .schedule-card {
   background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   border: 1px solid #f0f0f0;
 }
-.schedule-list { padding: 16px 24px 24px; }
-.shift-group { margin-bottom: 16px; }
+.schedule-list { padding: 12px 16px 16px; }
+.shift-group { margin-bottom: 12px; }
 .shift-group:last-child { margin-bottom: 0; }
 .shift-title {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: #303133;
-  padding-bottom: 12px;
-  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  margin: 0 0 8px 0;
   border-bottom: 1px solid #f0f0f0;
 }
 .no-schedule-text { padding-top: 8px; display: block; text-align: center; }
-.slot-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.slot-list { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .slot-card {
   background: #f9fafb;
   border: 1px solid #f0f0f0;
@@ -841,21 +826,21 @@ onMounted(() => {
 .right-column { display: flex; flex-direction: column; }
 .functions-section {
   background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   border: 1px solid #f0f0f0;
   flex: 1;
 }
 .function-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-  padding: 16px 24px 24px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 12px 16px 16px;
 }
 .function-card {
   background: #f9fafb;
-  border-radius: 12px;
-  padding: 24px 20px;
+  border-radius: 10px;
+  padding: 16px 12px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -868,13 +853,13 @@ onMounted(() => {
   box-shadow: 0 8px 20px rgba(102, 126, 234, 0.15);
 }
 .card-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 16px;
+  margin: 0 auto 12px;
   color: #fff;
 }
 .card-icon.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
@@ -882,8 +867,8 @@ onMounted(() => {
 .card-icon.danger { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #f56c6c; }
 .card-icon.warning { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #d9822b; }
 .card-icon.info { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #409eff; }
-.function-card h4 { font-size: 1.1rem; font-weight: 600; color: #2c3e50; margin: 0 0 8px 0; }
-.function-card p { font-size: 0.85rem; color: #909399; margin: 0; line-height: 1.4; }
+.function-card h4 { font-size: 1rem; font-weight: 600; color: #2c3e50; margin: 0 0 6px 0; }
+.function-card p { font-size: 0.8rem; color: #909399; margin: 0; line-height: 1.3; }
 
 /* 【新增】头像上传样式 */
 .avatar-uploader {

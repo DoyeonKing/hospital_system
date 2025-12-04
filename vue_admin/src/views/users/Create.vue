@@ -53,7 +53,11 @@
             </div>
           </el-form-item>
           <el-form-item label="职称" prop="title">
-            <el-input v-model="userForm.title" placeholder="如：主任医师、副主任医师、主治医师"></el-input>
+            <el-select v-model="userForm.title" placeholder="请选择职称" style="width: 100%;">
+              <el-option label="主任医师" value="主任医师" />
+              <el-option label="副主任医师" value="副主任医师" />
+              <el-option label="主治医师" value="主治医师" />
+            </el-select>
           </el-form-item>
           <el-form-item label="擅长领域" prop="specialty">
             <el-input v-model="userForm.specialty" type="textarea" :rows="3" placeholder="请输入擅长领域（可选）"></el-input>

@@ -52,3 +52,19 @@ export function searchPatientsByName(name, params = {}) {
         }
     });
 }
+
+/**
+ * 根据患者姓名查询该患者在本科室的所有就诊记录
+ * @param {number} doctorId - 医生ID (用于获取科室信息)
+ * @param {string} patientName - 患者姓名
+ */
+export function getPatientHistoryByName(doctorId, patientName) {
+    return request({
+        url: '/api/doctors/patient-history',
+        method: 'get',
+        params: {
+            doctorId,
+            patientName
+        }
+    });
+}

@@ -11,6 +11,7 @@ import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.service.AutoScheduleService;
 import com.example.springboot.service.ScheduleService;
+import com.example.springboot.common.Result;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -323,6 +324,32 @@ public class ScheduleController {
             System.err.println("查询医生排班时发生错误: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * 获取医生工时统计
+     */
+    @GetMapping("/work-hours")
+    public ResponseEntity<?> getDoctorWorkHours(
+            @RequestParam Integer doctorId,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        try {
+            System.out.println("=== 查询医生工时统计 ===");
+            System.out.println("doctorId: " + doctorId);
+            System.out.println("startDate: " + startDate);
+            System.out.println("endDate: " + endDate);
+            
+            List<WorkHoursResponse> workHours = scheduleService.getDoctorWorkHours(
+                    doctorId, startDate, endDate);
+            
+            System.out.println("查询结果: " + workHours.size() + " 条记录");
+            return ResponseEntity.ok(Result.success(workHours));
+        } catch (Exception e) {
+            System.err.println("查询医生工时统计时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.ok(Result.error("500", "查询失败: " + e.getMessage()));
         }
     }
 }
