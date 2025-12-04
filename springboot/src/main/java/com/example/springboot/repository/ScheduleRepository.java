@@ -7,6 +7,7 @@ import com.example.springboot.entity.enums.ScheduleStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -104,4 +105,13 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
            "AND s.status <> com.example.springboot.entity.enums.ScheduleStatus.cancelled")
     List<Schedule> findActiveSchedulesByDate(@Param("date") LocalDate date);
 
+    /**
+     * 删除指定科室在日期范围内的所有排班
+     */
+    @Modifying
+    @Query("DELETE FROM Schedule s WHERE s.doctor.department.departmentId = :departmentId " +
+           "AND s.scheduleDate >= :startDate AND s.scheduleDate <= :endDate")
+    void deleteByDepartmentAndDateRange(@Param("departmentId") Integer departmentId,
+                                        @Param("startDate") LocalDate startDate,
+                                        @Param("endDate") LocalDate endDate);
 }
