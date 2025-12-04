@@ -9,3 +9,4 @@ ADD COLUMN IF NOT EXISTS payment_deadline DATETIME DEFAULT NULL COMMENT '支付�
 DESCRIBE appointments;
 
 
+

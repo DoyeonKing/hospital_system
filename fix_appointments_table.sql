@@ -2,3 +2,4 @@
 ALTER TABLE appointments ADD COLUMN payment_deadline DATETIME DEFAULT NULL COMMENT '支付截止时间（加号专用）';
 
 
+
