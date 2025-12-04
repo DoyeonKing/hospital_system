@@ -71,12 +71,28 @@ function request(options) {
 					// 400 Bad Request - 业务逻辑错误
 					// 后端返回 {"error": "..."}
 					resolve(res.data)
+				} else if (res.statusCode === 502 || res.statusCode === 503 || res.statusCode === 504) {
+					// 502 Bad Gateway / 503 Service Unavailable / 504 Gateway Timeout
+					// 服务器暂时不可用，静默处理（不显示toast，避免后台检查时打扰用户）
+					console.warn(`[RESPONSE] 服务器暂时不可用: ${res.statusCode}, URL: ${fullUrl}`)
+					// 如果设置了 silentError，则不显示toast
+					if (!options.silentError) {
+						uni.showToast({
+							title: '服务器暂时不可用',
+							icon: 'none',
+							duration: 2000
+						})
+					}
+					reject(res)
 				} else {
 					console.error('[RESPONSE] 非200状态码:', res.statusCode, res.data)
-					uni.showToast({
-						title: '请求失败',
-						icon: 'none'
-					})
+					// 如果设置了 silentError，则不显示toast
+					if (!options.silentError) {
+						uni.showToast({
+							title: '请求失败',
+							icon: 'none'
+						})
+					}
 					reject(res)
 				}
 			},
@@ -97,18 +113,28 @@ function request(options) {
 				}
 				
 				// 根据错误类型给出提示
-				if (err.errMsg && err.errMsg.includes('timeout')) {
-					uni.showToast({
-						title: '请求超时，请检查网络',
-						icon: 'none',
-						duration: 2000
-					})
-				} else if (err.errMsg && err.errMsg.includes('CONNECTION_REFUSED')) {
-					uni.showToast({
-						title: '无法连接服务器，请检查网络配置',
-						icon: 'none',
-						duration: 2000
-					})
+				// 如果设置了 silentError，则不显示toast（用于后台检查等场景）
+				if (!options.silentError) {
+					if (err.errMsg && err.errMsg.includes('timeout')) {
+						uni.showToast({
+							title: '请求超时，请检查网络',
+							icon: 'none',
+							duration: 2000
+						})
+					} else if (err.errMsg && err.errMsg.includes('CONNECTION_REFUSED')) {
+						uni.showToast({
+							title: '无法连接服务器，请检查网络配置',
+							icon: 'none',
+							duration: 2000
+						})
+					}
+				} else {
+					// 静默模式下只记录警告日志
+					if (err.errMsg && err.errMsg.includes('timeout')) {
+						console.warn(`[REQUEST] 请求超时（静默）: ${fullUrl}`)
+					} else if (err.errMsg && err.errMsg.includes('CONNECTION_REFUSED')) {
+						console.warn(`[REQUEST] 连接被拒绝（静默）: ${fullUrl}`)
+					}
 				}
 				
 				reject(err)
