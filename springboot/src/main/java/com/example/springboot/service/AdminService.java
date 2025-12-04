@@ -14,6 +14,7 @@ import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.AdminRepository;
 import com.example.springboot.repository.RoleRepository;
 import com.example.springboot.util.PasswordEncoderUtil;
+import org.hibernate.Hibernate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -186,5 +187,65 @@ public class AdminService {
         PermissionResponse response = new PermissionResponse();
         BeanUtils.copyProperties(permission, response);
         return response;
+    }
+
+    // =========================================================================
+    // 【权限管理】
+    // =========================================================================
+
+    /**
+     * 获取管理员的所有权限
+     * @param adminId 管理员ID
+     * @return 权限名称集合
+     */
+    @Transactional(readOnly = true)
+    public Set<String> getAdminPermissions(Integer adminId) {
+        System.out.println("AdminService: 开始查询管理员权限，adminId=" + adminId);
+        
+        // 先验证管理员是否存在
+        if (!adminRepository.existsById(adminId)) {
+            throw new ResourceNotFoundException("管理员不存在，ID: " + adminId);
+        }
+        
+        // 使用原生 SQL 直接查询权限
+        Set<String> permissions = adminRepository.findPermissionNamesByAdminId(adminId);
+        System.out.println("AdminService: 通过原生SQL查询到的权限=" + permissions);
+        System.out.println("AdminService: 权限数量=" + (permissions != null ? permissions.size() : 0));
+        
+        return permissions != null ? permissions : Collections.emptySet();
+    }
+
+    /**
+     * 获取管理员的详细权限信息（包含权限描述）
+     * @param adminId 管理员ID
+     * @return 权限响应对象集合
+     */
+    @Transactional(readOnly = true)
+    public Set<PermissionResponse> getAdminPermissionDetails(Integer adminId) {
+        // 使用 JOIN FETCH 查询管理员及其角色和权限
+        Admin admin = adminRepository.findByIdWithRolesAndPermissions(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("管理员不存在，ID: " + adminId));
+        
+        Set<Role> roles = admin.getRoles();
+        // 强制初始化角色集合
+        Hibernate.initialize(roles);
+        
+        if (roles == null || roles.isEmpty()) {
+            return Collections.emptySet();
+        }
+        
+        Set<PermissionResponse> permissionResponses = new HashSet<>();
+        for (Role role : roles) {
+            Set<Permission> permissions = role.getPermissions();
+            // 强制初始化权限集合
+            Hibernate.initialize(permissions);
+            if (permissions != null) {
+                for (Permission permission : permissions) {
+                    permissionResponses.add(convertPermissionToResponseDto(permission));
+                }
+            }
+        }
+        
+        return permissionResponses;
     }
 }
