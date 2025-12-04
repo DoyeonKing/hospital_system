@@ -53,6 +53,13 @@
 				</view>
 				<text class="function-title">联系我们</text>
 			</view>
+
+			<view class="function-card card-ai" @click="navigateToPreTriage">
+				<view class="icon-wrapper">
+					<view class="function-icon">🤖</view>
+				</view>
+				<text class="function-title">AI 预问诊</text>
+			</view>
 		</view>
 
 		<!-- 即将就诊提醒卡片（简化版） -->
@@ -762,6 +769,13 @@
 			// 切换学号脱敏显示
 			toggleIdentifierMask() {
 				this.identifierMasked = !this.identifierMasked
+			},
+
+			// 导航到 AI 预问诊
+			navigateToPreTriage() {
+				uni.navigateTo({
+					url: '/pages/pre-triage/index'
+				})
 			}
 		}
 	}
@@ -971,6 +985,15 @@
 	.card-4 .icon-wrapper {
 		background-color: #FEF3C7;
 	}
+
+	.card-ai {
+		grid-column: span 2; /* 让 AI 卡片横跨两列，突出显示 */
+	}
+
+	.card-ai .icon-wrapper {
+		background-color: #E6FFFA;
+	}
+
 
 	.icon-wrapper {
 		width: 88rpx;

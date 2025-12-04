@@ -34,4 +34,17 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Inte
         @Param("startTime") LocalDateTime startTime,
         @Param("endTime") LocalDateTime endTime
     );
+
+    /**
+     * 统计指定日期范围内指定状态的请假数量
+     */
+    @Query("SELECT COUNT(DISTINCT lr.doctor.doctorId) " +
+           "FROM LeaveRequest lr " +
+           "WHERE lr.status = :status " +
+           "AND lr.endTime >= :startTime " +
+           "AND lr.startTime <= :endTime")
+    long countByDateRangeAndStatus(
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("status") LeaveRequestStatus status);
 }

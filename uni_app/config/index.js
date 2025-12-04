@@ -40,11 +40,14 @@ const development = {
 	
 	// 如果要在浏览器测试，可以临时改为：
 	// baseURL: 'http://localhost:8080'
+	//baseURL: 'http://localhost:8080', // 主后端服务（Spring Boot）
+	aiBaseURL: 'http://localhost:3000' // AI 预问诊后端服务（Node.js）
 }
 
 // 生产环境配置
 const production = {
-	baseURL: 'https://your-production-api.com'
+	baseURL: 'https://your-production-api.com',
+	aiBaseURL: 'https://your-ai-api.com'
 }
 
 // 当前使用的配置
