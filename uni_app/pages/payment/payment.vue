@@ -26,6 +26,10 @@
 				<text class="label">就诊时间：</text>
 				<text class="value">{{ scheduleDate }} {{ slotName }}</text>
 			</view>
+			<view class="info-row" v-if="location">
+				<text class="label">就诊地点：</text>
+				<text class="value">{{ location }}</text>
+			</view>
 			</view>
 			
 			<!-- 支付方式 -->
@@ -72,6 +76,7 @@
 				doctorTitle: '',
 				scheduleDate: '',
 				slotName: '',
+				location: '', // 就诊地点
 				patientInfo: {},
 				appointmentId: null, // 预约ID
 				isWaitlist: false, // 是否为候补支付
@@ -93,6 +98,7 @@
 			this.doctorTitle = decodeURIComponent(options.doctorTitle || '')
 			this.scheduleDate = decodeURIComponent(options.scheduleDate || '')
 			this.slotName = decodeURIComponent(options.slotName || '')
+			this.location = decodeURIComponent(options.location || '')
 			this.isWaitlist = !!this.waitlistId
 			this.loadPatientInfo()
 			this.createAppointment()

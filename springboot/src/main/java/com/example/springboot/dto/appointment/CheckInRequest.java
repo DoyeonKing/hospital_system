@@ -21,3 +21,21 @@ public class CheckInRequest {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

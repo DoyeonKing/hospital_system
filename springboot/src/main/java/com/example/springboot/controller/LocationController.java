@@ -35,6 +35,22 @@ public class LocationController {
     }
 
     /**
+     * 获取所有地点信息列表（用于二维码生成）
+     * GET /api/locations
+     * 
+     * @return 所有地点信息列表
+     */
+    @GetMapping("")
+    public ResponseEntity<?> getAllLocations() {
+        try {
+            List<LocationResponse> locations = locationService.getAllLocations();
+            return new ResponseEntity<>(locations, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("获取地点信息失败: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * 根据科室ID获取门诊室完整信息列表
      * 
      * @param departmentId 科室ID

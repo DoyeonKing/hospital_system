@@ -135,15 +135,21 @@
 				return;
 			}
 			
-			uni.showLoading({ title: '登录中...' });
+		const startTime = Date.now()
+		console.log('[LOGIN] 开始登录请求')
+		
+		try {
+			const response = await post('/api/auth/patient/login', {
+				identifier: this.loginForm.identifier,
+				password: this.loginForm.password
+			}, {
+				showLoading: true,
+				loadingText: '登录中...',
+				timeout: 30000 // 增加到30秒超时（真机调试网络可能较慢）
+			});
 			
-			try {
-				const response = await post('/api/auth/patient/login', {
-					identifier: this.loginForm.identifier,
-					password: this.loginForm.password
-				});
-				
-				uni.hideLoading();
+			const duration = Date.now() - startTime
+			console.log(`[LOGIN] 登录请求完成，耗时: ${duration}ms`)
 				
 				if (response.code === '200') {
 					// 保存token和用户信息
