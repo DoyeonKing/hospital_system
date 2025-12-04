@@ -30,7 +30,7 @@ public class DoctorProfile {
     @Column(name = "appointment_count", nullable = false)
     private Integer appointmentCount = 0;
     
-    @Column(name = "avg_rating", precision = 3, scale = 2)
+    @Column(name = "avg_rating", precision = 3)
     private Double avgRating = 0.0;
     
     @UpdateTimestamp

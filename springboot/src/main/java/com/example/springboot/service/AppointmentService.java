@@ -172,7 +172,7 @@ public class AppointmentService {
                     slotName = schedule.getSlot().getSlotName();
                 }
                 if (schedule.getLocation() != null) {
-                    locationName = schedule.getLocation().getName();
+                    locationName = schedule.getLocation().getLocationName();
                 }
             }
             
