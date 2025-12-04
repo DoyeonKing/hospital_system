@@ -36,11 +36,11 @@ const LOCAL_IP = '172.20.10.3' // 👈 电脑连接iPhone热点后的IP地址
 // 开发环境配置
 const development = {
 	// 真机调试使用局域网IP
-	baseURL: `http://${LOCAL_IP}:8080`
+	baseURL: `http://${LOCAL_IP}:8080`, // 主后端服务（Spring Boot）
 	
 	// 如果要在浏览器测试，可以临时改为：
-	// baseURL: 'http://localhost:8080'
-	//baseURL: 'http://localhost:8080', // 主后端服务（Spring Boot）
+	// baseURL: 'http://localhost:8080',
+	
 	aiBaseURL: 'http://localhost:3000' // AI 预问诊后端服务（Node.js）
 }
 
