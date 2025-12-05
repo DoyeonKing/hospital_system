@@ -40,7 +40,7 @@ public class ScheduleController {
      * 获取排班列表
      */
     @GetMapping
-    public ResponseEntity<Page<ScheduleResponse>> getSchedules(
+    public ResponseEntity<?> getSchedules(
             @RequestParam(required = false) Integer departmentId,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate) {
@@ -83,7 +83,8 @@ public class ScheduleController {
         } catch (Exception e) {
             System.err.println("查询排班数据时发生错误:");
             e.printStackTrace();
-            return ResponseEntity.status(500).build();
+            // 返回具体错误信息以便前端调试
+            return ResponseEntity.status(500).body("后端查询失败: " + e.toString());
         }
     }
 

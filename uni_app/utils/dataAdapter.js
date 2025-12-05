@@ -2,6 +2,7 @@
  * 数据适配工具函数
  * 用于将后端返回的数据格式转换为前端需要的扁平格式
  */
+import { processDoctorPhotoUrl } from './imageUtil.js'
 
 /**
  * 转换后端预约列表数据为前端格式
@@ -187,8 +188,7 @@ function adaptSingleSchedule(schedule) {
 	// 后端嵌套格式，需要转换
 	// 注意：这里假设后端会返回 doctor, department, slot, location 等关联数据
 	
-	// 获取默认头像
-	const defaultAvatar = 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'
+	// 获取默认头像并处理图片URL
 	const photoUrl = schedule.doctorPhotoUrl || schedule.photoUrl || ''
 	
 	return {
@@ -197,7 +197,7 @@ function adaptSingleSchedule(schedule) {
 		doctorName: schedule.doctorName || '',
 		doctorTitle: schedule.doctorTitle || '',
 		specialty: schedule.doctorSpecialty || schedule.specialty || '',
-		photoUrl: photoUrl || defaultAvatar,
+		photoUrl: processDoctorPhotoUrl(photoUrl),
 		departmentId: schedule.departmentId,
 		departmentName: schedule.departmentName || '',
 		scheduleDate: schedule.scheduleDate,

@@ -2,7 +2,6 @@
 server:
   port: 8080
   address: 0.0.0.0  # 允许外部访问（真机调试必需）
-  connection-timeout: 30000  # 连接超时30秒
   tomcat:
     threads:
       max: 200  # 最大线程数
@@ -47,7 +46,7 @@ spring:
   #   user:
   #     name: user # 默认用户
   #     password: password # 默认密码，生产环境应禁用或使用更复杂机制
-  
+
   # Redis配置
   data:
     redis:
@@ -78,3 +77,8 @@ logging:
 file:
   upload:
     path: uploads/
+
+# AI 模型配置
+ai:
+  model:
+    path: models/medical_word2vec.txt  # Word2Vec 模型文件路径（需要下载标准模型文件）
