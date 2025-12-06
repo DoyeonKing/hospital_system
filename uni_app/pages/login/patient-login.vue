@@ -137,6 +137,10 @@
 			
 		const startTime = Date.now()
 		console.log('[LOGIN] 开始登录请求')
+		console.log('[LOGIN] 登录信息:', {
+			identifier: this.loginForm.identifier,
+			password: '***'
+		})
 		
 		try {
 			const response = await post('/api/auth/patient/login', {
@@ -150,34 +154,47 @@
 			
 			const duration = Date.now() - startTime
 			console.log(`[LOGIN] 登录请求完成，耗时: ${duration}ms`)
+			console.log('[LOGIN] 响应数据:', response)
 				
-				if (response.code === '200') {
-					// 保存token和用户信息
-					uni.setStorageSync('patientToken', response.data.token);
-					
-					// 适配后端返回的数据格式：data.userInfo 包含患者信息
-					const userInfo = response.data.userInfo || {};
-					const adaptedInfo = {
-						id: userInfo.patientId,
-						name: userInfo.fullName,
-						identifier: userInfo.identifier
-					};
-					uni.setStorageSync('patientInfo', adaptedInfo);
-					
-					console.log('登录成功，保存的用户信息:', adaptedInfo);
-					
-					uni.showToast({ title: '登录成功', icon: 'success' });
-					// 跳转到主页
-					setTimeout(() => {
-						uni.switchTab({ url: '/pages/index/index' });
-					}, 1500);
-				} else {
-					uni.showToast({ title: response.msg || '登录失败', icon: 'none' });
-				}
-			} catch (error) {
-				uni.hideLoading();
-				console.error('登录请求失败:', error);
+			// 兼容多种响应格式
+			// 格式1: { code: '200', data: {...} }
+			// 格式2: { code: 200, data: {...} }
+			const isSuccess = response.code === '200' || response.code === 200
+			
+			if (isSuccess && response.data) {
+				// 保存token和用户信息
+				uni.setStorageSync('patientToken', response.data.token);
+				
+				// 适配后端返回的数据格式：data.userInfo 包含患者信息
+				const userInfo = response.data.userInfo || {};
+				const adaptedInfo = {
+					id: userInfo.patientId,
+					name: userInfo.fullName,
+					identifier: userInfo.identifier
+				};
+				uni.setStorageSync('patientInfo', adaptedInfo);
+				
+				console.log('[LOGIN] 登录成功，保存的用户信息:', adaptedInfo);
+				
+				uni.showToast({ title: '登录成功', icon: 'success' });
+				// 跳转到主页
+				setTimeout(() => {
+					uni.switchTab({ url: '/pages/index/index' });
+				}, 1500);
+			} else {
+				const errorMsg = response.msg || response.message || '登录失败'
+				console.error('[LOGIN] 登录失败:', errorMsg)
+				uni.showToast({ title: errorMsg, icon: 'none' });
 			}
+		} catch (error) {
+			uni.hideLoading();
+			console.error('[LOGIN] 登录请求异常:', error);
+			uni.showToast({ 
+				title: '登录失败，请检查网络连接', 
+				icon: 'none',
+				duration: 3000
+			});
+		}
 			},
 			
 			// 激活第一步：验证初始登录信息

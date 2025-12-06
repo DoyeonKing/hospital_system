@@ -289,46 +289,4 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     List<Appointment> findByPatientNameAndDepartment(
             @Param("patientName") String patientName,
             @Param("departmentId") Integer departmentId);
-    // ===== 加号功能相关查询方法 =====
-    
-    /**
-     * 查询超时未支付的加号预约（参考候补的expireNotifiedWaitlists实现）
-     * 用于定时任务检查并取消超时的加号预约
-     */
-    @Query("SELECT a FROM Appointment a WHERE a.appointmentType = :appointmentType " +
-           "AND a.status = :status " +
-           "AND a.paymentDeadline IS NOT NULL " +
-           "AND a.paymentDeadline < :now")
-    List<Appointment> findExpiredAddOnPayments(
-            @Param("appointmentType") AppointmentType appointmentType,
-            @Param("status") AppointmentStatus status,
-            @Param("now") LocalDateTime now);
-    
-    /**
-     * 根据预约类型和状态查询预约列表
-     */
-    List<Appointment> findByAppointmentTypeAndStatus(
-            AppointmentType appointmentType, 
-            AppointmentStatus status);
-    
-    /**
-     * 查询指定排班和类型的最大预约序号（用于加号序号分配）
-     */
-    @Query("SELECT MAX(a.appointmentNumber) FROM Appointment a " +
-           "WHERE a.schedule = :schedule AND a.appointmentType = :appointmentType")
-    Integer findMaxAppointmentNumberByScheduleAndType(
-            @Param("schedule") Schedule schedule,
-            @Param("appointmentType") AppointmentType appointmentType);
-    
-    /**
-     * 统计指定排班的待支付加号数量（用于计算实际可用号源）
-     */
-    @Query("SELECT COUNT(a) FROM Appointment a " +
-           "WHERE a.schedule = :schedule " +
-           "AND a.appointmentType = :appointmentType " +
-           "AND a.status = :status")
-    Integer countByScheduleAndTypeAndStatus(
-            @Param("schedule") Schedule schedule,
-            @Param("appointmentType") AppointmentType appointmentType,
-            @Param("status") AppointmentStatus status);
 }
