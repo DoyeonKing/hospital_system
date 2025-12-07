@@ -411,3 +411,7 @@ CREATE TABLE `symptom_department_mapping` (
 
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+
+
+

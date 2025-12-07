@@ -81,4 +81,4 @@ file:
 # AI 模型配置
 ai:
   model:
-    path: models/medical_word2vec.txt  # Word2Vec 模型文件路径（需要下载标准模型文件）
+    path: models/medical_word2vec.bin # Word2Vec 模型文件路径（需要下载标准模型文件）
