@@ -21,6 +21,24 @@
 			}
 		},
 		{
+			"path": "pages/pre-triage/index",
+			"style": {
+				"navigationBarTitleText": "AI 智能预问诊",
+				"navigationBarBackgroundColor": "#4FD9C3",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F8F8F8"
+			}
+		},
+		{
+			"path": "pages/ai-assistant/index",
+			"style": {
+				"navigationBarTitleText": "AI 挂号助手",
+				"navigationBarBackgroundColor": "#4FD1C5",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F8F8F8"
+			}
+		},
+		{
 			"path": "pages/departments/departments",
 			"style": {
 				"navigationBarTitleText": "选择科室",

@@ -1,6 +1,8 @@
 <script>
 	export default {
 		waitlistCheckTimer: null, // 候补检查定时器
+		waitlistCheckRetryCount: 0, // 连续失败次数
+		maxRetryCount: 3, // 最大连续失败次数，超过后延长检查间隔
 		
 		onLaunch: function() {
 			console.log('App Launch')
@@ -24,6 +26,9 @@
 				if (this.waitlistCheckTimer) {
 					clearInterval(this.waitlistCheckTimer)
 				}
+				
+				// 重置失败计数
+				this.waitlistCheckRetryCount = 0
 				
 				// 每30秒检查一次候补通知
 				this.waitlistCheckTimer = setInterval(() => {
@@ -53,8 +58,16 @@
 					// 动态导入 API
 					const { getPatientWaitlist } = await import('./api/appointment.js')
 					
-					// 获取候补列表
-					const waitlistResponse = await getPatientWaitlist(patientInfo.id)
+					// 获取候补列表（使用静默模式，不显示错误提示，设置较短的超时时间）
+					// 后台检查不应该阻塞太久，设置10秒超时
+					const waitlistResponse = await getPatientWaitlist(patientInfo.id, {
+						silentError: true, // 静默错误，不显示toast
+						timeout: 10000, // 10秒超时（后台检查不需要等太久）
+						showLoading: false // 不显示加载提示
+					})
+					
+					// 请求成功，重置失败计数
+					this.waitlistCheckRetryCount = 0
 					
 					let waitlistList = []
 					if (waitlistResponse && waitlistResponse.code === '200' && waitlistResponse.data) {
@@ -82,7 +95,31 @@
 						}
 					}
 				} catch (error) {
-					console.error('检查候补通知失败:', error)
+					// 静默处理错误，只记录日志
+					this.waitlistCheckRetryCount++
+					
+					// 如果连续失败次数过多，延长检查间隔
+					if (this.waitlistCheckRetryCount >= this.maxRetryCount) {
+						console.warn(`候补通知检查连续失败${this.waitlistCheckRetryCount}次，延长检查间隔`)
+						
+						// 清除当前定时器
+						if (this.waitlistCheckTimer) {
+							clearInterval(this.waitlistCheckTimer)
+						}
+						
+						// 延长到2分钟检查一次
+						this.waitlistCheckTimer = setInterval(() => {
+							this.checkWaitlistNotifications()
+						}, 120000)
+						
+						// 重置失败计数，避免重复延长
+						this.waitlistCheckRetryCount = 0
+					}
+					
+					// 只在开发环境或首次失败时记录详细错误
+					if (this.waitlistCheckRetryCount === 1) {
+						console.warn('检查候补通知失败（后台静默）:', error.statusCode || error.errMsg || error)
+					}
 				}
 			},
 			

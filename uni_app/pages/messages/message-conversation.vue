@@ -16,8 +16,8 @@
 			<!-- 有通知时显示 -->
 			<view 
 				class="message-bubble" 
-				v-for="notification in conversation.messages" 
-				:key="notification.notificationId || notification.id"
+				v-for="(notification, index) in conversation.messages" 
+				:key="getNotificationKey(notification, index)"
 				:class="{ 'unread': notification.status === 'unread', 'clickable': isClickableNotification(notification) }"
 				@click="handleNotificationClick(notification)"
 			>
@@ -144,6 +144,12 @@
 					'system_notice': '系统通知'
 				}
 				return typeMap[type] || '系统通知'
+			},
+			
+			// 获取通知的唯一key（小程序不支持表达式，需要使用方法）
+			getNotificationKey(notification, index) {
+				// 优先使用 notificationId，其次使用 id，最后使用索引
+				return notification.notificationId || notification.id || `notification-${index}`
 			},
 			
 			// 判断通知是否可点击

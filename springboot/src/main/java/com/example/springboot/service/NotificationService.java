@@ -48,6 +48,33 @@ public class NotificationService {
     }
 
     /**
+     * 发送预约成功通知
+     */
+    @Transactional
+    public NotificationResponse sendAppointmentNotification(Integer patientId, Integer appointmentId,
+                                                           String departmentName, String doctorName,
+                                                           String scheduleDate, String slotName,
+                                                           String locationName, Integer appointmentNumber) {
+        NotificationCreateRequest request = new NotificationCreateRequest();
+        request.setUserId(patientId);
+        request.setUserType(UserType.patient);
+        request.setType(NotificationType.appointment_success);
+        request.setTitle("预约成功");
+        String content = String.format("您的预约已成功创建！\n科室：%s\n医生：%s\n就诊时间：%s %s\n就诊序号：%d\n", 
+                departmentName, doctorName, scheduleDate, slotName, appointmentNumber);
+        if (locationName != null && !locationName.trim().isEmpty()) {
+            content += String.format("就诊地点：%s\n", locationName);
+        }
+        content += "请及时完成支付，祝您早日康复！";
+        request.setContent(content);
+        request.setRelatedEntity("appointment");
+        request.setRelatedId(appointmentId);
+        request.setPriority(NotificationPriority.high);
+
+        return createNotification(request);
+    }
+
+    /**
      * 发送支付成功通知
      */
     @Transactional
