@@ -10,7 +10,7 @@
 				<view class="loading-spinner"></view>
 				<text class="loading-text">加载中...</text>
 			</view>
-
+			
 			<!-- 状态卡片 -->
 			<view class="status-card" v-if="!loading">
 				<view class="status-icon" :class="isExpiredStatus(appointment) ? 'expired' : appointment.status">
@@ -653,7 +653,7 @@ onUnload() {
 				// 如果都没有，返回空字符串（不显示）
 				return ''
 			},
-
+			
 			// 处理支付
 			async handlePayment() {
 				if (!this.appointmentId) {
@@ -857,11 +857,11 @@ onUnload() {
 		opacity: 0;
 		transition: opacity 0.3s ease-in;
 	}
-
+	
 	.content-loaded {
 		opacity: 1;
 	}
-
+	
 	.loading-container {
 		display: flex;
 		flex-direction: column;
@@ -870,7 +870,7 @@ onUnload() {
 		padding: 120rpx 0;
 		min-height: 400rpx;
 	}
-
+	
 	.loading-spinner {
 		width: 80rpx;
 		height: 80rpx;
@@ -879,13 +879,13 @@ onUnload() {
 		border-radius: 50%;
 		animation: spin 1s linear infinite;
 	}
-
+	
 	@keyframes spin {
 		to {
 			transform: rotate(360deg);
 		}
 	}
-
+	
 	.loading-text {
 		margin-top: 30rpx;
 		font-size: 28rpx;
@@ -1075,7 +1075,7 @@ onUnload() {
 		box-shadow: 0 -2rpx 12rpx rgba(0, 0, 0, 0.08);
 		animation: slideUp 0.3s ease-out;
 	}
-
+	
 	@keyframes slideUp {
 		from {
 			opacity: 0;

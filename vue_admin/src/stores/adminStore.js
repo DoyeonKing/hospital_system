@@ -22,6 +22,8 @@ export const useAdminStore = defineStore('admin', {
             // 如果 Administrator.java 中有 permissionScope 且数据库有对应列，也应在此处添加
             // permissionScope: '',
         },
+        // 权限管理
+        permissions: [], // 管理员拥有的所有权限名称列表
         isLoading: false, // 可选：用于跟踪API请求状态
         error: null,      // 可选：用于存储API请求错误
     }),
@@ -32,10 +34,26 @@ export const useAdminStore = defineStore('admin', {
         // 是否已登录
         isAuthenticated: (state) => !!state.loggedInAdminBasicInfo,
         // 获取管理员ID
-        currentAdminId: (state) => state.detailedAdminInfo.adminId || state.loggedInAdminBasicInfo?.adminId,
+        currentAdminId: (state) => {
+            const adminId = state.detailedAdminInfo.adminId || state.loggedInAdminBasicInfo?.adminId;
+            // 确保返回数字类型，如果是字符串则转换
+            return adminId ? (typeof adminId === 'string' ? parseInt(adminId) : adminId) : null;
+        },
         // 获取权限等级
         adminPermissionLevel: (state) => state.detailedAdminInfo.permissionLevel || state.loggedInAdminBasicInfo?.permissionLevel,
-        // 其他需要的 getters
+        // 权限相关 getters
+        // 检查是否拥有某个权限
+        hasPermission: (state) => (permissionName) => {
+            return state.permissions.includes(permissionName);
+        },
+        // 检查是否拥有任意一个权限
+        hasAnyPermission: (state) => (permissionNames) => {
+            return permissionNames.some(p => state.permissions.includes(p));
+        },
+        // 检查是否拥有所有权限
+        hasAllPermissions: (state) => (permissionNames) => {
+            return permissionNames.every(p => state.permissions.includes(p));
+        },
     },
 
     actions: {
@@ -44,6 +62,11 @@ export const useAdminStore = defineStore('admin', {
             // apiResponseData 是后端 /administrator/login 返回的 res.data (完整的管理员对象)
             // basicLoginInfoFromLogin 应该包含用于登录的标识符, e.g., { adminId: 'input_value' } or { name: 'input_value' }
 
+            // 确保 adminId 是数字类型
+            if (basicLoginInfoFromLogin.adminId && typeof basicLoginInfoFromLogin.adminId === 'string') {
+                basicLoginInfoFromLogin.adminId = parseInt(basicLoginInfoFromLogin.adminId);
+            }
+            
             this.loggedInAdminBasicInfo = basicLoginInfoFromLogin; // 更新 Store 中的基本管理员信息
             localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(basicLoginInfoFromLogin)); // 持久化
             
@@ -65,10 +88,14 @@ export const useAdminStore = defineStore('admin', {
                 //    this.detailedAdminInfo.permissionScope = apiResponseData.permissionScope || '';
                 // }
                 console.log('AdminStore: detailedAdminInfo 在 loginSuccess 后更新:', JSON.parse(JSON.stringify(this.detailedAdminInfo)));
+                
+                // 登录成功后立即加载权限
+                this.fetchAdminPermissions();
             } else {
                 // 如果登录接口不返回详细信息，或者返回的信息不包含关键标识，则依赖 fetchDetailedAdminInfo
                 console.warn('AdminStore (loginSuccess): API响应不完整或缺少关键标识，将尝试获取详细信息。');
                 this.fetchDetailedAdminInfo();
+                this.fetchAdminPermissions();
             }
         },
 
@@ -230,6 +257,7 @@ export const useAdminStore = defineStore('admin', {
         logout() {
             this.loggedInAdminBasicInfo = null;
             this.clearDetailedAdminInfo();
+            this.clearPermissions(); // 清空权限
             localStorage.removeItem(ADMIN_SESSION_KEY);
             console.log('AdminStore: 已登出, 会话已清除。');
         },
@@ -245,6 +273,7 @@ export const useAdminStore = defineStore('admin', {
                         ((this.loggedInAdminBasicInfo.adminId && typeof this.loggedInAdminBasicInfo.adminId === 'string' && this.loggedInAdminBasicInfo.adminId.trim() !== '') ||
                          (this.loggedInAdminBasicInfo.name && typeof this.loggedInAdminBasicInfo.name === 'string' && this.loggedInAdminBasicInfo.name.trim() !== ''))) {
                         this.fetchDetailedAdminInfo();
+                        this.fetchAdminPermissions(); // 初始化时加载权限
                     } else if (this.loggedInAdminBasicInfo) {
                         // 有基础信息但没有有效的 adminId 或 name
                         console.warn('AdminStore (initializeStore): 已加载基础管理员信息，但无有效 adminId 或 name 获取详细信息。');
@@ -256,6 +285,63 @@ export const useAdminStore = defineStore('admin', {
                     this.logout();
                 }
             }
+        },
+
+        // =========================================================================
+        // 【权限管理】
+        // =========================================================================
+
+        /**
+         * 获取管理员的所有权限
+         */
+        async fetchAdminPermissions() {
+            console.log('AdminStore: fetchAdminPermissions 被调用');
+            console.log('AdminStore: detailedAdminInfo:', this.detailedAdminInfo);
+            console.log('AdminStore: loggedInAdminBasicInfo:', this.loggedInAdminBasicInfo);
+            
+            const adminId = this.currentAdminId;
+            console.log('AdminStore: currentAdminId:', adminId, 'type:', typeof adminId);
+            
+            if (!adminId) {
+                console.warn('AdminStore: 无法获取权限，adminId 为空');
+                this.permissions = [];
+                return;
+            }
+
+            this.isLoading = true;
+            this.error = null;
+            try {
+                console.log(`AdminStore: 正在获取管理员 ${adminId} 的权限`);
+                const url = `/api/admin/${adminId}/permissions`;
+                console.log('AdminStore: 请求URL:', url);
+                
+                const res = await request.get(url);
+                console.log('AdminStore: 权限API响应:', res);
+
+                if (res.code === '200' && res.data) {
+                    // res.data 是一个权限名称的数组
+                    this.permissions = Array.isArray(res.data) ? res.data : [];
+                    console.log('AdminStore: 权限加载成功:', this.permissions);
+                } else {
+                    console.error('AdminStore: 获取权限失败:', res.msg);
+                    this.error = res.msg || '获取权限失败';
+                    this.permissions = [];
+                }
+            } catch (err) {
+                console.error('AdminStore: 调用权限API时发生异常:', err);
+                this.error = '请求权限接口出错';
+                this.permissions = [];
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        /**
+         * 清空权限
+         */
+        clearPermissions() {
+            this.permissions = [];
+            console.log('AdminStore: 权限已清空');
         }
     }
 });

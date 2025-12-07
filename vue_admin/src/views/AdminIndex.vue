@@ -25,8 +25,11 @@
 
     <!-- 功能区 -->
     <div class="feature-grid">
-      <!-- 数据大屏入口 -->
-      <router-link to="/dashboard/stats" class="feature-card-link">
+      <!-- 数据大屏入口 - 需要 audit_log_view 或 report_generate -->
+      <router-link 
+        v-if="hasAnyPermission(['audit_log_view', 'report_generate'])"
+        to="/dashboard/stats" 
+        class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #9f7aea;">
             <el-icon :size="32" color="#fff"><DataLine /></el-icon>
@@ -36,8 +39,11 @@
         </div>
       </router-link>
 
-      <!-- 科室管理入口 -->
-      <router-link to="/departments" class="feature-card-link">
+      <!-- 科室管理入口 - 需要 doctor_manage -->
+      <router-link 
+        v-if="hasPermission('doctor_manage')"
+        to="/departments" 
+        class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #E6FFFA;">
             <el-icon :size="32" color="#38A2AC"><Tickets /></el-icon>
@@ -47,8 +53,11 @@
         </div>
       </router-link>
 
-      <!-- 用户管理入口 -->
-      <router-link to="/users" class="feature-card-link">
+      <!-- 用户管理入口 - 需要 user_manage -->
+      <router-link 
+        v-if="hasPermission('user_manage')"
+        to="/users" 
+        class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #EBF4FF;">
             <el-icon :size="32" color="#4299E1"><UserFilled /></el-icon>
@@ -58,8 +67,11 @@
         </div>
       </router-link>
 
-      <!-- 排班管理入口 -->
-      <router-link to="/scheduling/dashboard" class="feature-card-link">
+      <!-- 排班管理入口 - 需要 schedule_manage -->
+      <router-link 
+        v-if="hasPermission('schedule_manage')"
+        to="/scheduling/dashboard" 
+        class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #f0e6ff;">
             <el-icon :size="32" color="#9f7aea"><Calendar /></el-icon>
@@ -69,8 +81,11 @@
         </div>
       </router-link>
 
-      <!-- 号别管理入口 -->
-      <router-link to="/scheduling/fee-management" class="feature-card-link">
+      <!-- 号别管理入口 - 需要 schedule_manage 或 financial_manage -->
+      <router-link 
+        v-if="hasAnyPermission(['schedule_manage', 'financial_manage'])"
+        to="/scheduling/fee-management" 
+        class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #FFF5E6;">
             <el-icon :size="32" color="#F59E0B"><Money /></el-icon>
@@ -80,8 +95,11 @@
         </div>
       </router-link>
 
-      <!-- 就医规范管理入口 -->
-      <router-link to="/regulations" class="feature-card-link">
+      <!-- 就医规范管理入口 - 需要 medical_guide_manage -->
+      <router-link 
+        v-if="hasPermission('medical_guide_manage')"
+        to="/regulations" 
+        class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #FFF0F6;">
             <el-icon :size="32" color="#EC4899"><Document /></el-icon>
@@ -91,8 +109,11 @@
         </div>
       </router-link>
 
-      <!-- 医生工时统计入口 -->
-      <router-link to="/scheduling/doctor-hours" class="feature-card-link">
+      <!-- 医生工时统计入口 - 需要 report_generate -->
+      <router-link 
+        v-if="hasPermission('report_generate')"
+        to="/scheduling/doctor-hours" 
+        class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #E6F0FF;">
             <el-icon :size="32" color="#3B82F6"><DataAnalysis /></el-icon>
@@ -102,8 +123,11 @@
         </div>
       </router-link>
 
-      <!-- 患者签到入口 -->
-      <router-link to="/check-in" class="feature-card-link">
+      <!-- 患者签到入口 - 需要 appointment_manage -->
+      <router-link 
+        v-if="hasPermission('appointment_manage')"
+        to="/check-in" 
+        class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #F0FDF4;">
             <el-icon :size="32" color="#22C55E"><Document /></el-icon>
@@ -113,8 +137,11 @@
         </div>
       </router-link>
 
-      <!-- 请假审批入口 -->
-      <router-link to="/leave-approval" class="feature-card-link">
+      <!-- 请假审批入口 - 需要 schedule_manage -->
+      <router-link 
+        v-if="hasPermission('schedule_manage')"
+        to="/leave-approval" 
+        class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #FEF3E2;">
             <el-icon :size="32" color="#F59E0B"><Checked /></el-icon>
@@ -124,8 +151,11 @@
         </div>
       </router-link>
 
-      <!-- 加号审批入口 -->
-      <router-link to="/slot-approval" class="feature-card-link">
+      <!-- 加号审批入口 - 需要 schedule_manage 或 appointment_manage -->
+      <router-link 
+        v-if="hasAnyPermission(['schedule_manage', 'appointment_manage'])"
+        to="/slot-approval" 
+        class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #E6F7FF;">
             <el-icon :size="32" color="#1890FF"><DocumentAdd /></el-icon>
@@ -135,8 +165,11 @@
         </div>
       </router-link>
 
-      <!-- 现场服务入口 -->
-      <router-link to="/on-site-service" class="feature-card-link">
+      <!-- 现场服务入口 - 需要 appointment_manage 或 patient_manage -->
+      <router-link 
+        v-if="hasAnyPermission(['appointment_manage', 'patient_manage'])"
+        to="/on-site-service" 
+        class="feature-card-link">
         <div class="feature-card">
           <div class="icon-wrapper" style="background-color: #FFF4E6;">
             <el-icon :size="32" color="#F59E0B"><Service /></el-icon>
@@ -153,11 +186,32 @@
 import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Checked, Service, DocumentAdd } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { computed, onMounted } from 'vue';
 import doctorImage from '@/assets/doctor.jpg';
 import { useAdminStore } from '@/stores/adminStore';
 
 const router = useRouter();
 const adminStore = useAdminStore();
+
+// 权限检查方法
+const hasPermission = (permissionName) => {
+  return adminStore.hasPermission(permissionName);
+};
+
+const hasAnyPermission = (permissionNames) => {
+  return adminStore.hasAnyPermission(permissionNames);
+};
+
+// 组件挂载时确保权限已加载
+onMounted(async () => {
+  // 如果权限列表为空，尝试加载
+  if (adminStore.permissions.length === 0 && adminStore.currentAdminId) {
+    console.log('AdminIndex: 权限列表为空，正在加载权限...');
+    await adminStore.fetchAdminPermissions();
+  } else {
+    console.log('AdminIndex: 当前权限列表:', adminStore.permissions);
+  }
+});
 
 const handleLogout = async () => {
   try {

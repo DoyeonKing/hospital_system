@@ -36,12 +36,10 @@ const LOCAL_IP = '127.0.0.1'      // 👈 改成这个！
 // 开发环境配置
 const development = {
 	// 真机调试使用局域网IP
-	baseURL: `http://${LOCAL_IP}:8080`, // 主后端服务（Spring Boot）
+	//baseURL: `http://${LOCAL_IP}:8080`
 	
 	// 如果要在浏览器测试，可以临时改为：
-	// baseURL: 'http://localhost:8080',
-	
-	aiBaseURL: 'http://localhost:3000' // AI 预问诊后端服务（Node.js）
+	baseURL: 'http://localhost:8080'
 }
 
 // 生产环境配置

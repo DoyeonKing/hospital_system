@@ -246,6 +246,170 @@
         </el-tab-pane>
       </el-tabs>
     </div>
+
+    <!-- 隐藏的 PDF 报告内容 -->
+    <div id="pdf-report-content" style="position: absolute; top: -9999px; left: -9999px; width: 794px; background: white; padding: 30px 20px; font-family: 'Microsoft YaHei', 'SimSun', sans-serif; z-index: -1; opacity: 0; pointer-events: none;">
+      <!-- 报告标题 -->
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="font-size: 24px; font-weight: bold; color: #1a202c; margin: 0 0 10px 0;">医院运营数据分析报告</h1>
+        <p style="font-size: 14px; color: #606266; margin: 0;">{{ reportDate }}</p>
+        <div style="border-bottom: 2px solid #e2e8f0; margin-top: 15px;"></div>
+      </div>
+
+      <!-- 报告时间段 -->
+      <div style="margin-bottom: 25px;">
+        <p style="font-size: 12px; color: #606266; margin: 0;">报告时间段：本日/本月至今</p>
+      </div>
+
+      <!-- 一、运营核心指标概览 -->
+      <div style="margin-bottom: 30px; page-break-inside: avoid;">
+        <h2 style="font-size: 18px; font-weight: bold; color: #1a202c; margin: 0 0 15px 0; border-left: 4px solid #667eea; padding-left: 10px; page-break-after: avoid;">一、运营核心指标概览</h2>
+        <div style="background: #f7fafc; padding: 20px; border-radius: 8px;">
+          <div style="margin-bottom: 10px;"><strong style="color: #2d3748;">累计注册用户：</strong><span style="color: #4a5568;">{{ mockData.overview.totalPatients }} 人</span></div>
+          <div style="margin-bottom: 10px;"><strong style="color: #2d3748;">今日挂号量：</strong><span style="color: #4a5568;">{{ mockData.overview.todayAppointments }} 次</span></div>
+          <div style="margin-bottom: 10px;"><strong style="color: #2d3748;">今日出诊医生：</strong><span style="color: #4a5568;">{{ mockData.overview.activeDoctorsToday }} 人</span></div>
+          <div style="margin-bottom: 10px;"><strong style="color: #2d3748;">本月新增注册：</strong><span style="color: #4a5568;">{{ mockData.patients.monthlyNewRegistrations }} 人</span></div>
+          <div style="margin-bottom: 10px;"><strong style="color: #2d3748;">当前候诊人数：</strong><span style="color: #4a5568;">{{ mockData.overview.pendingPatients }} 人</span></div>
+          <div><strong style="color: #2d3748;">累计爽约次数：</strong><span style="color: #4a5568;">{{ mockData.patients.totalNoShows }} 次</span></div>
+        </div>
+      </div>
+
+      <!-- 二、患者群体与用户分析 -->
+      <div style="margin-bottom: 30px; page-break-inside: avoid;">
+        <h2 style="font-size: 18px; font-weight: bold; color: #1a202c; margin: 0 0 15px 0; border-left: 4px solid #667eea; padding-left: 10px; page-break-after: avoid;">二、患者群体与用户分析</h2>
+        
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0; page-break-after: avoid;">1. 用户增长趋势</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+          <div><strong style="color: #2d3748;">本月新增注册：</strong><span style="color: #4a5568;">{{ mockData.patients.monthlyNewRegistrations }} 人</span></div>
+        </div>
+
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0; page-break-after: avoid;">2. 患者类型构成</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px; page-break-inside: avoid;">
+          <div v-for="type in mockData.patients.patientType" :key="type.name" style="margin-bottom: 8px;">
+            <strong style="color: #2d3748;">{{ type.name }}：</strong>
+            <span style="color: #4a5568;">{{ getPercentage(type.value, mockData.patients.patientType) }}%</span>
+          </div>
+        </div>
+
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0; page-break-after: avoid;">3. 教师/职工/学生比例</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px;">
+          <div><strong style="color: #2d3748;">比例数据：</strong><span style="color: #4a5568;">{{ mockData.patients.teacherStaffStudentRatio }}</span></div>
+        </div>
+      </div>
+
+      <!-- 三、医生与医疗资源分析 -->
+      <div style="margin-bottom: 30px; page-break-before: always; page-break-inside: avoid;">
+        <h2 style="font-size: 18px; font-weight: bold; color: #1a202c; margin: 0 0 15px 0; border-left: 4px solid #667eea; padding-left: 10px; page-break-after: avoid;">三、医生与医疗资源分析</h2>
+        
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0; page-break-after: avoid;">1. 医生资源概览</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+          <div style="margin-bottom: 8px;"><strong style="color: #2d3748;">医生总数：</strong><span style="color: #4a5568;">{{ mockData.doctors.totalDoctors }} 人</span></div>
+          <div style="margin-bottom: 8px;"><strong style="color: #2d3748;">今日请假人数：</strong><span style="color: #4a5568;">{{ mockData.doctors.todayLeaveCount }} 人</span></div>
+          <div><strong style="color: #2d3748;">科室总数：</strong><span style="color: #4a5568;">{{ mockData.doctors.totalDepartments }} 个</span></div>
+        </div>
+
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0; page-break-after: avoid;">2. 医生工作量 Top 5</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px; page-break-inside: avoid;">
+          <div v-for="(doctor, index) in mockData.doctors.doctorWorkload.slice(0, 5)" :key="index" style="margin-bottom: 8px;">
+            <strong style="color: #2d3748;">{{ index + 1 }}. {{ doctor.name }}（{{ doctor.department }}）：</strong>
+            <span style="color: #4a5568;">{{ doctor.value }} 人次</span>
+          </div>
+        </div>
+
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0; page-break-after: avoid;">3. 科室繁忙度 Top 5</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px;">
+          <div v-for="(dept, index) in mockData.doctors.departmentBusy.slice(0, 5)" :key="index" style="margin-bottom: 8px;">
+            <strong style="color: #2d3748;">{{ index + 1 }}. {{ dept.name }}：</strong>
+            <span style="color: #4a5568;">{{ dept.value }} 人次</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 四、运营效率与财务分析 -->
+      <div style="margin-bottom: 30px; page-break-inside: avoid;">
+        <h2 style="font-size: 18px; font-weight: bold; color: #1a202c; margin: 0 0 15px 0; border-left: 4px solid #667eea; padding-left: 10px; page-break-after: avoid;">四、运营效率与财务分析</h2>
+        
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0; page-break-after: avoid;">支付状态分布</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px;">
+          <div v-for="status in mockData.overview.paymentStatus" :key="status.name" style="margin-bottom: 8px;">
+            <strong style="color: #2d3748;">{{ status.name }}：</strong>
+            <span style="color: #4a5568;">{{ getPercentage(status.value, mockData.overview.paymentStatus) }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 数据详情 -->
+      <div style="margin-bottom: 30px; page-break-before: always;">
+        <h2 style="font-size: 18px; font-weight: bold; color: #1a202c; margin: 0 0 15px 0; border-left: 4px solid #667eea; padding-left: 10px;">五、数据详情</h2>
+        
+        <!-- 挂号趋势数据 -->
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0; page-break-after: avoid;">1. 近7日挂号趋势</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: #e2e8f0;">
+                <th style="padding: 8px; text-align: left; border: 1px solid #cbd5e0;">日期</th>
+                <th style="padding: 8px; text-align: right; border: 1px solid #cbd5e0;">挂号量</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(date, index) in mockData.overview.last7DaysDates" :key="index" style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 8px; border: 1px solid #cbd5e0;">{{ date }}</td>
+                <td style="padding: 8px; text-align: right; border: 1px solid #cbd5e0;">{{ mockData.overview.last7DaysCounts[index] }} 次</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- 职称分布数据 -->
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0; page-break-after: avoid;">2. 医生职称分布</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <div v-for="item in mockData.doctors.titleDistribution" :key="item.name" style="margin-bottom: 8px;">
+            <strong style="color: #2d3748;">{{ item.name }}：</strong>
+            <span style="color: #4a5568;">{{ item.value }} 人 ({{ getPercentage(item.value, mockData.doctors.titleDistribution) }}%)</span>
+          </div>
+        </div>
+        
+        <!-- 用户增长数据 -->
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0; page-break-after: avoid;">3. 近30日用户增长</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <p style="margin: 0 0 10px 0; color: #2d3748;">
+            <strong>总新增用户：</strong>{{ mockData.patients.last30DaysCounts.reduce((sum, count) => sum + count, 0) }} 人
+          </p>
+          <p style="margin: 0 0 10px 0; color: #2d3748;">
+            <strong>日均新增：</strong>{{ (mockData.patients.last30DaysCounts.reduce((sum, count) => sum + count, 0) / 30).toFixed(1) }} 人
+          </p>
+          <p style="margin: 0; color: #2d3748;">
+            <strong>峰值日期：</strong>{{ mockData.patients.last30DaysDates[mockData.patients.last30DaysCounts.indexOf(Math.max(...mockData.patients.last30DaysCounts))] }} 
+            ({{ Math.max(...mockData.patients.last30DaysCounts) }} 人)
+          </p>
+        </div>
+      </div>
+
+      <!-- 结论与建议 -->
+      <div style="page-break-before: always;">
+        <h2 style="font-size: 18px; font-weight: bold; color: #1a202c; margin: 0 0 15px 0; border-left: 4px solid #667eea; padding-left: 10px;">💡 结论与行动建议</h2>
+        
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0;">主要发现：</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <div v-for="(finding, index) in reportFindings" :key="index" style="margin-bottom: 10px; line-height: 1.6;">
+            <span style="color: #2d3748;">{{ index + 1 }}. {{ finding }}</span>
+          </div>
+        </div>
+
+        <h3 style="font-size: 14px; font-weight: bold; color: #2d3748; margin: 0 0 10px 0;">行动建议：</h3>
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px;">
+          <div v-for="(rec, index) in reportRecommendations" :key="index" style="margin-bottom: 10px; line-height: 1.6;">
+            <span style="color: #2d3748;">{{ index + 1 }}. {{ rec }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 页脚 -->
+      <div style="margin-top: 40px; text-align: center; font-size: 11px; color: #999999; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+        <p style="margin: 0;">报告生成时间：{{ reportGeneratedTime }} | 医院运营数据中心</p>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -277,6 +441,12 @@ const exporting = ref(false)
 const loading = ref(false)
 // 就诊时段热力图日期范围
 const timeSlotDateRange = ref(null)
+
+// PDF 报告相关数据
+const reportDate = ref('')
+const reportGeneratedTime = ref('')
+const reportFindings = ref([])
+const reportRecommendations = ref([])
 
 const getDefaultPatientType = () => ([
   { name: '教师', value: 0 },
@@ -756,221 +926,327 @@ const handleExit = () => {
   router.push('/')
 }
 
-// 导出PDF
+// 计算百分比的辅助函数
+const getPercentage = (value, dataArray) => {
+  const total = dataArray.reduce((sum, item) => sum + item.value, 0)
+  return total > 0 ? ((value / total) * 100).toFixed(1) : '0.0'
+}
+
+// 生成结论与建议
+const generateSummaryAndRecommendations = () => {
+  const findings = []
+  const recommendations = []
+  
+  // 综合分析所有数据
+  // 运营总览分析
+  if (mockData.overview.todayAppointments > 50) {
+    findings.push('今日挂号量较高，医疗服务需求旺盛')
+    recommendations.push('建议优化挂号流程，减少患者等待时间')
+  } else if (mockData.overview.todayAppointments < 20) {
+    findings.push('今日挂号量偏低，可能存在服务推广不足')
+    recommendations.push('建议加强医疗服务宣传，提升患者就诊意愿')
+  }
+  
+  if (mockData.overview.pendingPatients > 30) {
+    findings.push('当前候诊人数较多，可能存在就诊高峰')
+    recommendations.push('建议增加医生排班，优化候诊流程')
+  }
+  
+  // 分析支付状态
+  const unpaidCount = mockData.overview.paymentStatus.find(s => s.name === '待支付')?.value || 0
+  if (unpaidCount > 10) {
+    findings.push('待支付订单较多，可能影响医院收入')
+    recommendations.push('建议优化支付流程，增加支付提醒功能')
+  }
+  
+  // 医生资源分析
+  if (mockData.doctors.todayLeaveCount > 5) {
+    findings.push(`今日请假医生数量较多（${mockData.doctors.todayLeaveCount}人），可能影响正常接诊`)
+    recommendations.push('建议建立医生排班备份机制，确保医疗服务连续性')
+  }
+  
+  // 分析医生工作量
+  if (mockData.doctors.doctorWorkload.length > 0) {
+    const maxWorkload = Math.max(...mockData.doctors.doctorWorkload.map(d => d.value))
+    const topDoctor = mockData.doctors.doctorWorkload[0]
+    if (maxWorkload > 50) {
+      findings.push(`${topDoctor.name}医生工作量已达到饱和状态（${maxWorkload}人次）`)
+      recommendations.push('建议合理分配医生工作量，避免过度疲劳')
+    }
+  }
+  
+  // 分析科室繁忙度
+  if (mockData.doctors.departmentBusy.length > 0) {
+    const busiestDept = mockData.doctors.departmentBusy[0]
+    findings.push(`${busiestDept.name}科室就诊量最高（${busiestDept.value}人次），为重点科室`)
+    recommendations.push(`建议在${busiestDept.name}科室增加医生配置，提升服务能力`)
+  }
+  
+  // 患者群体分析
+  if (mockData.patients.monthlyNewRegistrations > 100) {
+    findings.push('本月新增注册用户增长强劲，医疗服务影响力提升')
+    recommendations.push('建议继续优化用户体验，提高用户留存率')
+  }
+  
+  if (mockData.patients.totalNoShows > 20) {
+    findings.push(`累计爽约次数较高（${mockData.patients.totalNoShows}次），影响医疗资源利用率`)
+    recommendations.push('建议引入预约提醒机制，降低爽约率')
+  }
+  
+  // 分析患者类型
+  const studentType = mockData.patients.patientType.find(t => t.name === '学生')
+  if (studentType && studentType.value > 50) {
+    const percentage = ((studentType.value / mockData.patients.patientType.reduce((sum, t) => sum + t.value, 0)) * 100).toFixed(1)
+    findings.push(`学生群体占比较高（${percentage}%），为主要服务对象`)
+    recommendations.push('建议针对学生群体优化就诊时间安排，如增加晚间和周末门诊')
+  }
+  
+  // 如果没有特殊发现，添加默认内容
+  if (findings.length === 0) {
+    findings.push('当前运营数据整体平稳，各项指标正常')
+  }
+  if (recommendations.length === 0) {
+    recommendations.push('建议持续监控关键指标，及时发现并解决潜在问题')
+  }
+  
+  return { findings, recommendations }
+}
+
+// 获取所有图表的 Base64 图片
+const getAllChartsAsImages = async () => {
+  const chartImages = []
+  const chartIds = [
+    'appointmentTrendChart',
+    'paymentStatusChart',
+    'titleDistributionChart',
+    'departmentBusyChart',
+    'doctorWorkloadChart',
+    'userGrowthChart',
+    'patientTypeChart',
+    'timeSlotChart'
+  ]
+  
+  for (const chartId of chartIds) {
+    const chartInstance = chartInstances.get(chartId)
+    if (chartInstance && !chartInstance.isDisposed()) {
+      try {
+        // 获取图表截图
+        const dataUrl = chartInstance.getDataURL({
+          type: 'png',
+          pixelRatio: 1.5,
+          backgroundColor: '#fff'
+        })
+        chartImages.push({
+          id: chartId,
+          dataUrl
+        })
+      } catch (error) {
+        console.warn(`无法获取图表 ${chartId} 的图片:`, error)
+      }
+    }
+  }
+  
+  return chartImages
+}
+
+// 导出PDF - 使用 jsPDF.html() 方法
 const handleExportPDF = async () => {
   exporting.value = true
   try {
     ElMessage.info('正在生成报表，请稍候...')
     
-    // 等待所有图表渲染完成
+    // 确保所有数据都已加载
+    if (mockData.overview.totalPatients === 0) {
+      await loadOverviewData()
+    }
+    if (mockData.doctors.totalDoctors === 0) {
+      await loadDoctorsData()
+    }
+    if (mockData.patients.monthlyNewRegistrations === 0) {
+      await loadPatientsData()
+    }
+    
     await nextTick()
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise(resolve => setTimeout(resolve, 300))
 
-    // 获取要导出的内容区域（不包括顶部导航和返回按钮）
-    const contentWrapper = document.querySelector('.content-wrapper')
-    const welcomeBanner = document.querySelector('.welcome-banner')
-    
-    if (!contentWrapper) {
-      ElMessage.error('未找到要导出的内容')
-      return
-    }
-
-    // 使用html2canvas分别捕获横幅和内容区域
-    let bannerCanvas = null
-    if (welcomeBanner) {
-      bannerCanvas = await html2canvas(welcomeBanner, {
-        backgroundColor: null,
-        scale: 2,
-        useCORS: true,
-        logging: false
-      })
-    }
-
-    const contentCanvas = await html2canvas(contentWrapper, {
-      backgroundColor: '#f7fafc',
-      scale: 2, // 提高清晰度
-      useCORS: true,
-      logging: false
-    })
-
-    // 使用A3横向页面，更大尺寸
-    const pdf = new jsPDF('l', 'mm', 'a3') // A3横向: 420mm x 297mm
-    const pdfWidth = pdf.internal.pageSize.getWidth() // 420mm
-    const pdfHeight = pdf.internal.pageSize.getHeight() // 297mm
-    
-    const margin = 15 // 边距
-    const availableWidth = pdfWidth - margin * 2 // 390mm
+    // 准备报告数据
     const now = new Date()
-    const dateStr = now.toLocaleString('zh-CN', {
+    reportDate.value = now.toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: '2-digit'
+    }).replace(/\//g, '-')
+    reportGeneratedTime.value = now.toLocaleString('zh-CN')
+    
+    // 生成结论与建议
+    const { findings, recommendations } = generateSummaryAndRecommendations()
+    reportFindings.value = findings
+    reportRecommendations.value = recommendations
+    
+    // 等待 Vue 更新 DOM
+    await nextTick()
+    await new Promise(resolve => setTimeout(resolve, 200))
+    
+    // 获取报告内容元素
+    const reportContent = document.getElementById('pdf-report-content')
+    if (!reportContent) {
+      throw new Error('无法找到报告内容元素')
+    }
+    
+    // 临时显示报告内容以便 html2canvas 可以渲染（但保持在屏幕外）
+    const originalStyle = {
+      position: reportContent.style.position,
+      top: reportContent.style.top,
+      left: reportContent.style.left,
+      opacity: reportContent.style.opacity,
+      zIndex: reportContent.style.zIndex,
+      visibility: reportContent.style.visibility
+    }
+    
+    // 将元素移到屏幕外但保持可渲染状态
+    reportContent.style.position = 'fixed'
+    reportContent.style.top = '0'
+    reportContent.style.left = '-10000px'  // 保持在屏幕外，避免闪现
+    reportContent.style.opacity = '1'
+    reportContent.style.zIndex = '-1'
+    reportContent.style.visibility = 'visible'
+    
+    // 等待样式应用
+    await nextTick()
+    await new Promise(resolve => setTimeout(resolve, 200))
+    
+    // 使用 html2canvas 直接渲染
+    const canvas = await html2canvas(reportContent, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      width: 794,
+      windowWidth: 794,
+      scrollX: 0,
+      scrollY: 0
     })
-
-    // 创建标题和时间的canvas（避免中文乱码）
-    const titleCanvas = document.createElement('canvas')
-    titleCanvas.width = availableWidth * 2 // 提高清晰度
-    titleCanvas.height = 80 // 增加高度，确保标题和时间不重叠
-    const titleCtx = titleCanvas.getContext('2d')
     
-    // 设置背景
-    titleCtx.fillStyle = '#ffffff'
-    titleCtx.fillRect(0, 0, titleCanvas.width, titleCanvas.height)
+    // 立即恢复原始样式
+    reportContent.style.position = originalStyle.position
+    reportContent.style.top = originalStyle.top
+    reportContent.style.left = originalStyle.left
+    reportContent.style.opacity = originalStyle.opacity
+    reportContent.style.zIndex = originalStyle.zIndex
+    reportContent.style.visibility = originalStyle.visibility
     
-    // 绘制标题
-    titleCtx.fillStyle = '#303133'
-    titleCtx.font = 'bold 36px Arial, "Microsoft YaHei", "SimHei", sans-serif'
-    titleCtx.textAlign = 'center'
-    titleCtx.textBaseline = 'top'
-    const titleY = 10 // 标题Y位置
-    titleCtx.fillText('医院运营数据中心报表', titleCanvas.width / 2, titleY)
+    // 创建 PDF
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true
+    })
     
-    // 绘制生成时间（在标题下方，留出足够间距）
-    titleCtx.fillStyle = '#606266'
-    titleCtx.font = '20px Arial, "Microsoft YaHei", "SimHei", sans-serif'
-    titleCtx.textBaseline = 'top'
-    const timeY = titleY + 50 // 时间Y位置，确保在标题下方有足够间距
-    titleCtx.fillText(`生成时间: ${dateStr}`, titleCanvas.width / 2, timeY)
+    const imgData = canvas.toDataURL('image/png')
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const pdfHeight = pdf.internal.pageSize.getHeight()
     
-    // 将标题canvas转换为图片并添加到PDF
-    const titleImgData = titleCanvas.toDataURL('image/png', 1.0)
-    const titleImgHeight = 25 // PDF中的高度（mm），增加高度以容纳两行文字
-    pdf.addImage(
-      titleImgData,
-      'PNG',
-      margin,
-      margin,
-      availableWidth,
-      titleImgHeight,
-      undefined,
-      'FAST'
-    )
-
-    let currentY = margin + titleImgHeight + 10 // 起始Y位置
-
-    // 添加横幅（如果有）
-    if (bannerCanvas) {
-      // 计算横幅的缩放比例，保持宽高比
-      const bannerScale = availableWidth / bannerCanvas.width
-      const bannerImgWidth = availableWidth
-      const bannerImgHeight = bannerCanvas.height * bannerScale
-      
-      const bannerImgData = bannerCanvas.toDataURL('image/png', 1.0)
-      pdf.addImage(
-        bannerImgData,
-        'PNG',
-        margin,
-        currentY,
-        bannerImgWidth,
-        bannerImgHeight,
-        undefined,
-        'FAST'
-      )
-      currentY += bannerImgHeight + 10
-    }
-
-    // 计算内容区域的缩放比例，保持宽高比
-    const contentScale = availableWidth / contentCanvas.width
-    const contentImgWidth = availableWidth
-    const contentImgHeight = contentCanvas.height * contentScale
-
-    // 如果内容高度超过一页，需要分页
-    const maxPageHeight = pdfHeight - currentY - margin
-    const contentImgData = contentCanvas.toDataURL('image/png', 1.0)
+    // 计算合适的缩放比例，保持内容宽度适中
+    const contentWidth = canvas.width  // 实际渲染的内容宽度（794px）
+    const targetWidth = pdfWidth - 20  // 左右各留 10mm 边距
+    const scale = targetWidth / contentWidth
     
-    let heightLeft = contentImgHeight
-    let position = 0
-
-    while (heightLeft > 0) {
-      if (position > 0) {
+    const imgWidth = targetWidth
+    const imgHeight = canvas.height * scale
+    
+    // 计算居中位置
+    const marginX = (pdfWidth - imgWidth) / 2  // 水平居中
+    
+    // 智能分页：检测内容并在合适的位置分页
+    const pageHeightInPixels = pdfHeight / scale  // 转换为原始像素高度
+    let currentY = 0
+    let pageCount = 0
+    
+    // 添加第一页
+    const tempCanvas = document.createElement('canvas')
+    const tempCtx = tempCanvas.getContext('2d')
+    
+    while (currentY < canvas.height) {
+      if (pageCount > 0) {
         pdf.addPage()
-        currentY = margin
       }
-
-      const pageHeight = Math.min(heightLeft, maxPageHeight)
       
-      // 计算源图片的裁剪位置和高度
-      const sourceY = (position / contentImgHeight) * contentCanvas.height
-      const sourceHeight = (pageHeight / contentImgHeight) * contentCanvas.height
+      // 计算当前页应该显示的高度
+      let sliceHeight = Math.min(pageHeightInPixels, canvas.height - currentY)
       
-      // 创建临时canvas来裁剪当前页的内容
-      const tempCanvas = document.createElement('canvas')
-      tempCanvas.width = contentCanvas.width
-      tempCanvas.height = Math.ceil(sourceHeight)
-      const tempCtx = tempCanvas.getContext('2d')
+      // 如果不是最后一页，尝试找到更好的切割点（避免在标题处切割）
+      if (currentY + sliceHeight < canvas.height) {
+        // 在底部 20% 的区域内寻找空白区域
+        const searchStart = currentY + sliceHeight * 0.75
+        const searchEnd = currentY + sliceHeight
+        let bestCutPoint = sliceHeight
+        let maxWhiteLines = 0
+        let currentWhiteLines = 0
+        let bestWhiteLineStart = sliceHeight
+        
+        // 扫描这个区域，寻找连续的空白行（章节之间的间距）
+        for (let y = searchStart; y < searchEnd && y < canvas.height; y++) {
+          const imageData = canvas.getContext('2d').getImageData(0, y, canvas.width, 1)
+          const pixels = imageData.data
+          
+          // 检查这一行是否主要是白色（空白）
+          let whitePixelCount = 0
+          for (let i = 0; i < pixels.length; i += 4) {
+            const r = pixels[i]
+            const g = pixels[i + 1]
+            const b = pixels[i + 2]
+            // 如果像素接近白色
+            if (r > 245 && g > 245 && b > 245) {
+              whitePixelCount++
+            }
+          }
+          
+          // 如果这一行超过 95% 是白色
+          if (whitePixelCount / canvas.width > 0.95) {
+            currentWhiteLines++
+            // 记录连续空白行数最多的位置
+            if (currentWhiteLines > maxWhiteLines) {
+              maxWhiteLines = currentWhiteLines
+              bestWhiteLineStart = y - currentY - currentWhiteLines + 1
+            }
+          } else {
+            currentWhiteLines = 0
+          }
+        }
+        
+        // 如果找到了至少 3 行连续的空白（约 30px 的间距），在那里切割
+        if (maxWhiteLines >= 3) {
+          sliceHeight = bestWhiteLineStart + Math.floor(maxWhiteLines / 2)
+        }
+      }
       
-      // 绘制裁剪后的内容
+      // 创建当前页的图片切片
+      tempCanvas.width = canvas.width
+      tempCanvas.height = sliceHeight
       tempCtx.drawImage(
-        contentCanvas,
-        0, Math.floor(sourceY), contentCanvas.width, Math.ceil(sourceHeight),
-        0, 0, contentCanvas.width, Math.ceil(sourceHeight)
+        canvas,
+        0, currentY, canvas.width, sliceHeight,
+        0, 0, canvas.width, sliceHeight
       )
       
-      const pageImgData = tempCanvas.toDataURL('image/png', 1.0)
-      const pageImgHeight = (tempCanvas.height * contentScale)
+      const pageImgData = tempCanvas.toDataURL('image/png')
+      const pageImgHeight = sliceHeight * scale
       
-      pdf.addImage(
-        pageImgData,
-        'PNG',
-        margin,
-        currentY,
-        contentImgWidth,
-        pageImgHeight,
-        undefined,
-        'FAST'
-      )
-
-      heightLeft -= maxPageHeight
-      position += maxPageHeight
-    }
-
-    // 生成文件名（使用英文避免编码问题，但可以在下载时显示中文）
-    const tabNames = {
-      overview: '运营总览',
-      doctors: '医生资源分析',
-      patients: '患者群体画像'
-    }
-    const tabNameEn = {
-      overview: 'OperationsOverview',
-      doctors: 'DoctorResources',
-      patients: 'PatientProfile'
-    }
-    const tabName = tabNames[activeTab.value] || '报表'
-    const tabNameEnValue = tabNameEn[activeTab.value] || 'Report'
-    
-    // 生成文件名（使用英文避免编码问题）
-    const fileName = `HospitalDataReport_${tabNameEnValue}_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.pdf`
-    
-    // 使用 Blob 和 URL 来支持中文文件名
-    const pdfBlob = pdf.output('blob')
-    const url = URL.createObjectURL(pdfBlob)
-    const link = document.createElement('a')
-    link.href = url
-    
-    // 尝试使用中文文件名，如果浏览器不支持会自动回退
-    try {
-      // 使用 decodeURIComponent 和 encodeURIComponent 来处理中文
-      link.download = `医院运营数据报表_${tabName}_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.pdf`
-    } catch (e) {
-      // 如果中文文件名失败，使用英文文件名
-      link.download = fileName
+      pdf.addImage(pageImgData, 'PNG', marginX, 0, imgWidth, pageImgHeight)
+      
+      currentY += sliceHeight
+      pageCount++
     }
     
-    // 触发下载
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    // 生成文件名并下载
+    const fileName = `医院运营数据分析报告_${reportDate.value}.pdf`
+    pdf.save(fileName)
     
-    // 清理 URL 对象
-    setTimeout(() => {
-      URL.revokeObjectURL(url)
-    }, 100)
+    ElMessage.success('报表导出成功！')
     
-    ElMessage.success('报表导出成功')
   } catch (error) {
-    console.error('导出PDF失败:', error)
+    console.error('导出 PDF 失败:', error)
     ElMessage.error('导出失败: ' + (error.message || '请重试'))
   } finally {
     exporting.value = false

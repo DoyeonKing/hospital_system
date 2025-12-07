@@ -8,7 +8,7 @@ public class PasswordHashGenerator {
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
         // 这是我们要测试的初始密码
-        String password = "Xmr@6511";
+        String password = "02test";
 
         // 生成哈希值
         String hashedPassword = encoder.encode(password);
@@ -17,7 +17,7 @@ public class PasswordHashGenerator {
         System.out.println("生成的哈希值: " + hashedPassword);
 
         // 生成第二个密码的哈希值 (用户B)
-        String activePassword = "ActivePass";
+        String activePassword = "03test";
         String hashedActivePassword = encoder.encode(activePassword);
         System.out.println("原始密码: " + activePassword);
         System.out.println("生成的哈希值: " + hashedActivePassword);
