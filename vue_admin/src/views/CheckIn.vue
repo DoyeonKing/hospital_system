@@ -1,5 +1,8 @@
 <template>
   <div class="check-in-container">
+    <div class="back-area" style="margin-bottom: 12px;">
+      <BackButton />
+    </div>
     <el-card>
       <template #header>
         <div class="card-header">
@@ -300,6 +303,7 @@ import { Camera, Refresh, Loading } from '@element-plus/icons-vue'
 import { checkInAppointment, getAppointmentQrCode, clearCheckIn, getCallQueue, getNextAppointmentToCall, callAppointment, markMissedCall, recheckInAfterMissedCall, completeAppointment } from '@/api/appointment.js'
 import { getAllSchedules } from '@/api/schedule.js'
 import { Html5Qrcode } from 'html5-qrcode'
+import BackButton from '@/components/BackButton.vue'
 
 const checkInResult = ref(null)
 const showHelp = ref(false)

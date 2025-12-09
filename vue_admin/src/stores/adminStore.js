@@ -30,7 +30,13 @@ export const useAdminStore = defineStore('admin', {
 
     getters: {
         // 显示名称
-        displayName: (state) => state.detailedAdminInfo.name || state.loggedInAdminBasicInfo?.name || state.loggedInAdminBasicInfo?.adminId || '管理员',
+        displayName: (state) => {
+            return state.loggedInAdminBasicInfo?.fullName || 
+                   state.loggedInAdminBasicInfo?.username || 
+                   state.detailedAdminInfo.name || 
+                   state.loggedInAdminBasicInfo?.name || 
+                   '管理员';
+        },
         // 是否已登录
         isAuthenticated: (state) => !!state.loggedInAdminBasicInfo,
         // 获取管理员ID

@@ -43,7 +43,7 @@
             <div class="top-cards">
               <div class="stat-card stat-card-green">
                 <div class="stat-icon">
-                  <el-icon :size="40"><Calendar /></el-icon>
+                  <el-icon :size="30"><Calendar /></el-icon>
                 </div>
                 <div class="stat-content">
                   <div class="stat-label">今日挂号量</div>
@@ -53,7 +53,7 @@
 
               <div class="stat-card stat-card-blue">
                 <div class="stat-icon">
-                  <el-icon :size="40"><User /></el-icon>
+                  <el-icon :size="30"><User /></el-icon>
                 </div>
                 <div class="stat-content">
                   <div class="stat-label">今日出诊医生</div>
@@ -63,7 +63,7 @@
 
               <div class="stat-card stat-card-red">
                 <div class="stat-icon">
-                  <el-icon :size="40"><Warning /></el-icon>
+                  <el-icon :size="30"><Warning /></el-icon>
                 </div>
                 <div class="stat-content">
                   <div class="stat-label">当前候诊人数</div>
@@ -73,7 +73,7 @@
 
               <div class="stat-card stat-card-purple">
                 <div class="stat-icon">
-                  <el-icon :size="40"><UserFilled /></el-icon>
+                  <el-icon :size="30"><UserFilled /></el-icon>
                 </div>
                 <div class="stat-content">
                   <div class="stat-label">累计注册用户</div>
@@ -108,7 +108,7 @@
             <div class="top-cards">
               <div class="stat-card stat-card-blue">
                 <div class="stat-icon">
-                  <el-icon :size="40"><UserFilled /></el-icon>
+                  <el-icon :size="30"><UserFilled /></el-icon>
                 </div>
                 <div class="stat-content">
                   <div class="stat-label">医生总数</div>
@@ -118,7 +118,7 @@
 
               <div class="stat-card stat-card-orange">
                 <div class="stat-icon">
-                  <el-icon :size="40"><Calendar /></el-icon>
+                  <el-icon :size="30"><Calendar /></el-icon>
                 </div>
                 <div class="stat-content">
                   <div class="stat-label">今日请假人数</div>
@@ -128,7 +128,7 @@
 
               <div class="stat-card stat-card-indigo">
                 <div class="stat-icon">
-                  <el-icon :size="40"><OfficeBuilding /></el-icon>
+                  <el-icon :size="30"><OfficeBuilding /></el-icon>
                 </div>
                 <div class="stat-content">
                   <div class="stat-label">科室总数</div>
@@ -170,7 +170,7 @@
             <div class="top-cards">
               <div class="stat-card stat-card-green">
                 <div class="stat-icon">
-                  <el-icon :size="40"><User /></el-icon>
+                  <el-icon :size="30"><User /></el-icon>
                 </div>
                 <div class="stat-content">
                   <div class="stat-label">本月新增注册</div>
@@ -180,7 +180,7 @@
 
               <div class="stat-card stat-card-purple">
                 <div class="stat-icon">
-                  <el-icon :size="40"><DataAnalysis /></el-icon>
+                  <el-icon :size="30"><DataAnalysis /></el-icon>
                 </div>
                 <div class="stat-content">
                   <div class="stat-label">教师/职工/学生比例</div>
@@ -190,7 +190,7 @@
 
               <div class="stat-card stat-card-red">
                 <div class="stat-icon">
-                  <el-icon :size="40"><Warning /></el-icon>
+                  <el-icon :size="30"><Warning /></el-icon>
                 </div>
                 <div class="stat-content">
                   <div class="stat-label">累计爽约次数</div>
@@ -1570,26 +1570,26 @@ onUnmounted(() => {
   align-items: center;
 }
 
-/* 顶部欢迎横幅 */
+/* 顶部欢迎横幅 - 缩小尺寸 */
 .welcome-banner {
   background: linear-gradient(135deg, #9f7aea 0%, #667eea 100%);
-  border-radius: 12px;
-  padding: 30px;
+  border-radius: 8px;
+  padding: 16px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   color: white;
-  margin: 0 24px 24px 24px;
+  margin: 0 24px 16px 24px;
 }
 
 .banner-content h1 {
-  font-size: 24px;
-  margin: 0 0 8px 0;
+  font-size: 20px;
+  margin: 0 0 4px 0;
   font-weight: bold;
 }
 
 .banner-content p {
-  font-size: 16px;
+  font-size: 14px;
   margin: 0;
   opacity: 0.9;
 }
@@ -1597,14 +1597,14 @@ onUnmounted(() => {
 .banner-image {
   border-radius: 50%;
   object-fit: cover;
-  width: 120px;
-  height: 120px;
-  border: 4px solid white;
+  width: 80px;
+  height: 80px;
+  border: 3px solid white;
 }
 
-/* 内容包装器 */
+/* 内容包装器 - 减少内边距 */
 .content-wrapper {
-  padding: 0 24px 24px 24px;
+  padding: 0 24px 16px 24px;
 }
 
 .dashboard-tabs {
@@ -1624,18 +1624,18 @@ onUnmounted(() => {
   padding: 0;
 }
 
-/* 核心指标卡片 */
+/* 核心指标卡片 - 缩小尺寸 */
 .top-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .stat-card {
   background: white;
-  border-radius: 12px;
-  padding: 24px;
+  border-radius: 8px;
+  padding: 16px;
   display: flex;
   align-items: center;
   border: 1px solid #e2e8f0;
@@ -1674,13 +1674,13 @@ onUnmounted(() => {
 }
 
 .stat-icon {
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 16px;
+  margin-right: 12px;
 }
 
 .stat-card-green .stat-icon {
@@ -1718,24 +1718,24 @@ onUnmounted(() => {
 }
 
 .stat-label {
-  font-size: 14px;
+  font-size: 13px;
   color: #606266;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   font-weight: normal;
 }
 
 .stat-value {
-  font-size: 32px;
+  font-size: 24px;
   font-weight: bold;
   color: #303133;
   line-height: 1;
 }
 
-/* 图表区域 */
+/* 图表区域 - 减少间距 */
 .charts-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+  gap: 12px;
 }
 
 .chart-card {
@@ -1743,7 +1743,7 @@ onUnmounted(() => {
 }
 
 .chart-card :deep(.el-card__body) {
-  padding: 20px;
+  padding: 16px;
 }
 
 .chart-card.chart-full-width {
@@ -1758,7 +1758,7 @@ onUnmounted(() => {
 
 .chart {
   width: 100%;
-  height: 350px;
+  height: 280px;
 }
 
 /* 响应式设计 */

@@ -1,43 +1,25 @@
 <template>
-  <div class="app-container">
-    <div class="back-area" style="margin-bottom: 12px;">
-      <BackButton />
+  <div class="patient-info-page">
+    <div class="top-navbar">
+      <div class="navbar-content">
+        <div class="navbar-left">
+          <BackButton />
+          <div class="logo-section">
+            <el-icon :size="28"><User /></el-icon>
+            <h2>患者管理</h2>
+          </div>
+        </div>
+        <div class="navbar-right">
+          <div class="user-info">
+            <el-avatar :size="36" :src="getAvatarUrl(doctorStore.detailedDoctorInfo?.photoUrl)" />
+            <span class="user-name">{{ doctorStore.displayName }} 医生</span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <el-card shadow="always" class="patient-card">
-      <template #header>
-        <div class="card-header">
-          <span>患者管理</span>
-          <el-date-picker
-              v-model="selectedDate"
-              type="date"
-              placeholder="选择日期"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              @change="handleSearch"
-              style="width: 150px; margin-left: 20px;"
-          />
-        </div>
-      </template>
-
-      <div class="toolbar">
-        <el-input
-            v-model="searchQuery"
-            placeholder="搜索患者姓名、手机号..."
-            class="search-input"
-            :prefix-icon="Search"
-            @keyup.enter="handleSearch"
-            clearable
-            @clear="handleSearch"
-        />
-        <el-button
-            type="primary"
-            :icon="Refresh"
-            @click="fetchPatients"
-            :loading="loading">
-          刷新
-        </el-button>
-      </div>
+    <div class="main-content">
+      <el-card shadow="always" class="patient-card">
 
       <!-- 患者历史记录查询 -->
       <div class="history-search-section">
@@ -121,6 +103,34 @@
           <div class="title-content">
             <span class="title-text">📋 今日排班信息</span>
           </div>
+          <!-- 今日患者查询工具栏 -->
+          <div class="today-toolbar">
+            <el-input
+                v-model="searchQuery"
+                placeholder="搜索患者姓名、手机号..."
+                class="search-input"
+                :prefix-icon="Search"
+                @keyup.enter="handleSearch"
+                clearable
+                @clear="handleSearch"
+            />
+            <el-date-picker
+                v-model="selectedDate"
+                type="date"
+                placeholder="选择日期"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                @change="handleSearch"
+                style="width: 150px;"
+            />
+            <el-button
+                type="primary"
+                :icon="Refresh"
+                @click="fetchPatients"
+                :loading="loading">
+              刷新
+            </el-button>
+          </div>
         </div>
 
         <!-- 上午排班 -->
@@ -176,7 +186,6 @@
             </template>
           </el-table-column>
         </el-table>
-        <el-empty v-if="!loading && morningPatients.length === 0" description="上午暂无患者" :image-size="100" />
       </div>
 
       <!-- 下午排班 -->
@@ -232,13 +241,11 @@
             </template>
           </el-table-column>
         </el-table>
-        <el-empty v-if="!loading && afternoonPatients.length === 0" description="下午暂无患者" :image-size="100" />
       </div>
-
-      <el-empty v-if="!loading && allPatients.length === 0" description="当日暂无患者" :image-size="120" />
       </div>
 
     </el-card>
+    </div>
   </div>
 </template>
 
@@ -305,6 +312,13 @@ const getStatusTag = (status) => {
   return tags[status] || 'default';
 };
 
+
+// --- 工具函数 ---
+const getAvatarUrl = (photoUrl) => {
+  if (!photoUrl) return new URL('@/assets/doctor.jpg', import.meta.url).href;
+  if (photoUrl.startsWith('http')) return photoUrl;
+  return `http://localhost:9090${photoUrl}`;
+};
 
 // --- 状态 ---
 const router = useRouter();
@@ -448,15 +462,89 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.patient-info-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+/* 顶部导航栏 */
+.top-navbar {
+  background: #fff;
+  border-bottom: 1px solid #e4e7ed;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 64px;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 8px;
+}
+
+.logo-section h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #f5f7fa;
+  border-radius: 20px;
+}
+
+.user-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.main-content {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
 .app-container {
   padding: 24px;
   background-color: #f7fafc;
   min-height: calc(100vh - 50px);
 }
+
 .patient-card {
   flex: 1;
   overflow: auto;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -464,13 +552,16 @@ onMounted(() => {
   font-size: 18px;
   font-weight: bold;
 }
-.toolbar {
+
+/* 今日患者查询工具栏 */
+.today-toolbar {
   display: flex;
-  justify-content: space-between;
+  gap: 10px;
   align-items: center;
 }
-.search-input {
-  max-width: 300px;
+
+.today-toolbar .search-input {
+  width: 220px;
 }
 .text-truncate {
   display: -webkit-box;
@@ -488,16 +579,15 @@ onMounted(() => {
 
 /* 排班包装器 */
 .schedule-wrapper {
-  padding: 24px;
+  padding: 20px;
   background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
 }
 
 /* 排班区域样式 */
 .schedule-section {
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
 .schedule-section:first-of-type {
@@ -508,54 +598,58 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 10px 16px;
   margin-bottom: 12px;
-  border-radius: 8px;
-  font-weight: bold;
+  border-radius: 4px;
+  font-weight: 500;
+  background: #f5f7fa;
+  border-left: 3px solid #409eff;
 }
 
 .morning-header {
-  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-  color: #2c3e50;
+  border-left-color: #67c23a;
 }
 
 .afternoon-header {
-  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-  color: #2c3e50;
+  border-left-color: #e6a23c;
 }
 
 .section-title {
-  font-size: 16px;
+  font-size: 15px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  color: #303133;
 }
 
 .patient-count {
-  font-size: 14px;
-  padding: 4px 12px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 12px;
+  font-size: 13px;
+  padding: 2px 10px;
+  background: #ffffff;
+  border-radius: 4px;
   color: #606266;
+  border: 1px solid #dcdfe6;
 }
 
 /* 区块标题栏样式 */
 .section-title-bar {
-  padding: 16px 20px;
-  margin-bottom: 20px;
-  border-radius: 8px;
-  border-left: 4px solid;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  border-left: 3px solid;
+  background: #f5f7fa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .history-title-bar {
-  background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%);
-  border-left-color: #00897b;
+  border-left-color: #409eff;
 }
 
 .schedule-title-bar {
-  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-  border-left-color: #f57c00;
-  margin-bottom: 24px;
+  border-left-color: #409eff;
+  margin-bottom: 20px;
 }
 
 .title-content {
@@ -565,24 +659,23 @@ onMounted(() => {
 }
 
 .title-icon {
-  font-size: 20px;
-  color: #00897b;
+  font-size: 18px;
+  color: #409eff;
 }
 
 .title-text {
-  font-size: 17px;
-  font-weight: 600;
-  color: #2c3e50;
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
 }
 
 /* 历史记录查询样式 */
 .history-search-section {
-  margin-bottom: 48px;
-  padding: 24px;
+  margin-bottom: 24px;
+  padding: 20px;
   background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
 }
 
 .history-search-toolbar {

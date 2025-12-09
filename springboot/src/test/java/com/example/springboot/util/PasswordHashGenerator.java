@@ -17,7 +17,7 @@ public class PasswordHashGenerator {
         System.out.println("生成的哈希值: " + hashedPassword);
 
         // 生成第二个密码的哈希值 (用户B)
-        String activePassword = "03test";
+        String activePassword = "01test";
         String hashedActivePassword = encoder.encode(activePassword);
         System.out.println("原始密码: " + activePassword);
         System.out.println("生成的哈希值: " + hashedActivePassword);

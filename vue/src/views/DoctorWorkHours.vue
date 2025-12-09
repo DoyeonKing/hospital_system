@@ -3,11 +3,18 @@
     <div class="top-navbar">
       <div class="navbar-content">
         <div class="navbar-left">
-          <el-button :icon="ArrowLeft" @click="goBack">返回</el-button>
-          <h2>我的工时统计</h2>
+          <BackButton />
+          <div class="logo-section">
+            <el-icon :size="28"><DataLine /></el-icon>
+            <h2>我的工时统计</h2>
+          </div>
         </div>
         <div class="navbar-right">
           <el-button type="primary" @click="exportData" :disabled="!workHoursList.length" :loading="exporting">导出PDF</el-button>
+          <div class="user-info">
+            <el-avatar :size="36" :src="getAvatarUrl(doctorStore.detailedDoctorInfo?.photoUrl)" />
+            <span class="user-name">{{ doctorStore.displayName }} 医生</span>
+          </div>
         </div>
       </div>
     </div>
@@ -184,16 +191,22 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Clock, User, Moon, TrendCharts } from '@element-plus/icons-vue'
+import { Clock, User, Moon, TrendCharts, DataLine } from '@element-plus/icons-vue'
 import { useDoctorStore } from '@/stores/doctorStore'
+import BackButton from '@/components/BackButton.vue'
 import request from '@/utils/request'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 
-const router = useRouter()
 const doctorStore = useDoctorStore()
+
+// 工具函数
+const getAvatarUrl = (photoUrl) => {
+  if (!photoUrl) return new URL('@/assets/doctor.jpg', import.meta.url).href;
+  if (photoUrl.startsWith('http')) return photoUrl;
+  return `http://localhost:9090${photoUrl}`;
+};
 
 const loading = ref(false)
 const exporting = ref(false)
@@ -421,10 +434,6 @@ const exportData = async () => {
   }
 }
 
-// 返回
-const goBack = () => {
-  router.back()
-}
 
 // 页面加载时
 onMounted(() => {
@@ -446,6 +455,12 @@ onMounted(() => {
 .doctor-work-hours {
   min-height: 100vh;
   background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
+  padding: 24px 32px;
+}
+
+.back-area {
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .top-navbar {
@@ -462,7 +477,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   height: 64px;
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 0 32px;
 }
@@ -473,10 +488,38 @@ onMounted(() => {
   gap: 16px;
 }
 
-.navbar-left h2 {
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 8px;
+}
+
+.logo-section h2 {
   margin: 0;
-  font-size: 1.3rem;
+  font-size: 1.4rem;
   font-weight: 600;
+  color: #2c3e50;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #f5f7fa;
+  border-radius: 20px;
+}
+
+.user-name {
+  font-size: 0.95rem;
+  font-weight: 500;
   color: #2c3e50;
 }
 

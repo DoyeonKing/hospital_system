@@ -1,24 +1,30 @@
 <template>
   <div class="admin-management">
-    <div class="page-header">
-      <h2>管理员管理</h2>
-      <el-button type="primary" @click="handleAdd">
-        <el-icon><Plus /></el-icon>
-        添加管理员
-      </el-button>
+    <div class="back-area" style="margin-bottom: 12px;">
+      <BackButton />
     </div>
 
-    <!-- 搜索栏 -->
-    <el-card class="search-card">
-      <el-form :inline="true" :model="searchForm">
+    <el-card shadow="always">
+      <template #header>
+        <div class="card-header-title">
+          <span>管理员管理</span>
+          <el-button type="primary" @click="handleAdd">
+            <el-icon><Plus /></el-icon>
+            添加管理员
+          </el-button>
+        </div>
+      </template>
+
+      <!-- 搜索栏 -->
+      <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="用户名">
-          <el-input v-model="searchForm.username" placeholder="请输入用户名" clearable />
+          <el-input v-model="searchForm.username" placeholder="请输入用户名" clearable style="width: 200px" />
         </el-form-item>
         <el-form-item label="姓名">
-          <el-input v-model="searchForm.fullName" placeholder="请输入姓名" clearable />
+          <el-input v-model="searchForm.fullName" placeholder="请输入姓名" clearable style="width: 200px" />
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 150px">
             <el-option label="正常" value="active" />
             <el-option label="已禁用" value="inactive" />
           </el-select>
@@ -28,12 +34,10 @@
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
-    </el-card>
 
-    <!-- 管理员列表 -->
-    <el-card class="table-card">
-      <el-table :data="adminList" v-loading="loading" stripe>
-        <el-table-column prop="adminId" label="ID" width="80" />
+      <!-- 管理员列表 -->
+      <el-table :data="adminList" v-loading="loading" border stripe :header-cell-style="{ background: '#f5f7fa', color: '#606266' }">
+        <el-table-column prop="adminId" label="ID" width="80" align="center" />
         <el-table-column prop="username" label="用户名" width="150" />
         <el-table-column prop="fullName" label="姓名" width="120" />
         <el-table-column label="角色" width="200">
@@ -48,14 +52,14 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'active' ? 'success' : 'danger'">
               {{ row.status === 'active' ? '正常' : '已禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="180">
+        <el-table-column prop="createdAt" label="创建时间" width="180" align="center">
           <template #default="{ row }">
             {{ formatDateTime(row.createdAt) }}
           </template>
@@ -221,6 +225,7 @@
 import { ref, reactive, onMounted, computed } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Edit, View, Switch, Key } from '@element-plus/icons-vue';
+import BackButton from '@/components/BackButton.vue';
 import request from '@/utils/request';
 
 // 数据
@@ -525,33 +530,48 @@ onMounted(() => {
 <style scoped>
 .admin-management {
   padding: 20px;
+  background-color: #f5f7fa;
+  min-height: calc(100vh - 50px);
 }
 
-.page-header {
+.card-header-title {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
-.page-header h2 {
-  margin: 0;
-  font-size: 24px;
+.card-header-title span {
+  font-size: 18px;
+  font-weight: 600;
   color: #303133;
 }
 
-.search-card {
-  margin-bottom: 20px;
-}
-
-.table-card {
-  margin-bottom: 20px;
+.search-form {
+  margin-bottom: 16px;
+  padding: 16px;
+  background-color: #f9fafb;
+  border-radius: 8px;
 }
 
 .pagination {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+/* 表格优化 */
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-table th) {
+  font-weight: 600;
+}
+
+:deep(.el-table .el-tag) {
+  font-weight: 500;
 }
 
 .permission-detail {

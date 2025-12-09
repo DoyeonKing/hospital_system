@@ -1,5 +1,8 @@
 <template>
   <div class="on-site-service-container">
+    <div class="back-area" style="margin-bottom: 12px;">
+      <BackButton />
+    </div>
     <el-card>
       <template #header>
         <div class="card-header">
@@ -402,8 +405,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import BackButton from '@/components/BackButton.vue';
 import { Loading, User, Calendar, Clock, Location } from '@element-plus/icons-vue';
 import { createWalkInAppointment, refundAppointment, searchAppointments, payForAppointment, getPatientAppointments } from '@/api/appointment';
 import { getAllSchedules } from '@/api/schedule';
@@ -1348,6 +1352,12 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.card-header span {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .search-form {

@@ -53,7 +53,7 @@ const development = {
 	
 	// 如果要在浏览器测试，可以临时改为：
 	baseURL: 'http://localhost:8080',
-	aiBaseURL: 'http://localhost:3000' // AI 预问诊后端服务（Node.js）
+	aiBaseURL: 'http://localhost:5000' // AI 预问诊后端服务（Node.js）- 端口5000
 }
 
 // 生产环境配置
