@@ -422,6 +422,12 @@ onMounted(() => {
   align-items: center;
 }
 
+.card-header span {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
 .header-actions {
   display: flex;
   align-items: center;

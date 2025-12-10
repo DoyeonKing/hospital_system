@@ -466,10 +466,10 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'AI 预问诊服务运行正常' });
 });
 
-// 启动服务器
-app.listen(PORT, () => {
+// 启动服务器 - 使用 127.0.0.1 强制 IPv4
+app.listen(PORT, '127.0.0.1', () => {
   console.log(`🚀 AI 预问诊服务已启动`);
-  console.log(`📍 服务地址: http://localhost:${PORT}`);
+  console.log(`📍 服务地址: http://127.0.0.1:${PORT}`);
   console.log(`📝 请确保已配置 .env 文件中的数据库和通义千问 API 密钥`);
 });
 

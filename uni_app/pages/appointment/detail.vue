@@ -4,9 +4,15 @@
 			<text class="page-title">预约详情</text>
 		</view>
 		
-		<view class="content">
+		<view class="content" :class="{ 'content-loaded': !loading }">
+			<!-- 加载指示器 -->
+			<view class="loading-container" v-if="loading">
+				<view class="loading-spinner"></view>
+				<text class="loading-text">加载中...</text>
+			</view>
+			
 			<!-- 状态卡片 -->
-			<view class="status-card">
+			<view class="status-card" v-if="!loading">
 				<view class="status-icon" :class="isExpiredStatus(appointment) ? 'expired' : appointment.status">
 					<text>{{ getStatusIcon(appointment) }}</text>
 				</view>
@@ -14,7 +20,7 @@
 			</view>
 			
 			<!-- 患者信息 -->
-			<view class="info-card">
+			<view class="info-card" v-if="!loading">
 				<view class="card-title">患者信息</view>
 				<view class="info-row">
 					<text class="label">姓名：</text>
@@ -27,7 +33,7 @@
 			</view>
 			
 			<!-- 预约信息 -->
-			<view class="info-card">
+			<view class="info-card" v-if="!loading">
 				<view class="card-title">预约信息</view>
 				<view class="info-row">
 					<text class="label">科室：</text>
@@ -61,7 +67,7 @@
 			</view>
 			
 			<!-- 过号提示卡片（已叫号但状态已改回scheduled） -->
-			<view class="missed-call-card" v-if="appointment.calledAt && appointment.status !== 'checked_in'">
+			<view class="missed-call-card" v-if="!loading && appointment.calledAt && appointment.status !== 'checked_in'">
 				<view class="missed-call-icon">⚠️</view>
 				<view class="missed-call-content">
 					<text class="missed-call-title">您已过号</text>
@@ -70,7 +76,7 @@
 			</view>
 			
 			<!-- 待支付提示卡片 -->
-			<view class="payment-pending-card" v-if="isPendingPaymentStatus(appointment.status)">
+			<view class="payment-pending-card" v-if="!loading && isPendingPaymentStatus(appointment.status)">
 				<view class="payment-icon">💰</view>
 				<view class="payment-content">
 					<text class="payment-title">待支付</text>
@@ -83,7 +89,7 @@
 			</view>
 			
 			<!-- 签到二维码（已支付且未过期状态显示，排除待支付状态） -->
-			<view class="qr-code-card" v-if="isConfirmedStatus(appointment.status) && !isPendingPaymentStatus(appointment.status) && !isExpiredStatus(appointment)">
+			<view class="qr-code-card" v-if="!loading && isConfirmedStatus(appointment.status) && !isPendingPaymentStatus(appointment.status) && !isExpiredStatus(appointment)">
 				<view class="qr-title">
 					<text class="qr-icon">📱</text>
 					<text class="qr-text">签到二维码</text>
@@ -105,7 +111,7 @@
 			</view>
 			
 			<!-- 导航按钮（仅已确认且未过期状态显示） -->
-			<view class="navigation-section" v-if="isConfirmedStatus(appointment.status) && !isExpiredStatus(appointment)">
+			<view class="navigation-section" v-if="!loading && isConfirmedStatus(appointment.status) && !isExpiredStatus(appointment)">
 				<button class="navigation-btn" @click="handleNavigation">
 					<text class="nav-icon">🧭</text>
 					<text>导航到诊室</text>
@@ -113,7 +119,7 @@
 			</view>
 			
 			<!-- 操作按钮 -->
-			<view class="action-section" v-if="!isCancelledStatus(appointment.status)">
+			<view class="action-section" v-if="!isCancelledStatus(appointment.status) && !loading">
 				<!-- 待支付状态：显示支付和取消按钮 -->
 				<view class="button-row" v-if="isPendingPaymentStatus(appointment.status)">
 					<button class="pay-btn-half" @click="handlePayment">立即支付</button>
@@ -848,6 +854,42 @@ onUnload() {
 
 	.content {
 		padding: 30rpx;
+		opacity: 0;
+		transition: opacity 0.3s ease-in;
+	}
+	
+	.content-loaded {
+		opacity: 1;
+	}
+	
+	.loading-container {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 120rpx 0;
+		min-height: 400rpx;
+	}
+	
+	.loading-spinner {
+		width: 80rpx;
+		height: 80rpx;
+		border: 6rpx solid #E6F7FF;
+		border-top-color: #4FD9C3;
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+	}
+	
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	
+	.loading-text {
+		margin-top: 30rpx;
+		font-size: 28rpx;
+		color: #718096;
 	}
 
 	.status-card {
@@ -1031,6 +1073,18 @@ onUnload() {
 		padding: 30rpx;
 		background: #ffffff;
 		box-shadow: 0 -2rpx 12rpx rgba(0, 0, 0, 0.08);
+		animation: slideUp 0.3s ease-out;
+	}
+	
+	@keyframes slideUp {
+		from {
+			opacity: 0;
+			transform: translateY(100rpx);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.button-row {

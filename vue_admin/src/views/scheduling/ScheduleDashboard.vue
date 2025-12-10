@@ -4,13 +4,15 @@
       <BackButton />
     </div>
     
-    <!-- 折叠/展开按钮 -->
-    <div class="sidebar-toggle" :class="{ collapsed: sidebarCollapsed }" @click="toggleSidebar" :title="sidebarCollapsed ? '展开科室列表' : '收起科室列表'">
-      <el-icon><component :is="sidebarCollapsed ? 'DArrowRight' : 'DArrowLeft'" /></el-icon>
-    </div>
-    
-    <!-- 左侧科室导航 -->
-    <div class="department-sidebar" :class="{ 'collapsed': sidebarCollapsed }">
+    <!-- 主要内容容器 -->
+    <div class="main-container">
+      <!-- 折叠/展开按钮 -->
+      <div class="sidebar-toggle" :class="{ collapsed: sidebarCollapsed }" @click="toggleSidebar" :title="sidebarCollapsed ? '展开科室列表' : '收起科室列表'">
+        <el-icon><component :is="sidebarCollapsed ? 'DArrowRight' : 'DArrowLeft'" /></el-icon>
+      </div>
+      
+      <!-- 左侧科室导航 -->
+      <div class="department-sidebar" :class="{ 'collapsed': sidebarCollapsed }">
       <div v-if="loadingDepartments" class="loading-container">
         <el-icon class="is-loading"><Loading /></el-icon>
         <span>加载科室数据中...</span>
@@ -350,6 +352,70 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 隐藏的冲突报告内容 -->
+    <div id="conflict-report-content" style="position: absolute; top: -9999px; left: -9999px; width: 794px; background: white; padding: 30px 20px; font-family: 'Microsoft YaHei', 'SimSun', sans-serif; z-index: -1; opacity: 0; pointer-events: none;">
+      <!-- 报告标题 -->
+      <div style="text-align: center; margin-bottom: 25px;">
+        <h1 style="font-size: 22px; font-weight: bold; color: #1a202c; margin: 0 0 10px 0;">排班冲突报告</h1>
+        <p style="font-size: 13px; color: #606266; margin: 0;">{{ conflictReportDate }}</p>
+        <div style="border-bottom: 2px solid #e2e8f0; margin-top: 12px;"></div>
+      </div>
+
+      <!-- 基本信息 -->
+      <div style="margin-bottom: 20px;">
+        <p style="font-size: 12px; color: #4a5568; margin: 0 0 8px 0;"><strong>科室：</strong>{{ selectedDepartmentName }}</p>
+        <p style="font-size: 12px; color: #4a5568; margin: 0;"><strong>生成时间：</strong>{{ conflictReportTime }}</p>
+      </div>
+
+      <!-- 冲突汇总 -->
+      <div style="margin-bottom: 25px;">
+        <h2 style="font-size: 16px; font-weight: bold; color: #1a202c; margin: 0 0 12px 0; border-left: 4px solid #e53e3e; padding-left: 10px;">冲突汇总</h2>
+        <div style="background: #fff5f5; padding: 15px; border-radius: 8px; border: 1px solid #feb2b2;">
+          <div style="margin-bottom: 8px;"><strong style="color: #2d3748;">总计：</strong><span style="color: #4a5568;">{{ conflictData.summary.total }} 个冲突</span></div>
+          <div style="margin-bottom: 8px;"><strong style="color: #e53e3e;">严重冲突：</strong><span style="color: #4a5568;">{{ conflictData.summary.critical }} 个</span></div>
+          <div><strong style="color: #f59e0b;">警告冲突：</strong><span style="color: #4a5568;">{{ conflictData.summary.warning }} 个</span></div>
+        </div>
+      </div>
+
+      <!-- 冲突详情 -->
+      <div style="margin-bottom: 20px;">
+        <h2 style="font-size: 16px; font-weight: bold; color: #1a202c; margin: 0 0 12px 0; border-left: 4px solid #667eea; padding-left: 10px;">冲突详情</h2>
+        
+        <div v-for="(conflict, index) in conflictData.conflicts" :key="index" style="margin-bottom: 20px; page-break-inside: avoid;">
+          <!-- 冲突标题 -->
+          <div style="background: #f7fafc; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid" :style="{ borderLeftColor: conflict.severity === 'critical' ? '#e53e3e' : '#f59e0b' }">
+            <h3 style="font-size: 14px; font-weight: bold; margin: 0 0 6px 0;" :style="{ color: conflict.severity === 'critical' ? '#e53e3e' : '#f59e0b' }">
+              {{ index + 1 }}. {{ conflict.title }} [{{ conflict.severity === 'critical' ? '严重' : '警告' }}]
+            </h3>
+            <p style="font-size: 12px; color: #4a5568; margin: 0;">{{ conflict.description }}</p>
+          </div>
+
+          <!-- 冲突详细信息 -->
+          <div style="background: #ffffff; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 10px;">
+            <div v-for="(detail, detailIndex) in conflict.details" :key="detailIndex" style="margin-bottom: 6px; font-size: 11px; color: #718096; line-height: 1.5;">
+              • {{ detail }}
+            </div>
+          </div>
+
+          <!-- 涉及医生 -->
+          <div v-if="conflict.allDoctors && conflict.allDoctors.length > 0" style="padding: 10px; background: #f0f9ff; border-radius: 6px; border: 1px solid #bfdbfe;">
+            <p style="font-size: 11px; color: #2d3748; margin: 0 0 6px 0;"><strong>涉及医生：</strong></p>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <span v-for="doctor in conflict.allDoctors" :key="doctor.id" style="display: inline-block; padding: 4px 8px; background: #dbeafe; color: #1e40af; border-radius: 4px; font-size: 10px;">
+                {{ doctor.name }} ({{ doctor.identifier || doctor.id }})
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 页脚 -->
+      <div style="margin-top: 30px; text-align: center; font-size: 10px; color: #999999; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+        <p style="margin: 0;">报告生成时间：{{ conflictReportTime }} | 医院排班系统</p>
+      </div>
+    </div>
+    </div><!-- 主要内容容器结束 -->
   </div>
 </template>
 
@@ -365,6 +431,9 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 // [新增] 导入 Excel 解析库
 import * as XLSX from 'xlsx';
+// [新增] 导入 jsPDF 和 html2canvas 用于生成PDF报告
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { ElMessage } from 'element-plus';
 import doctorMaleImg from '@/assets/doctor.jpg';
 import doctorFemaleImg from '@/assets/doctor1.jpg';
@@ -471,6 +540,10 @@ const conflictData = ref({
 const conflictDialogVisible = ref(false);
 const activeConflictNames = ref([]);
 
+// 冲突报告相关数据
+const conflictReportDate = ref('');
+const conflictReportTime = ref('');
+
 const subDepartments = computed(() => {
   if (!activeParent.value) return [];
   const parent = departments.value.find(p => p.id === activeParent.value);
@@ -535,7 +608,8 @@ const selectedDepartmentName = computed(() => {
   for (const parent of departments.value) {
     const sub = parent.children.find(c => c.id === activeSub.value);
     if (sub) {
-      return sub.name;
+      // 返回父科室名称 + 子科室名称
+      return `${parent.name}-${sub.name}`;
   }
   }
   
@@ -2343,25 +2417,28 @@ watch(() => timeSlotColumns.value, () => {
 const loadDepartments = async () => {
   try {
     loadingDepartments.value = true;
-    console.log('开始获取科室数据...');
+    console.log('🔍 开始获取科室数据...');
     
     // 获取所有父科室
     const parentResponse = await getAllParentDepartments();
-    console.log('父科室API响应:', parentResponse);
+    console.log('📋 父科室API响应:', parentResponse);
+    console.log('📊 父科室数量:', parentResponse?.length);
     
     if (parentResponse && Array.isArray(parentResponse)) {
       const parentDepartments = parentResponse;
-      console.log('父科室数据:', parentDepartments);
+      console.log('✅ 父科室数据:', parentDepartments);
       
       // 为每个父科室获取子科室
       const departmentsWithChildren = await Promise.all(
         parentDepartments.map(async (parent) => {
           try {
+            console.log(`🔄 正在获取父科室 "${parent.name}" (ID: ${parent.parentDepartmentId}) 的子科室...`);
             const childrenResponse = await getDepartmentsByParentId(parent.parentDepartmentId);
-            console.log(`父科室 ${parent.name} 的子科室响应:`, childrenResponse);
+            console.log(`📥 父科室 "${parent.name}" 的子科室API响应:`, childrenResponse);
             
             const children = childrenResponse && Array.isArray(childrenResponse) ? childrenResponse : [];
-            console.log(`父科室 ${parent.name} 的子科室:`, children);
+            console.log(`✅ 父科室 "${parent.name}" 的子科室数量: ${children.length}`);
+            console.log(`📝 子科室列表:`, children.map(c => c.name).join(', '));
             
             return {
               id: `p${parent.parentDepartmentId}`,
@@ -2377,7 +2454,8 @@ const loadDepartments = async () => {
               }))
             };
           } catch (error) {
-            console.error(`获取父科室 ${parent.name} 的子科室失败:`, error);
+            console.error(`❌ 获取父科室 "${parent.name}" 的子科室失败:`, error);
+            console.error('错误详情:', error.response?.data || error.message);
             return {
               id: `p${parent.parentDepartmentId}`,
               name: parent.name,
@@ -2390,17 +2468,22 @@ const loadDepartments = async () => {
       );
       
       departments.value = departmentsWithChildren;
-      console.log('最终科室数据结构:', departments.value);
+      console.log('🎉 最终科室数据结构:', departments.value);
+      console.log('📊 科室统计:');
+      departments.value.forEach(dept => {
+        console.log(`  - ${dept.name}: ${dept.children.length} 个子科室`);
+      });
       
       // 初始进入页面不选中任何科室，等待用户手动选择
       
     } else {
-      console.error('获取父科室数据失败:', parentResponse);
+      console.error('❌ 获取父科室数据失败，响应格式不正确:', parentResponse);
       ElMessage.warning('获取科室数据失败，使用默认数据');
       loadFallbackDepartments();
     }
   } catch (error) {
-    console.error('获取科室数据出错:', error);
+    console.error('❌ 获取科室数据出错:', error);
+    console.error('错误详情:', error.response?.data || error.message);
     ElMessage.warning('网络错误，使用默认科室数据');
     loadFallbackDepartments();
   } finally {
@@ -2892,68 +2975,209 @@ const showConflictDialog = () => {
   }
 };
 
-// [新增] 导出冲突报告
-const exportConflictReport = () => {
-  try {
-    const report = generateConflictReport();
-    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const timestamp = new Date().toISOString().split('T')[0];
-    link.download = `排班冲突报告_${selectedDepartmentName.value}_${timestamp}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    ElMessage.success('冲突报告已导出');
-  } catch (error) {
-    console.error('导出冲突报告失败:', error);
-    ElMessage.error('导出失败');
+// 创建文本Canvas - 用于PDF中文渲染
+const createTextCanvas = (text, fontSize, fontWeight = 'normal', color = '#303133', align = 'left', width = 170) => {
+  const canvas = document.createElement('canvas');
+  const scaleFactor = 6;
+  canvas.width = width * scaleFactor;
+  canvas.height = fontSize * scaleFactor * 1.8;
+  const ctx = canvas.getContext('2d');
+  
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = color;
+  
+  const fontFamily = fontWeight === 'bold' 
+    ? 'bold Microsoft YaHei, SimHei, STHeiti, sans-serif' 
+    : 'Microsoft YaHei, SimSun, STSong, sans-serif';
+  ctx.font = `${fontSize * scaleFactor}px ${fontFamily}`;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  
+  let xPos;
+  if (align === 'center') {
+    xPos = canvas.width / 2;
+  } else if (align === 'left') {
+    xPos = 60;
+  } else {
+    xPos = canvas.width - 60;
   }
+  
+  ctx.fillText(text, xPos, canvas.height / 2);
+  return canvas;
 };
 
-// [新增] 生成冲突报告文本
-const generateConflictReport = () => {
-  const lines = [];
-  lines.push('=' .repeat(60));
-  lines.push(`排班冲突报告`);
-  lines.push(`科室: ${selectedDepartmentName.value}`);
-  lines.push(`生成时间: ${new Date().toLocaleString('zh-CN')}`);
-  lines.push('=' .repeat(60));
-  lines.push('');
-  
-  lines.push(`冲突汇总:`);
-  lines.push(`  总计: ${conflictData.value.summary.total} 个冲突`);
-  lines.push(`  严重: ${conflictData.value.summary.critical} 个`);
-  lines.push(`  警告: ${conflictData.value.summary.warning} 个`);
-  lines.push('');
-  lines.push('-' .repeat(60));
-  lines.push('');
-  
-  conflictData.value.conflicts.forEach((conflict, index) => {
-    lines.push(`${index + 1}. ${conflict.title} [${conflict.severity === 'critical' ? '严重' : '警告'}]`);
-    lines.push(`   ${conflict.description}`);
-    lines.push('');
+// [新增] 导出冲突报告为PDF
+const exportConflictReport = async () => {
+  try {
+    ElMessage.info('正在生成PDF报告，请稍候...');
     
-    conflict.details.forEach(detail => {
-      lines.push(`   ${detail}`);
-    });
+    // 准备报告数据
+    const now = new Date();
+    conflictReportDate.value = now.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).replace(/\//g, '-');
+    conflictReportTime.value = now.toLocaleString('zh-CN');
     
-    if (conflict.allDoctors && conflict.allDoctors.length > 0) {
-      lines.push(`   涉及医生: ${conflict.allDoctors.map(d => `${d.name}(${d.identifier || d.id})`).join(', ')}`);
+    // 等待 Vue 更新 DOM
+    await nextTick();
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // 获取报告内容元素
+    const reportContent = document.getElementById('conflict-report-content');
+    if (!reportContent) {
+      throw new Error('无法找到报告内容元素');
     }
     
-    lines.push('');
-    lines.push('-' .repeat(60));
-    lines.push('');
-  });
-  
-  lines.push('');
-  lines.push('报告结束');
-  lines.push('=' .repeat(60));
-  
-  return lines.join('\n');
+    // 临时显示报告内容以便 html2canvas 可以渲染（但保持在屏幕外）
+    const originalStyle = {
+      position: reportContent.style.position,
+      top: reportContent.style.top,
+      left: reportContent.style.left,
+      opacity: reportContent.style.opacity,
+      zIndex: reportContent.style.zIndex,
+      visibility: reportContent.style.visibility
+    };
+    
+    // 将元素移到屏幕外但保持可渲染状态
+    reportContent.style.position = 'fixed';
+    reportContent.style.top = '0';
+    reportContent.style.left = '-10000px';
+    reportContent.style.opacity = '1';
+    reportContent.style.zIndex = '-1';
+    reportContent.style.visibility = 'visible';
+    
+    // 等待样式应用
+    await nextTick();
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // 使用 html2canvas 直接渲染
+    const canvas = await html2canvas(reportContent, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      width: 794,
+      windowWidth: 794,
+      scrollX: 0,
+      scrollY: 0
+    });
+    
+    // 立即恢复原始样式
+    reportContent.style.position = originalStyle.position;
+    reportContent.style.top = originalStyle.top;
+    reportContent.style.left = originalStyle.left;
+    reportContent.style.opacity = originalStyle.opacity;
+    reportContent.style.zIndex = originalStyle.zIndex;
+    reportContent.style.visibility = originalStyle.visibility;
+    
+    // 创建 PDF
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true
+    });
+    
+    const imgData = canvas.toDataURL('image/png');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    
+    // 计算合适的缩放比例
+    const contentWidth = canvas.width;
+    const targetWidth = pdfWidth - 20;  // 左右各留 10mm 边距
+    const scale = targetWidth / contentWidth;
+    
+    const imgWidth = targetWidth;
+    const imgHeight = canvas.height * scale;
+    
+    // 计算居中位置
+    const marginX = (pdfWidth - imgWidth) / 2;
+    
+    // 智能分页
+    const pageHeightInPixels = pdfHeight / scale;
+    let currentY = 0;
+    let pageCount = 0;
+    
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    while (currentY < canvas.height) {
+      if (pageCount > 0) {
+        pdf.addPage();
+      }
+      
+      let sliceHeight = Math.min(pageHeightInPixels, canvas.height - currentY);
+      
+      // 智能分页：寻找空白区域
+      if (currentY + sliceHeight < canvas.height) {
+        const searchStart = currentY + sliceHeight * 0.75;
+        const searchEnd = currentY + sliceHeight;
+        let maxWhiteLines = 0;
+        let currentWhiteLines = 0;
+        let bestWhiteLineStart = sliceHeight;
+        
+        for (let y = searchStart; y < searchEnd && y < canvas.height; y++) {
+          const imageData = canvas.getContext('2d').getImageData(0, y, canvas.width, 1);
+          const pixels = imageData.data;
+          
+          let whitePixelCount = 0;
+          for (let i = 0; i < pixels.length; i += 4) {
+            const r = pixels[i];
+            const g = pixels[i + 1];
+            const b = pixels[i + 2];
+            if (r > 245 && g > 245 && b > 245) {
+              whitePixelCount++;
+            }
+          }
+          
+          if (whitePixelCount / canvas.width > 0.95) {
+            currentWhiteLines++;
+            if (currentWhiteLines > maxWhiteLines) {
+              maxWhiteLines = currentWhiteLines;
+              bestWhiteLineStart = y - currentY - currentWhiteLines + 1;
+            }
+          } else {
+            currentWhiteLines = 0;
+          }
+        }
+        
+        if (maxWhiteLines >= 3) {
+          sliceHeight = bestWhiteLineStart + Math.floor(maxWhiteLines / 2);
+        }
+      }
+      
+      // 创建当前页的图片切片
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = sliceHeight;
+      tempCtx.drawImage(
+        canvas,
+        0, currentY, canvas.width, sliceHeight,
+        0, 0, canvas.width, sliceHeight
+      );
+      
+      const pageImgData = tempCanvas.toDataURL('image/png');
+      const pageImgHeight = sliceHeight * scale;
+      
+      pdf.addImage(pageImgData, 'PNG', marginX, 0, imgWidth, pageImgHeight);
+      
+      currentY += sliceHeight;
+      pageCount++;
+    }
+    
+    // 生成文件名并下载
+    const fileName = `排班冲突报告_${selectedDepartmentName.value}_${conflictReportDate.value}.pdf`;
+    pdf.save(fileName);
+    
+    ElMessage.success('冲突报告已导出为PDF');
+  } catch (error) {
+    console.error('导出冲突报告失败:', error);
+    ElMessage.error('导出失败: ' + (error.message || '请重试'));
+  }
 };
 
 // [新增] 自动填充排班数据
@@ -3265,9 +3489,17 @@ onMounted(async () => {
 <style scoped>
 .schedule-dashboard {
   display: flex;
+  flex-direction: column;
   height: calc(100vh - 50px);
   background-color: #f7fafc;
   overflow: hidden; /* 防止整个页面滚动 */
+}
+
+.main-container {
+  display: flex;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
 }
 
 /* [新增] 头部控制按钮样式 */
@@ -3397,7 +3629,7 @@ onMounted(async () => {
   border-right: 1px solid #e2e8f0;
   flex-shrink: 0;
   overflow-y: auto; /* 垂直滚动 */
-  max-height: calc(100vh - 50px); /* 限制最大高度 */
+  height: 100%; /* 占满main-container的高度 */
   scroll-behavior: smooth; /* 平滑滚动 */
   transition: all 0.3s ease;
 }
@@ -3413,7 +3645,7 @@ onMounted(async () => {
 .sidebar-toggle {
   position: absolute;
   left: 320px;                /* 贴在侧栏右边缘 */
-  top: 50%;                   /* 垂直居中 */
+  top: 50%;                   /* 垂直居中（相对于main-container） */
   transform: translateY(-50%);
   width: 28px;
   height: 64px;
@@ -3423,8 +3655,8 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   z-index: 10;
+  cursor: pointer;
   transition: all 0.2s ease;
   color: #fff;
 }
@@ -3483,10 +3715,32 @@ onMounted(async () => {
 .sub-department-panel {
   flex: 1;
   padding: 8px;
+  padding-right: 4px;
   border-left: 1px solid #e2e8f0;
+  overflow-y: auto;
+}
+
+/* 子科室面板滚动条样式 */
+.sub-department-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sub-department-panel::-webkit-scrollbar-track {
+  background-color: transparent;
+  margin: 4px 0;
+}
+
+.sub-department-panel::-webkit-scrollbar-thumb {
+  background-color: #d0d7de;
+  border-radius: 3px;
+}
+
+.sub-department-panel::-webkit-scrollbar-thumb:hover {
+  background-color: #b0b7be;
 }
 .sub-department-item {
-  padding: 10px 15px;
+  padding: 10px 12px 10px 15px;
+  margin-right: 4px;
   cursor: pointer;
   border-radius: 4px;
 }
@@ -3507,7 +3761,7 @@ onMounted(async () => {
   overflow-y: scroll; /* 始终显示垂直滚动条 */
   overflow-x: hidden; /* 隐藏横向滚动 */
   min-width: 0;
-  height: calc(100vh - 50px); /* 固定高度 */
+  height: 100%; /* 占满main-container的高度 */
   scroll-behavior: smooth; /* 平滑滚动 */
 }
 

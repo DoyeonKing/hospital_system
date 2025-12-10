@@ -22,8 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -343,6 +342,121 @@ public class ScheduleServiceImpl implements ScheduleService {
             response.setBookedSlots(schedule.getBookedSlots());
             return response;
         });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WorkHoursResponse> getDoctorWorkHours(Integer doctorId, String startDate, String endDate) {
+        // 解析日期参数
+        java.time.LocalDate start = null;
+        java.time.LocalDate end = null;
+        
+        if (startDate != null && !startDate.isEmpty()) {
+            try {
+                start = java.time.LocalDate.parse(startDate);
+            } catch (Exception e) {
+                System.err.println("解析开始日期失败: " + startDate);
+            }
+        }
+        
+        if (endDate != null && !endDate.isEmpty()) {
+            try {
+                end = java.time.LocalDate.parse(endDate);
+            } catch (Exception e) {
+                System.err.println("解析结束日期失败: " + endDate);
+            }
+        }
+        
+        // 查询排班数据
+        Pageable pageable = PageRequest.of(0, 1000); // 获取所有数据
+        Page<Schedule> schedulePage = scheduleRepository.findSchedulesByDoctorIdAndDateRange(
+                doctorId, start, end, pageable);
+        
+        List<WorkHoursResponse> workHoursList = new ArrayList<>();
+        
+        // 按日期分组统计
+        Map<String, List<Schedule>> schedulesByDate = schedulePage.getContent().stream()
+                .collect(Collectors.groupingBy(s -> s.getScheduleDate().toString()));
+        
+        for (Map.Entry<String, List<Schedule>> entry : schedulesByDate.entrySet()) {
+            String date = entry.getKey();
+            List<Schedule> schedules = entry.getValue();
+            
+            // 按班段分组（上午/下午）
+            Map<String, List<Schedule>> schedulesByShift = schedules.stream()
+                    .collect(Collectors.groupingBy(s -> {
+                        int hour = s.getSlot().getStartTime().getHour();
+                        return hour < 12 ? "上午" : "下午";
+                    }));
+            
+            for (Map.Entry<String, List<Schedule>> shiftEntry : schedulesByShift.entrySet()) {
+                String shift = shiftEntry.getKey();
+                List<Schedule> shiftSchedules = shiftEntry.getValue();
+                
+                WorkHoursResponse response = new WorkHoursResponse();
+                response.setWorkDate(date);
+                response.setSegmentLabel(shift);
+                
+                // 计算首诊和末诊时间
+                String firstTime = shiftSchedules.stream()
+                        .map(s -> s.getSlot().getStartTime().toString())
+                        .min(String::compareTo)
+                        .orElse("");
+                String lastTime = shiftSchedules.stream()
+                        .map(s -> s.getSlot().getEndTime().toString())
+                        .max(String::compareTo)
+                        .orElse("");
+                
+                response.setFirstCallDisplay(firstTime);
+                response.setLastEndDisplay(lastTime);
+                
+                // 计算工时（简化计算：末诊时间 - 首诊时间）
+                double hours = calculateHours(firstTime, lastTime);
+                response.setRawHours(hours);
+                response.setRegHours(hours + 0.5); // 加上缓冲时间
+                
+                // 统计接诊人次（已预约数量）
+                int visitCount = shiftSchedules.stream()
+                        .mapToInt(Schedule::getBookedSlots)
+                        .sum();
+                response.setVisitCount(visitCount);
+                
+                // 判断是否夜班（开始时间在18:00之后）
+                boolean isNight = !firstTime.isEmpty() && Integer.parseInt(firstTime.split(":")[0]) >= 18;
+                response.setNightFlag(isNight);
+                
+                // 诊室/地点
+                String locations = shiftSchedules.stream()
+                        .map(s -> s.getLocation().getLocationName())
+                        .distinct()
+                        .collect(Collectors.joining(", "));
+                response.setLocations(locations);
+                
+                // 绩效点数（简化计算：工时 * 10）
+                response.setPerformancePoints(response.getRegHours() * 10);
+                
+                workHoursList.add(response);
+            }
+        }
+        
+        // 按日期排序
+        workHoursList.sort((a, b) -> b.getWorkDate().compareTo(a.getWorkDate()));
+        
+        return workHoursList;
+    }
+    
+    private double calculateHours(String startTime, String endTime) {
+        try {
+            String[] startParts = startTime.split(":");
+            String[] endParts = endTime.split(":");
+            
+            int startMinutes = Integer.parseInt(startParts[0]) * 60 + Integer.parseInt(startParts[1]);
+            int endMinutes = Integer.parseInt(endParts[0]) * 60 + Integer.parseInt(endParts[1]);
+            
+            return (endMinutes - startMinutes) / 60.0;
+        } catch (Exception e) {
+            return 0.0;
+        }
     }
 }
 

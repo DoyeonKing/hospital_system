@@ -1,295 +1,336 @@
-<template>
+﻿<template>
   <div class="slot-application-page">
-    <!-- 顶部导航栏 -->
     <div class="top-navbar">
       <div class="navbar-content">
         <div class="navbar-left">
-          <el-button :icon="ArrowLeft" @click="goBack" text>返回</el-button>
-          <div class="page-title">
-            <el-icon :size="24"><DocumentAdd /></el-icon>
-            <h2>申请加号</h2>
+          <BackButton />
+          <div class="logo-section">
+            <el-icon :size="28"><DocumentAdd /></el-icon>
+            <h2>我的加号申请</h2>
           </div>
         </div>
         <div class="navbar-right">
+          <el-button type="primary" :icon="Plus" @click="openApplyDialog">申请加号</el-button>
           <div class="user-info">
-            <el-avatar :size="36" :src="getAvatarUrl(doctorStore.detailedDoctorInfo.photoUrl)" />
+            <el-avatar :size="36" :src="getAvatarUrl(doctorStore.detailedDoctorInfo?.photoUrl)" />
             <span class="user-name">{{ doctorStore.displayName }} 医生</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 主要内容区域 -->
     <div class="main-content">
-      <div class="content-wrapper">
-        <!-- 左侧：申请表单 -->
-        <div class="form-section">
-          <el-card class="form-card" shadow="never">
-            <template #header>
-              <div class="card-header-content">
-                <span class="card-title">加号申请表</span>
-                <el-tag type="info" size="small">请填写完整信息</el-tag>
-              </div>
-            </template>
+      <el-card shadow="always" class="slot-card">
 
-            <el-form
-              ref="applicationFormRef"
-              :model="applicationForm"
-              :rules="formRules"
-              label-width="120px"
-              label-position="top"
-              class="application-form"
-            >
-              <!-- 基本信息 -->
-              <div class="form-section-title">
-                <el-icon><Calendar /></el-icon>
-                <span>选择排班</span>
-              </div>
+      <el-table
+          v-loading="recordsLoading"
+          :data="applicationRecords"
+          style="width: 100%; margin-top: 20px;"
+          border
+          stripe
+      >
+        <el-table-column prop="scheduleDate" label="排班日期" width="150" sortable />
+        <el-table-column prop="timeSlot" label="时段" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getTimeSlotType(row.timeSlot)" size="small">
+              {{ row.timeSlot === 'MORNING' ? '上午' : '下午' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="addedSlots" label="加号数量" width="100" align="center">
+          <template #default="{ row }">
+            {{ row.addedSlots }} 个
+          </template>
+        </el-table-column>
+        <el-table-column prop="urgencyLevel" label="紧急程度" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag :type="getUrgencyType(row.urgencyLevel)" size="small">
+              {{ getUrgencyText(row.urgencyLevel) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="reason" label="申请理由" min-width="200" />
+        <el-table-column prop="status" label="审批状态" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)">
+              {{ getStatusText(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150" align="center">
+          <template #default="{ row }">
+            <el-button
+                type="primary"
+                link
+                size="small"
+                @click="viewDetail(row)">
+              查看详情
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
 
-              <el-form-item label="选择加号时间" prop="scheduleId">
-                <el-select 
-                  v-model="applicationForm.scheduleId" 
-                  placeholder="请选择您的排班时间" 
-                  style="width: 100%"
-                  filterable
-                  :loading="schedulesLoading"
-                  @change="handleScheduleChange"
-                >
-                  <el-option
-                    v-for="schedule in availableSchedules"
-                    :key="schedule.scheduleId"
-                    :label="formatScheduleOption(schedule)"
-                    :value="schedule.scheduleId"
-                  >
-                    <div class="schedule-option">
-                      <div class="schedule-option-main">
-                        <el-icon v-if="isScheduleMorning(schedule)"><Sunrise /></el-icon>
-                        <el-icon v-else><Sunset /></el-icon>
-                        <span class="schedule-date">{{ schedule.scheduleDate }}</span>
-                        <el-tag :type="isScheduleMorning(schedule) ? 'success' : 'warning'" size="small">
-                          {{ isScheduleMorning(schedule) ? '上午' : '下午' }}
-                        </el-tag>
-                      </div>
-                      <div class="schedule-option-detail">
-                        <span>{{ schedule.startTime }} - {{ schedule.endTime }}</span>
-                        <span class="schedule-location">{{ schedule.location }}</span>
-                      </div>
-                    </div>
-                  </el-option>
-                </el-select>
-                <div v-if="selectedSchedule" class="selected-schedule-info">
-                  <el-tag type="info" size="small">已选择</el-tag>
-                  <span>{{ selectedSchedule.scheduleDate }} {{ isScheduleMorning(selectedSchedule) ? '上午' : '下午' }} {{ selectedSchedule.startTime }}-{{ selectedSchedule.endTime }}</span>
-                </div>
-              </el-form-item>
+      <el-empty v-if="!recordsLoading && applicationRecords.length === 0" description="暂无加号申请记录" />
 
-              <el-form-item label="加号数量" prop="addedSlots">
-                <el-input-number
-                  v-model="applicationForm.addedSlots"
-                  :min="1"
-                  :max="20"
-                  style="width: 100%"
-                  placeholder="请输入加号数量"
-                />
-              </el-form-item>
+    </el-card>
 
-              <!-- 紧急程度 -->
-              <div class="form-section-title">
-                <el-icon><Warning /></el-icon>
-                <span>紧急程度</span>
-              </div>
-
-              <el-form-item label="紧急程度" prop="urgencyLevel">
-                <el-radio-group v-model="applicationForm.urgencyLevel" class="urgency-radio-group">
-                  <el-radio value="LOW" border>
-                    <div class="radio-content">
-                      <el-tag type="info" size="small">低</el-tag>
-                      <span>常规加号</span>
-                    </div>
-                  </el-radio>
-                  <el-radio value="MEDIUM" border>
-                    <div class="radio-content">
-                      <el-tag type="warning" size="small">中</el-tag>
-                      <span>较为紧急</span>
-                    </div>
-                  </el-radio>
-                  <el-radio value="HIGH" border>
-                    <div class="radio-content">
-                      <el-tag type="danger" size="small">高</el-tag>
-                      <span>非常紧急</span>
-                    </div>
-                  </el-radio>
-                  <el-radio value="CRITICAL" border>
-                    <div class="radio-content">
-                      <el-tag type="danger" effect="dark" size="small">紧急</el-tag>
-                      <span>危急情况</span>
-                    </div>
-                  </el-radio>
-                </el-radio-group>
-              </el-form-item>
-
-              <!-- 申请理由 -->
-              <div class="form-section-title">
-                <el-icon><Document /></el-icon>
-                <span>申请理由</span>
-              </div>
-
-              <el-form-item label="申请理由" prop="reason">
-                <el-input
-                  v-model="applicationForm.reason"
-                  type="textarea"
-                  :rows="6"
-                  placeholder="请详细说明加号的原因，例如：患者病情紧急、复诊需求、特殊情况等..."
-                  maxlength="500"
-                  show-word-limit
-                />
-              </el-form-item>
-
-              <!-- 患者信息 -->
-              <div class="form-section-title">
-                <el-icon><User /></el-icon>
-                <span>患者信息</span>
-              </div>
-
-              <el-form-item label="选择患者" prop="patientId">
-                <el-select
-                  v-model="applicationForm.patientId"
-                  placeholder="输入患者姓名进行搜索"
-                  style="width: 100%"
-                  filterable
-                  remote
-                  :remote-method="searchPatients"
-                  :loading="patientsLoading"
-                  clearable
-                  @change="handlePatientChange"
-                >
-                  <el-option
-                    v-for="patient in patientOptions"
-                    :key="patient.patientId"
-                    :label="formatPatientOption(patient)"
-                    :value="patient.patientId"
-                  >
-                    <div class="patient-option">
-                      <div class="patient-option-main">
-                        <span class="patient-name">{{ patient.fullName || patient.name }}</span>
-                        <el-tag v-if="patient.gender" :type="patient.gender === 'MALE' ? 'primary' : 'danger'" size="small">
-                          {{ patient.gender === 'MALE' ? '男' : '女' }}
-                        </el-tag>
-                      </div>
-                      <div class="patient-option-detail">
-                        <span v-if="patient.phoneNumber || patient.phone">{{ patient.phoneNumber || patient.phone }}</span>
-                        <span v-if="patient.idCardNumber || patient.idCard">{{ maskIdCard(patient.idCardNumber || patient.idCard) }}</span>
-                      </div>
-                    </div>
-                  </el-option>
-                </el-select>
-                <div v-if="selectedPatient" class="selected-patient-info">
-                  <el-tag type="success" size="small">已选择患者</el-tag>
-                  <span>{{ selectedPatient.fullName || selectedPatient.name }} ({{ selectedPatient.phoneNumber || selectedPatient.phone || '无电话' }})</span>
-                </div>
-              </el-form-item>
-
-              <!-- 提交按钮 -->
-              <el-form-item class="submit-section">
-                <el-button type="primary" size="large" :icon="Check" @click="submitApplication" :loading="submitting">
-                  提交申请
-                </el-button>
-                <el-button size="large" :icon="RefreshLeft" @click="resetForm">
-                  重置表单
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </el-card>
+    <!-- 查看详情对话框 -->
+    <el-dialog
+        v-model="detailDialogVisible"
+        title="加号申请详情"
+        width="800px"
+        :close-on-click-modal="false"
+    >
+      <div v-if="currentDetail" class="detail-container">
+        <div class="detail-row">
+          <div class="detail-item">
+            <span class="detail-label">申请ID</span>
+            <span class="detail-value">{{ currentDetail.applicationId }}</span>
+          </div>
         </div>
 
-        <!-- 右侧：申请记录 -->
-        <div class="records-section">
-          <el-card class="records-card" shadow="never">
-            <template #header>
-              <div class="card-header-content">
-                <span class="card-title">我的申请记录</span>
-                <el-button :icon="Refresh" circle size="small" @click="loadApplicationRecords" />
-              </div>
-            </template>
+        <div class="detail-row">
+          <div class="detail-item">
+            <span class="detail-label">申请医生</span>
+            <span class="detail-value">{{ doctorStore.displayName || '未知' }}</span>
+          </div>
+        </div>
 
-            <div v-loading="recordsLoading" class="records-list">
-              <el-empty v-if="!recordsLoading && applicationRecords.length === 0" description="暂无申请记录" />
+        <div class="detail-row">
+          <div class="detail-item">
+            <span class="detail-label">排班日期</span>
+            <span class="detail-value">{{ currentDetail.scheduleDate }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">时段</span>
+            <span class="detail-value">{{ currentDetail.timeSlot === 'MORNING' ? '上午' : '下午' }}</span>
+          </div>
+        </div>
 
-              <div v-else class="record-items">
-                <div
-                  v-for="record in applicationRecords"
-                  :key="record.applicationId"
-                  class="record-item"
-                  :class="`status-${record.status.toLowerCase()}`"
-                >
-                  <div class="record-header">
-                    <div class="record-date">
-                      <el-icon><Calendar /></el-icon>
-                      <span>{{ record.scheduleDate }}</span>
-                      <el-tag :type="getTimeSlotType(record.timeSlot)" size="small">
-                        {{ record.timeSlot === 'MORNING' ? '上午' : '下午' }}
-                      </el-tag>
-                    </div>
-                    <el-tag :type="getStatusType(record.status)" size="small">
-                      {{ getStatusText(record.status) }}
-                    </el-tag>
-                  </div>
+        <div class="detail-row">
+          <div class="detail-item">
+            <span class="detail-label">时间</span>
+            <span class="detail-value">{{ getScheduleTime(currentDetail) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">地点</span>
+            <span class="detail-value">{{ currentDetail.location || '未知' }}</span>
+          </div>
+        </div>
 
-                  <div class="record-body">
-                    <div class="record-info">
-                      <span class="info-label">加号数量：</span>
-                      <span class="info-value">{{ record.addedSlots }} 个</span>
-                    </div>
-                    <div class="record-info">
-                      <span class="info-label">紧急程度：</span>
-                      <el-tag :type="getUrgencyType(record.urgencyLevel)" size="small">
-                        {{ getUrgencyText(record.urgencyLevel) }}
-                      </el-tag>
-                    </div>
-                  </div>
+        <div class="detail-row">
+          <div class="detail-item">
+            <span class="detail-label">患者姓名</span>
+            <span class="detail-value">{{ currentDetail.patientName || '未知' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">患者电话</span>
+            <span class="detail-value">{{ currentDetail.patientPhone || '未知' }}</span>
+          </div>
+        </div>
 
-                  <div class="record-reason">
-                    <span class="reason-label">申请理由：</span>
-                    <p class="reason-text">{{ record.reason }}</p>
-                  </div>
+        <div class="detail-row">
+          <div class="detail-item">
+            <span class="detail-label">加号数量</span>
+            <span class="detail-value detail-highlight">+{{ currentDetail.addedSlots }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">紧急程度</span>
+            <span class="detail-value">
+              <el-tag :type="getUrgencyType(currentDetail.urgencyLevel)" size="small">
+                {{ getUrgencyText(currentDetail.urgencyLevel) }}
+              </el-tag>
+            </span>
+          </div>
+        </div>
 
-                  <div v-if="record.approverComments" class="record-comments">
-                    <span class="comments-label">审批意见：</span>
-                    <p class="comments-text">{{ record.approverComments }}</p>
-                  </div>
+        <div class="detail-row">
+          <div class="detail-item full-width">
+            <span class="detail-label">申请理由</span>
+            <span class="detail-value">{{ currentDetail.reason }}</span>
+          </div>
+        </div>
 
-                  <div class="record-footer">
-                    <span class="record-time">{{ formatDateTime(record.createdAt) }}</span>
-                    <el-button
-                      v-if="record.status === 'PENDING'"
-                      type="danger"
-                      size="small"
-                      text
-                      :icon="Close"
-                      @click="cancelApplication(record.applicationId)"
-                    >
-                      取消申请
-                    </el-button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </el-card>
+        <div class="detail-row">
+          <div class="detail-item">
+            <span class="detail-label">申请状态</span>
+            <span class="detail-value">
+              <el-tag :type="getStatusType(currentDetail.status)">
+                {{ getStatusText(currentDetail.status) }}
+              </el-tag>
+            </span>
+          </div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-item">
+            <span class="detail-label">申请时间</span>
+            <span class="detail-value">{{ formatDetailDateTime(currentDetail.createdAt) }}</span>
+          </div>
+        </div>
+
+        <div class="detail-row" v-if="currentDetail.updatedAt && currentDetail.status !== 'PENDING'">
+          <div class="detail-item">
+            <span class="detail-label">处理时间</span>
+            <span class="detail-value">{{ formatDetailDateTime(currentDetail.updatedAt) }}</span>
+          </div>
+        </div>
+
+        <div class="detail-row" v-if="currentDetail.approverName">
+          <div class="detail-item">
+            <span class="detail-label">审批人</span>
+            <span class="detail-value">{{ currentDetail.approverName }}</span>
+          </div>
+        </div>
+
+        <div class="detail-row" v-if="currentDetail.approverComments">
+          <div class="detail-item full-width">
+            <span class="detail-label">审批意见</span>
+            <span class="detail-value" :style="{ color: currentDetail.status === 'REJECTED' ? '#f56c6c' : '#67c23a', fontWeight: 500 }">
+              {{ currentDetail.approverComments }}
+            </span>
+          </div>
         </div>
       </div>
+      <template #footer>
+        <el-button @click="detailDialogVisible = false">关闭</el-button>
+        <el-button
+            v-if="currentDetail && currentDetail.status === 'PENDING'"
+            type="danger"
+            :icon="Delete"
+            @click="handleCancelFromDetail">
+          撤销申请
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 申请加号对话框 -->
+    <el-dialog
+        v-model="dialogVisible"
+        title="申请加号"
+        width="600px"
+        @close="resetForm"
+    >
+      <el-form
+          ref="applicationFormRef"
+          :model="applicationForm"
+          :rules="formRules"
+          label-position="top"
+      >
+        <el-form-item label="选择加号时间" prop="scheduleId">
+          <el-select 
+            v-model="applicationForm.scheduleId" 
+            placeholder="请选择您的排班时间" 
+            style="width: 100%"
+            filterable
+            :loading="schedulesLoading"
+            @change="handleScheduleChange"
+          >
+            <el-option
+              v-for="schedule in availableSchedules"
+              :key="schedule.scheduleId"
+              :label="formatScheduleOption(schedule)"
+              :value="schedule.scheduleId"
+            >
+              <div class="schedule-option">
+                <div class="schedule-option-main">
+                  <el-icon v-if="isScheduleMorning(schedule)"><Sunrise /></el-icon>
+                  <el-icon v-else><Sunset /></el-icon>
+                  <span class="schedule-date">{{ schedule.scheduleDate }}</span>
+                  <el-tag :type="isScheduleMorning(schedule) ? 'success' : 'warning'" size="small">
+                    {{ isScheduleMorning(schedule) ? '上午' : '下午' }}
+                  </el-tag>
+                </div>
+                <div class="schedule-option-detail">
+                  <span>{{ schedule.startTime }} - {{ schedule.endTime }}</span>
+                  <span class="schedule-location">{{ schedule.location }}</span>
+                </div>
+              </div>
+            </el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="加号数量" prop="addedSlots">
+          <el-input-number
+            v-model="applicationForm.addedSlots"
+            :min="1"
+            :max="20"
+            style="width: 100%"
+            placeholder="请输入加号数量"
+          />
+        </el-form-item>
+
+        <el-form-item label="紧急程度" prop="urgencyLevel">
+          <el-radio-group v-model="applicationForm.urgencyLevel">
+            <el-radio value="LOW">低 - 常规加号</el-radio>
+            <el-radio value="MEDIUM">中 - 较为紧急</el-radio>
+            <el-radio value="HIGH">高 - 非常紧急</el-radio>
+            <el-radio value="CRITICAL">紧急 - 危急情况</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item label="申请理由" prop="reason">
+          <el-input
+            v-model="applicationForm.reason"
+            type="textarea"
+            :rows="4"
+            placeholder="请详细说明加号的原因，例如：患者病情紧急、复诊需求、特殊情况等..."
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
+
+        <el-form-item label="选择患者" prop="patientId">
+          <el-select
+            v-model="applicationForm.patientId"
+            placeholder="输入患者姓名进行搜索"
+            style="width: 100%"
+            filterable
+            remote
+            :remote-method="searchPatients"
+            :loading="patientsLoading"
+            clearable
+            @change="handlePatientChange"
+          >
+            <el-option
+              v-for="patient in patientOptions"
+              :key="patient.patientId"
+              :label="formatPatientOption(patient)"
+              :value="patient.patientId"
+            >
+              <div class="patient-option">
+                <div class="patient-option-main">
+                  <span class="patient-name">{{ patient.fullName || patient.name }}</span>
+                  <el-tag v-if="patient.gender" :type="patient.gender === 'MALE' ? 'primary' : 'danger'" size="small">
+                    {{ patient.gender === 'MALE' ? '男' : '女' }}
+                  </el-tag>
+                </div>
+                <div class="patient-option-detail">
+                  <span v-if="patient.phoneNumber || patient.phone">{{ patient.phoneNumber || patient.phone }}</span>
+                  <span v-if="patient.idCardNumber || patient.idCard">{{ maskIdCard(patient.idCardNumber || patient.idCard) }}</span>
+                </div>
+              </div>
+            </el-option>
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitApplication" :loading="submitting">
+          提交申请
+        </el-button>
+      </template>
+    </el-dialog>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  ArrowLeft, DocumentAdd, Calendar, Sunrise, Sunset,
-  User, Warning, Document,
-  Check, RefreshLeft, Refresh, Close
-} from '@element-plus/icons-vue'
+import { Plus, Delete, Calendar, Sunrise, Sunset, DocumentAdd } from '@element-plus/icons-vue'
+import BackButton from '@/components/BackButton.vue'
 import { useDoctorStore } from '@/stores/doctorStore'
 import { getSchedulesByDoctorId } from '@/api/schedule'
 import { searchPatientsByName } from '@/api/patient'
@@ -298,15 +339,24 @@ import {
   getSlotApplicationsByDoctor,
   cancelSlotApplication 
 } from '@/api/slotApplication'
-import defaultAvatar from '@/assets/doctor.jpg'
 
 const router = useRouter()
 const doctorStore = useDoctorStore()
 
-// 表单引用
-const applicationFormRef = ref(null)
+// --- 工具函数 ---
+const getAvatarUrl = (photoUrl) => {
+  if (!photoUrl) return new URL('@/assets/doctor.jpg', import.meta.url).href;
+  if (photoUrl.startsWith('http')) return photoUrl;
+  return `http://localhost:9090${photoUrl}`;
+};
 
-// 提交状态
+// --- 状态 ---
+const recordsLoading = ref(false)
+const dialogVisible = ref(false)
+const detailDialogVisible = ref(false)
+const applicationRecords = ref([])
+const applicationFormRef = ref(null)
+const currentDetail = ref(null)
 const submitting = ref(false)
 
 // 排班相关状态
@@ -319,7 +369,22 @@ const patientsLoading = ref(false)
 const patientOptions = ref([])
 const selectedPatient = ref(null)
 
-// 申请表单数据
+// 从 localStorage 获取当前医生ID
+const getCurrentDoctorId = () => {
+  const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'))
+  const doctorId = savedInfo?.doctorId
+  
+  if (doctorId) {
+    return doctorId
+  }
+  
+  console.error('未能从 localStorage 获取医生ID')
+  return null
+}
+
+const currentDoctorId = ref(getCurrentDoctorId())
+
+// --- 表单 ---
 const applicationForm = reactive({
   scheduleId: '',
   addedSlots: 1,
@@ -328,8 +393,7 @@ const applicationForm = reactive({
   patientId: ''
 })
 
-// 表单验证规则
-const formRules = {
+const formRules = reactive({
   scheduleId: [
     { required: true, message: '请选择排班时间', trigger: 'change' }
   ],
@@ -347,16 +411,19 @@ const formRules = {
   patientId: [
     { required: true, message: '请选择患者', trigger: 'change' }
   ]
-}
+})
 
-// 申请记录
-const recordsLoading = ref(false)
-const applicationRecords = ref([])
+// --- 方法 ---
+
+// 打开申请对话框
+const openApplyDialog = () => {
+  loadDoctorSchedules()
+  dialogVisible.value = true
+}
 
 // 加载医生排班
 const loadDoctorSchedules = async () => {
-  const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'))
-  const doctorId = savedInfo?.doctorId || doctorStore.currentDoctorId
+  const doctorId = currentDoctorId.value
   
   if (!doctorId) {
     ElMessage.error('无法获取医生ID')
@@ -368,7 +435,7 @@ const loadDoctorSchedules = async () => {
   try {
     const today = new Date()
     const endDate = new Date()
-    endDate.setDate(today.getDate() + 30) // 获取未来1个月的排班
+    endDate.setDate(today.getDate() + 30)
     
     const formatDate = (date) => {
       const year = date.getFullYear()
@@ -446,11 +513,9 @@ const searchPatients = async (query) => {
 // 格式化患者选项
 const formatPatientOption = (patient) => {
   let info = patient.fullName || patient.name || ''
-  if (patient.gender) {
-    info += ` (${patient.gender === 'MALE' ? '男' : '女'})`
-  }
-  if (patient.phoneNumber || patient.phone) {
-    info += ` - ${patient.phoneNumber || patient.phone}`
+  // 显示患者identifier而不是电话号
+  if (patient.identifier) {
+    info += ` - ${patient.identifier}`
   }
   return info
 }
@@ -466,76 +531,36 @@ const maskIdCard = (idCard) => {
   return idCard.substring(0, 6) + '********' + idCard.substring(idCard.length - 4)
 }
 
-// 获取头像URL
-const getAvatarUrl = (url) => {
-  if (!url) return defaultAvatar
-  if (url.startsWith('blob:')) return url
-  if (url.startsWith('http')) return url
-  if (url.startsWith('/')) {
-    return `http://localhost:8080${url}`
-  }
-  return url || defaultAvatar
-}
-
-// 返回上一页
-const goBack = () => {
-  router.back()
-}
-
 // 提交申请
 const submitApplication = async () => {
   if (!applicationFormRef.value) return
 
-  try {
-    const valid = await applicationFormRef.value.validate()
-    if (!valid) return
-  } catch (error) {
-    return
-  }
+  await applicationFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        submitting.value = true
 
-  try {
-    await ElMessageBox.confirm(
-      '确认提交加号申请？提交后将等待管理员审批。',
-      '确认提交',
-      {
-        confirmButtonText: '确认提交',
-        cancelButtonText: '取消',
-        type: 'warning'
+        const requestData = {
+          doctorId: currentDoctorId.value,
+          scheduleId: applicationForm.scheduleId,
+          addedSlots: applicationForm.addedSlots,
+          patientId: applicationForm.patientId,
+          urgencyLevel: applicationForm.urgencyLevel,
+          reason: applicationForm.reason
+        }
+
+        await createSlotApplication(requestData)
+        ElMessage.success('申请提交成功，请等待审批')
+        dialogVisible.value = false
+        loadApplicationRecords()
+      } catch (error) {
+        console.error('提交失败:', error)
+        ElMessage.error('提交失败：' + (error.message || error.response?.data?.message || '网络错误'))
+      } finally {
+        submitting.value = false
       }
-    )
-
-    submitting.value = true
-
-    // 获取医生ID
-    const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'))
-    const doctorId = savedInfo?.doctorId || doctorStore.currentDoctorId
-
-    // 调用后端API提交申请
-    const requestData = {
-      doctorId: doctorId,
-      scheduleId: applicationForm.scheduleId,
-      addedSlots: applicationForm.addedSlots,
-      patientId: applicationForm.patientId,
-      urgencyLevel: applicationForm.urgencyLevel,
-      reason: applicationForm.reason
     }
-
-    await createSlotApplication(requestData)
-
-    ElMessage.success('申请提交成功，请等待审批')
-    
-    // 重置表单
-    resetForm()
-    
-    // 刷新申请记录
-    loadApplicationRecords()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('提交失败：' + (error.message || '未知错误'))
-    }
-  } finally {
-    submitting.value = false
-  }
+  })
 }
 
 // 重置表单
@@ -549,12 +574,12 @@ const resetForm = () => {
   selectedSchedule.value = null
   selectedPatient.value = null
   patientOptions.value = []
+  availableSchedules.value = []
 }
 
 // 加载申请记录
 const loadApplicationRecords = async () => {
-  const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'))
-  const doctorId = savedInfo?.doctorId || doctorStore.currentDoctorId
+  const doctorId = currentDoctorId.value
   
   if (!doctorId) {
     console.error('无法获取医生ID')
@@ -564,10 +589,8 @@ const loadApplicationRecords = async () => {
   recordsLoading.value = true
 
   try {
-    // 调用后端API获取申请记录
     const response = await getSlotApplicationsByDoctor(doctorId)
     applicationRecords.value = Array.isArray(response) ? response : []
-    console.log('加载申请记录成功:', applicationRecords.value)
   } catch (error) {
     console.error('加载申请记录失败:', error)
     ElMessage.error('加载申请记录失败')
@@ -579,30 +602,57 @@ const loadApplicationRecords = async () => {
 
 // 取消申请
 const cancelApplication = async (applicationId) => {
-  try {
-    await ElMessageBox.confirm(
-      '确认取消该申请？取消后无法恢复。',
-      '确认取消',
-      {
-        confirmButtonText: '确认取消',
-        cancelButtonText: '返回',
-        type: 'warning'
-      }
-    )
-
-    const savedInfo = JSON.parse(localStorage.getItem('xm-pro-doctor'))
-    const doctorId = savedInfo?.doctorId || doctorStore.currentDoctorId
-
-    // 调用后端API取消申请
-    await cancelSlotApplication(applicationId, doctorId)
-
-    ElMessage.success('申请已取消')
-    loadApplicationRecords()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('取消失败：' + (error.message || '未知错误'))
+  ElMessageBox.confirm(
+    '确定要撤销该加号申请吗？',
+    '确认撤销',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
     }
-  }
+  ).then(async () => {
+    try {
+      await cancelSlotApplication(applicationId, currentDoctorId.value)
+      ElMessage.success('撤销成功')
+      loadApplicationRecords()
+    } catch (error) {
+      ElMessage.error('撤销失败：' + (error.message || '未知错误'))
+    }
+  }).catch(() => {
+    // 用户取消
+  })
+}
+
+// 查看详情
+const viewDetail = (row) => {
+  currentDetail.value = row
+  detailDialogVisible.value = true
+}
+
+// 从详情对话框撤销申请
+const handleCancelFromDetail = async () => {
+  if (!currentDetail.value) return
+  
+  ElMessageBox.confirm(
+    '确定要撤销该加号申请吗？',
+    '确认撤销',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  ).then(async () => {
+    try {
+      await cancelSlotApplication(currentDetail.value.applicationId, currentDoctorId.value)
+      ElMessage.success('撤销成功')
+      detailDialogVisible.value = false
+      loadApplicationRecords()
+    } catch (error) {
+      ElMessage.error('撤销失败：' + (error.message || '未知错误'))
+    }
+  }).catch(() => {
+    // 用户取消
+  })
 }
 
 // 辅助函数：获取状态类型
@@ -660,9 +710,36 @@ const formatDateTime = (dateTimeStr) => {
   return dateTimeStr.replace('T', ' ').substring(0, 16)
 }
 
-// 页面加载时
+// 辅助函数：格式化详情页日期时间
+const formatDetailDateTime = (dateTimeStr) => {
+  if (!dateTimeStr) return ''
+  const date = new Date(dateTimeStr)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}/${month}/${day} ${hours}:${minutes}`
+}
+
+// 辅助函数：获取排班时间
+const getScheduleTime = (detail) => {
+  if (!detail) return '未知'
+  // 如果有 startTime 和 endTime 字段
+  if (detail.startTime && detail.endTime) {
+    return `${detail.startTime} - ${detail.endTime}`
+  }
+  // 否则根据时段返回默认时间
+  return detail.timeSlot === 'MORNING' ? '08:00 - 12:00' : '14:00 - 18:00'
+}
+
+// --- 生命周期 ---
 onMounted(() => {
-  loadDoctorSchedules()
+  if (!currentDoctorId.value) {
+    ElMessage.error('未获取到医生信息，请重新登录')
+    return
+  }
+  
   loadApplicationRecords()
 })
 </script>
@@ -670,7 +747,7 @@ onMounted(() => {
 <style scoped>
 .slot-application-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
+  background: #f5f7fa;
 }
 
 /* 顶部导航栏 */
@@ -699,21 +776,18 @@ onMounted(() => {
   gap: 16px;
 }
 
-.page-title {
+.logo-section {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-left: 8px;
 }
 
-.page-title h2 {
+.logo-section h2 {
   margin: 0;
   font-size: 1.4rem;
   font-weight: 600;
   color: #2c3e50;
-}
-
-.page-title .el-icon {
-  color: #667eea;
 }
 
 .navbar-right {
@@ -737,265 +811,79 @@ onMounted(() => {
   color: #2c3e50;
 }
 
-/* 主要内容区域 */
 .main-content {
   max-width: 1600px;
   margin: 0 auto;
   padding: 32px;
 }
 
-.content-wrapper {
-  display: grid;
-  grid-template-columns: 1fr 450px;
-  gap: 24px;
-}
-
-/* 表单区域 */
-.form-section {
-  min-height: 100%;
-}
-
-.form-card {
-  border-radius: 16px;
-  border: 1px solid #f0f0f0;
-}
-
-.form-card :deep(.el-card__header) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px 24px;
-  border-bottom: none;
-}
-
-.card-header-content {
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-size: 18px;
+  font-weight: bold;
 }
 
-.card-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #fff;
+:deep(.el-form-item__label) {
+  font-weight: 600 !important;
+  color: #303133 !important;
 }
 
-.form-card :deep(.el-card__body) {
-  padding: 32px;
-}
-
-.application-form {
-  max-width: 100%;
-}
-
-.form-section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #303133;
-  margin: 24px 0 16px 0;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #f0f0f0;
-}
-
-.form-section-title:first-child {
-  margin-top: 0;
-}
-
-.form-section-title .el-icon {
-  color: #667eea;
-}
-
-.urgency-radio-group {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  width: 100%;
-}
-
-.urgency-radio-group :deep(.el-radio) {
-  margin-right: 0;
-  width: 100%;
-}
-
-.urgency-radio-group :deep(.el-radio__label) {
-  width: 100%;
-}
-
-.radio-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.option-with-icon {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.submit-section {
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.submit-section :deep(.el-form-item__content) {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-/* 申请记录区域 */
-.records-section {
-  min-height: 100%;
-}
-
-.records-card {
-  border-radius: 16px;
-  border: 1px solid #f0f0f0;
-  height: 100%;
-}
-
-.records-card :deep(.el-card__header) {
-  background: #fff;
-  padding: 20px 24px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.records-card :deep(.el-card__body) {
+/* 详情对话框样式 */
+.detail-container {
   padding: 0;
-  height: calc(100% - 64px);
-  overflow-y: auto;
 }
 
-.records-list {
-  min-height: 400px;
+.detail-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 12px;
 }
 
-.record-items {
-  padding: 16px;
-}
-
-.record-item {
-  background: #fff;
-  border: 1px solid #e4e7ed;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
-  transition: all 0.3s ease;
-}
-
-.record-item:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  transform: translateY(-2px);
-}
-
-.record-item:last-child {
+.detail-row:last-child {
+  border-bottom: none;
   margin-bottom: 0;
+  padding-bottom: 0;
 }
 
-.record-item.status-pending {
-  border-left: 4px solid #e6a23c;
-}
-
-.record-item.status-approved {
-  border-left: 4px solid #67c23a;
-}
-
-.record-item.status-rejected {
-  border-left: 4px solid #f56c6c;
-}
-
-.record-item.status-cancelled {
-  border-left: 4px solid #909399;
-}
-
-.record-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.record-date {
+.detail-item {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #303133;
 }
 
-.record-body {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin-bottom: 12px;
+.detail-item.full-width {
+  flex: 1 1 100%;
 }
 
-.record-info {
-  font-size: 0.85rem;
-  color: #606266;
-}
-
-.info-label {
-  color: #909399;
-}
-
-.info-value {
+.detail-label {
+  min-width: 70px;
   font-weight: 500;
-  color: #303133;
-}
-
-.record-reason,
-.record-comments {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.reason-label,
-.comments-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #606266;
-  display: block;
-  margin-bottom: 6px;
-}
-
-.reason-text,
-.comments-text {
-  font-size: 0.85rem;
-  color: #606266;
-  line-height: 1.6;
-  margin: 0;
-  word-break: break-word;
-}
-
-.record-comments {
-  background: #f5f7fa;
-  padding: 12px;
-  border-radius: 8px;
-  margin-top: 12px;
-}
-
-.comments-text {
-  color: #303133;
-}
-
-.record-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.record-time {
-  font-size: 0.8rem;
   color: #909399;
+  background-color: #f5f7fa;
+  padding: 6px 12px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.detail-value {
+  flex: 1;
+  color: #303133;
+  padding: 6px 0;
+  word-break: break-word;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.detail-highlight {
+  color: #f56c6c;
+  font-weight: 600;
+  font-size: 15px;
 }
 
 /* 排班选项样式 */
@@ -1031,18 +919,6 @@ onMounted(() => {
   color: #909399;
 }
 
-.selected-schedule-info {
-  margin-top: 8px;
-  padding: 8px 12px;
-  background: #f0f9ff;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  color: #606266;
-}
-
 /* 患者选项样式 */
 .patient-option {
   display: flex;
@@ -1070,56 +946,5 @@ onMounted(() => {
   font-size: 0.85rem;
   color: #909399;
   margin-left: 4px;
-}
-
-.selected-patient-info {
-  margin-top: 8px;
-  padding: 8px 12px;
-  background: #f0f9ff;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  color: #606266;
-}
-
-/* 响应式设计 */
-@media (max-width: 1400px) {
-  .content-wrapper {
-    grid-template-columns: 1fr 400px;
-  }
-}
-
-@media (max-width: 1200px) {
-  .content-wrapper {
-    grid-template-columns: 1fr;
-  }
-
-  .records-section {
-    min-height: 500px;
-  }
-}
-
-@media (max-width: 768px) {
-  .main-content {
-    padding: 20px;
-  }
-
-  .navbar-content {
-    padding: 0 16px;
-  }
-
-  .user-name {
-    display: none;
-  }
-
-  .urgency-radio-group {
-    grid-template-columns: 1fr;
-  }
-
-  .form-card :deep(.el-card__body) {
-    padding: 20px;
-  }
 }
 </style>

@@ -394,9 +394,9 @@ public class RegistrationReportService {
         }
 
         private static boolean isNight(VisitPoint point) {
+            // 只有首诊时间严格大于18:00才算夜班（18:00整点不算）
             LocalTime call = point.callTime() != null ? point.callTime().toLocalTime() : null;
-            LocalTime end = point.endTime() != null ? point.endTime().toLocalTime() : null;
-            return (call != null && !call.isBefore(NIGHT_THRESHOLD)) || (end != null && !end.isBefore(NIGHT_THRESHOLD));
+            return call != null && call.isAfter(NIGHT_THRESHOLD);
         }
 
         public LocalDateTime getFirstCallTime() {

@@ -8,7 +8,7 @@
         <div class="card-header-title">
           <span>科室信息总览与管理</span>
           <div>
-            <el-button type="info" @click="handleSymptomMapping">
+            <el-button style="background-color: #9f7aea; border-color: #9f7aea; color: white;" @click="handleSymptomMapping">
               症状映射管理
             </el-button>
             <el-button type="success" :icon="Plus" @click="handleCreateDepartment">
@@ -506,6 +506,12 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.card-header-title > span {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .search-form {

@@ -18,6 +18,7 @@ import java.util.Set;
 public class Admin {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "admin_id")
     private Integer adminId;
 
     @Column(nullable = false, unique = true, length = 100)
@@ -37,7 +38,7 @@ public class Admin {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt; // 账户创建时间
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "admin_roles",
             joinColumns = @JoinColumn(name = "admin_id"),
