@@ -43,7 +43,7 @@
                   v-model="loginForm.identifier"
                   placeholder="请输入工号 (默认: D001)"
                   size="large"
-                  prefix-icon="User"
+                  :prefix-icon="User"
                   clearable
               />
             </el-form-item>
@@ -54,7 +54,7 @@
                   type="password"
                   placeholder="请输入密码"
                   size="large"
-                  prefix-icon="Lock"
+                  :prefix-icon="Lock"
                   show-password
                   clearable
                   @keyup.enter="handleLogin"
@@ -106,7 +106,7 @@
                     v-model="activationForm.identifier"
                     placeholder="请输入工号"
                     size="large"
-                    prefix-icon="User"
+                    :prefix-icon="User"
                     clearable
                 />
               </el-form-item>
@@ -117,7 +117,7 @@
                     type="password"
                     placeholder="请输入初始密码"
                     size="large"
-                    prefix-icon="Lock"
+                    :prefix-icon="Lock"
                     show-password
                     clearable
                 />
@@ -154,7 +154,7 @@
                     v-model="activationForm.idCardInput"
                     placeholder="请输入身份证号后6位"
                     size="large"
-                    prefix-icon="CreditCard"
+                    :prefix-icon="CreditCard"
                     maxlength="6"
                     clearable
                 />
@@ -166,7 +166,7 @@
                     type="password"
                     placeholder="请输入新密码（6-20位）"
                     size="large"
-                    prefix-icon="Lock"
+                    :prefix-icon="Lock"
                     show-password
                     clearable
                 />
@@ -178,7 +178,7 @@
                     type="password"
                     placeholder="请再次输入新密码"
                     size="large"
-                    prefix-icon="Lock"
+                    :prefix-icon="Lock"
                     show-password
                     clearable
                 />
