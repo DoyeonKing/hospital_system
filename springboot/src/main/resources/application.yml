@@ -21,7 +21,7 @@ spring:
 
   datasource:
     #url: jdbc:mysql://localhost:3306/hospital_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
-    url: jdbc:mysql://localhost:3306/hospital2?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
+    url: jdbc:mysql://localhost:3306/hopital?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
     username: root
     password: Mga@5182 # 使用引号包裹密码，避免特殊字符解析问题
     driver-class-name: com.mysql.cj.jdbc.Driver
