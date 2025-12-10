@@ -386,3 +386,5 @@ FROM locations
 GROUP BY location_name
 HAVING COUNT(*) > 1;
 
+
+
