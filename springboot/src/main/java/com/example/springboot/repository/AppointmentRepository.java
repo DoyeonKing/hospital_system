@@ -269,4 +269,24 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     List<Map<String, Object>> countByTimeSlotAndDateRange(
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+    
+    /**
+     * 根据患者姓名和科室ID查询该患者在该科室的所有就诊记录
+     * @param patientName 患者姓名
+     * @param departmentId 科室ID
+     * @return 预约列表
+     */
+    @Query("SELECT a FROM Appointment a " +
+           "LEFT JOIN FETCH a.patient p " +
+           "LEFT JOIN FETCH p.patientProfile " +
+           "LEFT JOIN FETCH a.schedule s " +
+           "LEFT JOIN FETCH s.doctor d " +
+           "LEFT JOIN FETCH d.department dept " +
+           "LEFT JOIN FETCH s.slot " +
+           "WHERE p.fullName LIKE %:patientName% " +
+           "AND dept.departmentId = :departmentId " +
+           "ORDER BY s.scheduleDate DESC, s.slot.startTime DESC")
+    List<Appointment> findByPatientNameAndDepartment(
+            @Param("patientName") String patientName,
+            @Param("departmentId") Integer departmentId);
 }

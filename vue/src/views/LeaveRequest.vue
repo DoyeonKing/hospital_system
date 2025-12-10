@@ -1,21 +1,26 @@
 <template>
-  <div class="app-container">
-    <div class="back-area" style="margin-bottom: 12px;">
-      <BackButton />
+  <div class="leave-request-page">
+    <div class="top-navbar">
+      <div class="navbar-content">
+        <div class="navbar-left">
+          <BackButton />
+          <div class="logo-section">
+            <el-icon :size="28"><Calendar /></el-icon>
+            <h2>我的休假申请</h2>
+          </div>
+        </div>
+        <div class="navbar-right">
+          <el-button type="primary" :icon="Plus" @click="openApplyDialog">申请休假</el-button>
+          <div class="user-info">
+            <el-avatar :size="36" :src="getAvatarUrl(doctorStore.detailedDoctorInfo?.photoUrl)" />
+            <span class="user-name">{{ doctorStore.displayName }} 医生</span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <el-card shadow="always" class="leave-card">
-      <template #header>
-        <div class="card-header">
-          <span>我的休假申请</span>
-          <el-button
-              type="primary"
-              :icon="Plus"
-              @click="openApplyDialog">
-            申请休假
-          </el-button>
-        </div>
-      </template>
+    <div class="main-content">
+      <el-card shadow="always" class="leave-card">
 
       <el-table
           v-loading="loading"
@@ -178,16 +183,27 @@
         </el-button>
       </template>
     </el-dialog>
-
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Delete } from '@element-plus/icons-vue';
+import { Plus, Delete, Calendar } from '@element-plus/icons-vue';
 import BackButton from '@/components/BackButton.vue';
 import { getMyLeaveRequests, createLeaveRequest, cancelLeaveRequest } from '@/api/leave';
+import { useDoctorStore } from '@/stores/doctorStore';
+
+// --- Store ---
+const doctorStore = useDoctorStore();
+
+// --- 工具函数 ---
+const getAvatarUrl = (photoUrl) => {
+  if (!photoUrl) return new URL('@/assets/doctor.jpg', import.meta.url).href;
+  if (photoUrl.startsWith('http')) return photoUrl;
+  return `http://localhost:9090${photoUrl}`;
+};
 
 // --- 状态 ---
 const loading = ref(false);
@@ -448,10 +464,76 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.app-container {
-  padding: 24px;
-  background-color: #f7fafc;
-  min-height: calc(100vh - 50px);
+.leave-request-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+/* 顶部导航栏 */
+.top-navbar {
+  background: #fff;
+  border-bottom: 1px solid #e4e7ed;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 64px;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 8px;
+}
+
+.logo-section h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #f5f7fa;
+  border-radius: 20px;
+}
+
+.user-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.main-content {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 32px;
 }
 .card-header {
   display: flex;

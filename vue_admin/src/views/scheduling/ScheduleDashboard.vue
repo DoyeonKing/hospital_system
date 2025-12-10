@@ -4,13 +4,15 @@
       <BackButton />
     </div>
     
-    <!-- 折叠/展开按钮 -->
-    <div class="sidebar-toggle" :class="{ collapsed: sidebarCollapsed }" @click="toggleSidebar" :title="sidebarCollapsed ? '展开科室列表' : '收起科室列表'">
-      <el-icon><component :is="sidebarCollapsed ? 'DArrowRight' : 'DArrowLeft'" /></el-icon>
-    </div>
-    
-    <!-- 左侧科室导航 -->
-    <div class="department-sidebar" :class="{ 'collapsed': sidebarCollapsed }">
+    <!-- 主要内容容器 -->
+    <div class="main-container">
+      <!-- 折叠/展开按钮 -->
+      <div class="sidebar-toggle" :class="{ collapsed: sidebarCollapsed }" @click="toggleSidebar" :title="sidebarCollapsed ? '展开科室列表' : '收起科室列表'">
+        <el-icon><component :is="sidebarCollapsed ? 'DArrowRight' : 'DArrowLeft'" /></el-icon>
+      </div>
+      
+      <!-- 左侧科室导航 -->
+      <div class="department-sidebar" :class="{ 'collapsed': sidebarCollapsed }">
       <div v-if="loadingDepartments" class="loading-container">
         <el-icon class="is-loading"><Loading /></el-icon>
         <span>加载科室数据中...</span>
@@ -413,6 +415,7 @@
         <p style="margin: 0;">报告生成时间：{{ conflictReportTime }} | 医院排班系统</p>
       </div>
     </div>
+    </div><!-- 主要内容容器结束 -->
   </div>
 </template>
 
@@ -605,7 +608,8 @@ const selectedDepartmentName = computed(() => {
   for (const parent of departments.value) {
     const sub = parent.children.find(c => c.id === activeSub.value);
     if (sub) {
-      return sub.name;
+      // 返回父科室名称 + 子科室名称
+      return `${parent.name}-${sub.name}`;
   }
   }
   
@@ -2413,25 +2417,28 @@ watch(() => timeSlotColumns.value, () => {
 const loadDepartments = async () => {
   try {
     loadingDepartments.value = true;
-    console.log('开始获取科室数据...');
+    console.log('🔍 开始获取科室数据...');
     
     // 获取所有父科室
     const parentResponse = await getAllParentDepartments();
-    console.log('父科室API响应:', parentResponse);
+    console.log('📋 父科室API响应:', parentResponse);
+    console.log('📊 父科室数量:', parentResponse?.length);
     
     if (parentResponse && Array.isArray(parentResponse)) {
       const parentDepartments = parentResponse;
-      console.log('父科室数据:', parentDepartments);
+      console.log('✅ 父科室数据:', parentDepartments);
       
       // 为每个父科室获取子科室
       const departmentsWithChildren = await Promise.all(
         parentDepartments.map(async (parent) => {
           try {
+            console.log(`🔄 正在获取父科室 "${parent.name}" (ID: ${parent.parentDepartmentId}) 的子科室...`);
             const childrenResponse = await getDepartmentsByParentId(parent.parentDepartmentId);
-            console.log(`父科室 ${parent.name} 的子科室响应:`, childrenResponse);
+            console.log(`📥 父科室 "${parent.name}" 的子科室API响应:`, childrenResponse);
             
             const children = childrenResponse && Array.isArray(childrenResponse) ? childrenResponse : [];
-            console.log(`父科室 ${parent.name} 的子科室:`, children);
+            console.log(`✅ 父科室 "${parent.name}" 的子科室数量: ${children.length}`);
+            console.log(`📝 子科室列表:`, children.map(c => c.name).join(', '));
             
             return {
               id: `p${parent.parentDepartmentId}`,
@@ -2447,7 +2454,8 @@ const loadDepartments = async () => {
               }))
             };
           } catch (error) {
-            console.error(`获取父科室 ${parent.name} 的子科室失败:`, error);
+            console.error(`❌ 获取父科室 "${parent.name}" 的子科室失败:`, error);
+            console.error('错误详情:', error.response?.data || error.message);
             return {
               id: `p${parent.parentDepartmentId}`,
               name: parent.name,
@@ -2460,17 +2468,22 @@ const loadDepartments = async () => {
       );
       
       departments.value = departmentsWithChildren;
-      console.log('最终科室数据结构:', departments.value);
+      console.log('🎉 最终科室数据结构:', departments.value);
+      console.log('📊 科室统计:');
+      departments.value.forEach(dept => {
+        console.log(`  - ${dept.name}: ${dept.children.length} 个子科室`);
+      });
       
       // 初始进入页面不选中任何科室，等待用户手动选择
       
     } else {
-      console.error('获取父科室数据失败:', parentResponse);
+      console.error('❌ 获取父科室数据失败，响应格式不正确:', parentResponse);
       ElMessage.warning('获取科室数据失败，使用默认数据');
       loadFallbackDepartments();
     }
   } catch (error) {
-    console.error('获取科室数据出错:', error);
+    console.error('❌ 获取科室数据出错:', error);
+    console.error('错误详情:', error.response?.data || error.message);
     ElMessage.warning('网络错误，使用默认科室数据');
     loadFallbackDepartments();
   } finally {
@@ -3476,9 +3489,17 @@ onMounted(async () => {
 <style scoped>
 .schedule-dashboard {
   display: flex;
+  flex-direction: column;
   height: calc(100vh - 50px);
   background-color: #f7fafc;
   overflow: hidden; /* 防止整个页面滚动 */
+}
+
+.main-container {
+  display: flex;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
 }
 
 /* [新增] 头部控制按钮样式 */
@@ -3608,7 +3629,7 @@ onMounted(async () => {
   border-right: 1px solid #e2e8f0;
   flex-shrink: 0;
   overflow-y: auto; /* 垂直滚动 */
-  max-height: calc(100vh - 50px); /* 限制最大高度 */
+  height: 100%; /* 占满main-container的高度 */
   scroll-behavior: smooth; /* 平滑滚动 */
   transition: all 0.3s ease;
 }
@@ -3624,7 +3645,7 @@ onMounted(async () => {
 .sidebar-toggle {
   position: absolute;
   left: 320px;                /* 贴在侧栏右边缘 */
-  top: 50%;                   /* 垂直居中 */
+  top: 50%;                   /* 垂直居中（相对于main-container） */
   transform: translateY(-50%);
   width: 28px;
   height: 64px;
@@ -3634,8 +3655,8 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   z-index: 10;
+  cursor: pointer;
   transition: all 0.2s ease;
   color: #fff;
 }
@@ -3694,10 +3715,32 @@ onMounted(async () => {
 .sub-department-panel {
   flex: 1;
   padding: 8px;
+  padding-right: 4px;
   border-left: 1px solid #e2e8f0;
+  overflow-y: auto;
+}
+
+/* 子科室面板滚动条样式 */
+.sub-department-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sub-department-panel::-webkit-scrollbar-track {
+  background-color: transparent;
+  margin: 4px 0;
+}
+
+.sub-department-panel::-webkit-scrollbar-thumb {
+  background-color: #d0d7de;
+  border-radius: 3px;
+}
+
+.sub-department-panel::-webkit-scrollbar-thumb:hover {
+  background-color: #b0b7be;
 }
 .sub-department-item {
-  padding: 10px 15px;
+  padding: 10px 12px 10px 15px;
+  margin-right: 4px;
   cursor: pointer;
   border-radius: 4px;
 }
@@ -3718,7 +3761,7 @@ onMounted(async () => {
   overflow-y: scroll; /* 始终显示垂直滚动条 */
   overflow-x: hidden; /* 隐藏横向滚动 */
   min-width: 0;
-  height: calc(100vh - 50px); /* 固定高度 */
+  height: 100%; /* 占满main-container的高度 */
   scroll-behavior: smooth; /* 平滑滚动 */
 }
 

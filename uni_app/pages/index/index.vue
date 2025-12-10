@@ -54,13 +54,20 @@
 				<text class="function-title">联系我们</text>
 			</view>
 
-			<view class="function-card card-ai" @click="navigateToPreTriage">
-				<view class="icon-wrapper">
-					<view class="function-icon">🤖</view>
-				</view>
-				<text class="function-title">AI 预问诊</text>
+		<view class="function-card card-ai" @click="navigateToPreTriage">
+			<view class="icon-wrapper">
+				<view class="function-icon">🤖</view>
 			</view>
+			<text class="function-title">AI 预问诊</text>
 		</view>
+
+		<view class="function-card card-ai-assistant" @click="navigateToAIAssistant">
+			<view class="icon-wrapper">
+				<view class="function-icon">💡</view>
+			</view>
+			<text class="function-title">AI 挂号助手</text>
+		</view>
+	</view>
 
 		<!-- 即将就诊提醒卡片（简化版） -->
 		<view class="appointment-card" v-if="upcomingAppointment && isWithin24Hours">
@@ -771,12 +778,19 @@
 				this.identifierMasked = !this.identifierMasked
 			},
 
-			// 导航到 AI 预问诊
-			navigateToPreTriage() {
-				uni.navigateTo({
-					url: '/pages/pre-triage/index'
-				})
-			}
+		// 导航到 AI 预问诊
+		navigateToPreTriage() {
+			uni.navigateTo({
+				url: '/pages/pre-triage/index'
+			})
+		},
+		
+		// 导航到 AI 挂号助手
+		navigateToAIAssistant() {
+			uni.navigateTo({
+				url: '/pages/ai-assistant/index'
+			})
+		}
 		}
 	}
 </script>
@@ -992,6 +1006,14 @@
 
 	.card-ai .icon-wrapper {
 		background-color: #E6FFFA;
+	}
+
+	.card-ai-assistant {
+		grid-column: span 2; /* 让 AI 挂号助手卡片也横跨两列 */
+	}
+
+	.card-ai-assistant .icon-wrapper {
+		background-color: #FFF5E6;
 	}
 
 

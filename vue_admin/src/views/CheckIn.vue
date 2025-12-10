@@ -1,5 +1,8 @@
 <template>
   <div class="check-in-container">
+    <div class="back-area" style="margin-bottom: 12px;">
+      <BackButton />
+    </div>
     <el-card>
       <template #header>
         <div class="card-header">
@@ -120,10 +123,10 @@
             <el-icon class="is-loading"><Loading /></el-icon>
             <span style="margin-left: 10px;">加载中...</span>
           </div>
-          <div v-else-if="callQueue.length === 0" style="text-align: center; padding: 20px;">
-            <el-empty description="暂无已签到的患者" />
-          </div>
           <el-table v-else :data="Array.isArray(callQueue) ? callQueue : []" stripe style="width: 100%">
+            <template #empty>
+              <div style="padding: 20px; color: #909399;">暂无患者</div>
+            </template>
             <el-table-column prop="appointmentNumber" label="就诊序号" width="100" align="center">
               <template #default="{ row }">
                 <el-tag type="primary" size="large">{{ row.appointmentNumber }}号</el-tag>
@@ -300,6 +303,7 @@ import { Camera, Refresh, Loading } from '@element-plus/icons-vue'
 import { checkInAppointment, getAppointmentQrCode, clearCheckIn, getCallQueue, getNextAppointmentToCall, callAppointment, markMissedCall, recheckInAfterMissedCall, completeAppointment } from '@/api/appointment.js'
 import { getAllSchedules } from '@/api/schedule.js'
 import { Html5Qrcode } from 'html5-qrcode'
+import BackButton from '@/components/BackButton.vue'
 
 const checkInResult = ref(null)
 const showHelp = ref(false)

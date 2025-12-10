@@ -21,7 +21,7 @@
         :closable="false"
         class="logic-hint"
         title="计算逻辑提示"
-        description="仅统计状态为 completed 且存在 check_in_time 的号源；同一医生同一天按时间排序，空档 ≥ 90 分钟自动切成多段；每段工时 = 首诊至末诊跨度并统一 +0.5h 缓冲，夜班判定基于 18:00 时间阈值。"
+        description="仅统计状态为 completed 且存在 check_in_time 的号源；同一医生同一天按时间排序，空档 ≥ 90 分钟自动切成多段；每段工时 = 首诊至末诊跨度并统一 +0.5h 缓冲，夜班判定：首诊时间 > 18:00（不含18:00整点）。"
         show-icon
       />
 
@@ -57,33 +57,50 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="rows" v-loading="loading" border style="width: 100%; margin-top: 8px;">
+      <!-- 空状态显示 -->
+      <div v-if="!rows.length && !loading" class="empty-state">
+        <el-empty description="暂无数据">
+          <template #description>
+            <div class="empty-description">
+              <p>请选择日期范围和科室后点击"查询"按钮</p>
+              <p class="empty-hint">系统将统计已完成挂号的工时和门诊人次数据</p>
+            </div>
+          </template>
+        </el-empty>
+      </div>
+
+      <!-- 数据表格 -->
+      <el-table v-else :data="rows" v-loading="loading" border stripe style="width: 100%; margin-top: 8px;" :header-cell-style="{ background: '#f5f7fa', color: '#606266' }">
         <el-table-column prop="doctorName" label="医生" min-width="140" fixed="left" />
         <el-table-column prop="departmentName" label="所属科室" min-width="160" />
-        <el-table-column prop="workDate" label="日期" width="120" />
-        <el-table-column prop="segmentLabel" label="班段" width="100" />
-        <el-table-column label="首诊时间" width="170">
+        <el-table-column prop="workDate" label="日期" width="120" align="center" />
+        <el-table-column prop="segmentLabel" label="班段" width="100" align="center" />
+        <el-table-column label="首诊时间" width="170" align="center">
           <template #default="scope">
             {{ scope.row.firstCallDisplay || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="末诊时间" width="170">
+        <el-table-column label="末诊时间" width="170" align="center">
           <template #default="scope">
             {{ scope.row.lastEndDisplay || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="rawHours" label="原始工时(h)" width="130">
+        <el-table-column prop="rawHours" label="原始工时(h)" width="130" align="center">
           <template #default="scope">
-            {{ Number(scope.row.rawHours).toFixed(2) }}
+            <el-tag type="info" size="small">{{ Number(scope.row.rawHours).toFixed(2) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="regHours" label="挂号工时(h)" width="140">
+        <el-table-column prop="regHours" label="挂号工时(h)" width="140" align="center">
           <template #default="scope">
-            {{ Number(scope.row.regHours).toFixed(2) }}
+            <el-tag type="success" size="small">{{ Number(scope.row.regHours).toFixed(2) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="visitCount" label="门诊人次" width="110" />
-        <el-table-column label="夜班" width="90">
+        <el-table-column prop="visitCount" label="门诊人次" width="110" align="center">
+          <template #default="scope">
+            <el-tag type="primary" size="small">{{ scope.row.visitCount }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="夜班" width="90" align="center">
           <template #default="scope">
             <el-tag :type="scope.row.nightFlag ? 'danger' : 'info'" size="small">
               {{ scope.row.nightFlag ? '夜班' : '否' }}
@@ -91,18 +108,30 @@
           </template>
         </el-table-column>
         <el-table-column prop="locations" label="诊室/地点" min-width="160" />
-        <el-table-column prop="performancePoints" label="绩效点数" width="120">
+        <el-table-column prop="performancePoints" label="绩效点数" width="120" align="center">
           <template #default="scope">
-            {{ Number(scope.row.performancePoints).toFixed(2) }}
+            <el-tag type="warning" size="small">{{ Number(scope.row.performancePoints).toFixed(2) }}</el-tag>
           </template>
         </el-table-column>
       </el-table>
 
-      <div class="stats-bar" v-if="rows.length" style="margin-top: 12px; display: flex; gap: 16px; color: #606266;">
-        <div>统计医生数：{{ statDistinctDoctors }}</div>
-        <div>门诊人次：{{ statTotalVisits }}</div>
-        <div>挂号工时合计：{{ statTotalRegHours }} 小时</div>
-        <div>夜班班段：{{ statNightSegments }}</div>
+      <div class="stats-bar" v-if="rows.length">
+        <div class="stat-item">
+          <div class="stat-label">统计医生数</div>
+          <div class="stat-value">{{ statDistinctDoctors }}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">门诊人次</div>
+          <div class="stat-value">{{ statTotalVisits }}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">挂号工时合计</div>
+          <div class="stat-value">{{ statTotalRegHours }} <span class="stat-unit">小时</span></div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">夜班班段</div>
+          <div class="stat-value">{{ statNightSegments }}</div>
+        </div>
       </div>
     </el-card>
   </div>
@@ -335,13 +364,122 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.app-container { padding: 16px; }
+.app-container { 
+  padding: 20px;
+  background-color: #f5f7fa;
+  min-height: calc(100vh - 50px);
+}
+
 .card-header-title {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.search-form { margin-bottom: 8px; }
+
+.card-header-title span {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.search-form { 
+  margin-bottom: 16px;
+  padding: 16px;
+  background-color: #f9fafb;
+  border-radius: 8px;
+}
+
+.logic-hint {
+  margin-bottom: 16px;
+}
+
+/* 空状态样式 */
+.empty-state {
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-description {
+  margin-top: 16px;
+}
+
+.empty-description p {
+  margin: 8px 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.empty-hint {
+  color: #909399;
+  font-size: 13px;
+}
+
+/* 统计栏样式 */
+.stats-bar {
+  margin-top: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  display: flex;
+  gap: 20px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.stat-item {
+  flex: 1;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.stat-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 8px;
+  font-weight: 400;
+}
+
+.stat-value {
+  font-size: 28px;
+  color: white;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stat-unit {
+  font-size: 14px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* 表格优化 */
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-table th) {
+  font-weight: 600;
+}
+
+:deep(.el-table .el-tag) {
+  font-weight: 500;
+}
+
+/* 按钮组优化 */
+.card-header-title > div {
+  display: flex;
+  gap: 8px;
+}
 </style>
 
 

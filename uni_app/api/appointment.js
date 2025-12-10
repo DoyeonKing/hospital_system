@@ -185,9 +185,10 @@ export async function payForAppointment(appointmentId, paymentData) {
 /**
  * 获取患者的所有候补记录
  * @param {Number} patientId - 患者ID
+ * @param {Object} options - 额外选项（如 silentError, timeout, showLoading 等）
  */
-export async function getPatientWaitlist(patientId) {
-	const response = await get(`/api/waitlist/patient/${patientId}`)
+export async function getPatientWaitlist(patientId, options = {}) {
+	const response = await get(`/api/waitlist/patient/${patientId}`, {}, options)
 	// 后端直接返回数组，直接使用
 	if (Array.isArray(response)) {
 		return {

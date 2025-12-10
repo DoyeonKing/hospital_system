@@ -249,27 +249,59 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { ArrowLeft, ArrowRight, Money, Tickets, RefreshLeft, Check, Refresh } from '@element-plus/icons-vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ArrowLeft, ArrowRight, Money, Tickets, RefreshLeft, Check, Refresh, Loading } from '@element-plus/icons-vue';
 import BackButton from '@/components/BackButton.vue';
 import { getSchedules, batchUpdateSchedules } from '@/api/schedule';
+import { getAllParentDepartments, getDepartmentsByParentId } from '@/api/department';
 
 // --- 科室数据 ---
-const departments = ref([
-  { id: 'p1', name: '内科', children: [
-      { id: 's1-1', name: '呼吸内科' }, 
-      { id: 's1-2', name: '心血管内科' },
-      { id: 's1-3', name: '消化内科' }
-    ]},
-  { id: 'p2', name: '外科', children: [ 
-      { id: 's2-1', name: '普外科' },
-      { id: 's2-2', name: '骨科' }
-    ]},
-  { id: 'p3', name: '专科', children: [
-      { id: 's3-1', name: '口腔科' },
-      { id: 's3-2', name: '眼科' }
-    ]},
-]);
+const departments = ref([]);
+const loadingDepartments = ref(false);
+
+// 加载科室数据
+const loadDepartments = async () => {
+  loadingDepartments.value = true;
+  try {
+    const parentResponse = await getAllParentDepartments();
+    if (parentResponse && Array.isArray(parentResponse)) {
+      const departmentsWithChildren = await Promise.all(
+        parentResponse.map(async (parent) => {
+          try {
+            const childrenResponse = await getDepartmentsByParentId(parent.parentDepartmentId);
+            const children = childrenResponse && Array.isArray(childrenResponse) ? childrenResponse : [];
+            return {
+              id: `p${parent.parentDepartmentId}`,
+              name: parent.name,
+              description: parent.description,
+              parentDepartmentId: parent.parentDepartmentId,
+              children: children.map(child => ({
+                id: `s${child.departmentId}`,
+                name: child.name,
+                description: child.description,
+                departmentId: child.departmentId,
+                parentDepartmentId: child.parentDepartmentId
+              }))
+            };
+          } catch (error) {
+            console.error(`获取父科室 ${parent.name} 的子科室失败:`, error);
+            return {
+              id: `p${parent.parentDepartmentId}`,
+              name: parent.name,
+              description: parent.description,
+              parentDepartmentId: parent.parentDepartmentId,
+              children: []
+            };
+          }
+        })
+      );
+      departments.value = departmentsWithChildren;
+    }
+  } catch (error) {
+    console.error('加载科室数据失败:', error);
+  } finally {
+    loadingDepartments.value = false;
+  }
+};
 
 // --- 排班数据（从后端获取）---
 const scheduleData = ref({});
@@ -317,7 +349,7 @@ const selectedDepartmentName = computed(() => {
   if (parentAsSub) return parentAsSub.name;
   for (const parent of departments.value) {
     const sub = parent.children.find(c => c.id === activeSub.value);
-    if (sub) return sub.name;
+    if (sub) return `${parent.name}-${sub.name}`;
   }
   return '未知科室';
 });
@@ -404,18 +436,14 @@ const loadSchedules = async () => {
     weekEnd.setDate(weekEnd.getDate() + 6);
     
     // 将前端科室ID转换为后端期望的数字ID
+    // activeSub.value 格式为 's{departmentId}'，例如 's1' 表示科室ID为1
     let departmentId = null;
     if (activeSub.value.startsWith('s')) {
-      const idMapping = {
-        's1-1': 1, // 呼吸内科
-        's1-2': 2, // 心血管内科  
-        's1-3': 3, // 消化内科
-        's2-1': 4, // 普外科
-        's2-2': 5, // 骨科
-        's3-1': 6, // 口腔科
-        's3-2': 7  // 眼科
-      };
-      departmentId = idMapping[activeSub.value];
+      // 直接从ID中提取数字部分
+      departmentId = parseInt(activeSub.value.substring(1));
+    } else if (activeSub.value.startsWith('p')) {
+      // 如果是父科室，提取父科室ID
+      departmentId = parseInt(activeSub.value.substring(1));
     }
     
     const requestParams = {
@@ -862,7 +890,10 @@ const handleResetChanges = () => {
   });
 };
 
-onMounted(() => {
+onMounted(async () => {
+  // 先加载科室数据
+  await loadDepartments();
+  
   if (departments.value.length > 0) {
     handleParentSelect(departments.value[0].id);
     // 初始加载时从后端获取数据

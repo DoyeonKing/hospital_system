@@ -73,7 +73,7 @@
 			</view>
 		</view>
 
-		<!-- C. 医生推荐区 -->
+			<!-- C. 医生推荐区 -->
 		<view class="section doctor-section" v-if="doctorList.length > 0">
 			<view class="section-header">
 				<text class="section-title">为您推荐 {{selectedDeptName}} 专家</text>
@@ -83,11 +83,11 @@
 				<view 
 					class="doctor-card" 
 					v-for="(item, index) in doctorList" 
-					:key="item.id"
+					:key="item.id || item.doctorId"
 				>
 					<view class="doctor-info">
 						<view class="doctor-header">
-							<text class="doctor-name">{{item.name}}</text>
+							<text class="doctor-name">{{item.name || item.doctorName}}</text>
 							<text class="doctor-title">{{item.title}}</text>
 						</view>
 						<view 
@@ -95,15 +95,34 @@
 							:class="{ expanded: item.expanded }"
 							@click="toggleDoctorExpand(index)"
 						>
-							擅长：{{item.specialty}}
+							擅长：{{item.specialty || '暂无'}}
 						</view>
 					</view>
-					<button 
-						class="book-btn" 
-						@click="bookDoctor(item.id)"
-					>
-						去挂号
-					</button>
+					
+					<!-- 排班信息 -->
+					<view class="schedule-section" v-if="item.availableSchedules && item.availableSchedules.length > 0">
+						<view 
+							class="schedule-item" 
+							v-for="schedule in item.availableSchedules" 
+							:key="schedule.scheduleId"
+							:class="{ disabled: schedule.availableSlots === 0 }"
+							@click="selectSchedule(item, schedule)"
+						>
+							<view class="schedule-time-info">
+								<text class="schedule-date">{{ formatDate(schedule.scheduleDate) }}</text>
+								<text class="schedule-time">{{ formatTime(schedule.startTime) }} - {{ formatTime(schedule.endTime) }}</text>
+							</view>
+							<view class="schedule-meta">
+								<text class="schedule-location" v-if="schedule.locationName">{{ schedule.locationName }}</text>
+								<text class="schedule-slots" :class="{ full: schedule.availableSlots === 0 }">
+									{{ schedule.availableSlots === 0 ? '已满' : `剩余 ${schedule.availableSlots} 号` }}
+								</text>
+							</view>
+						</view>
+					</view>
+					<view class="no-schedule" v-else>
+						<text class="no-schedule-text">暂无可用排班</text>
+					</view>
 				</view>
 			</view>
 		</view>
@@ -321,17 +340,60 @@
 				this.fetchRecommendedDoctors(id, this.symptomText)
 			},
 
-			// 获取推荐医生 - 调用真实 API
+			// 获取推荐医生 - 调用带排班信息的接口
 			async fetchRecommendedDoctors(deptId, symptomText) {
 				try {
 					uni.showLoading({ title: '查找专家中...' })
 					
+					const patientId = this.getPatientId()
+					
+					// 优先使用 Spring Boot 接口（带排班信息）
+					try {
+						const { recommendDoctorsByDepartment } = await import('../../api/recommendation.js')
+						const response = await recommendDoctorsByDepartment(
+							deptId,
+							null, // symptomKeywords 可以为空
+							patientId,
+							10 // 返回Top-10个医生
+						)
+						
+						if (response && response.code === '200' && response.data && response.data.length > 0) {
+							// 格式化医生数据，保留排班信息
+							this.doctorList = response.data.map(doctor => ({
+								id: doctor.doctorId,
+								doctorId: doctor.doctorId,
+								name: doctor.doctorName,
+								doctorName: doctor.doctorName,
+								title: doctor.title || '医师',
+								specialty: doctor.specialty || '暂无',
+								availableSchedules: doctor.availableSchedules || [],
+								expanded: false
+							}))
+							return
+						} else if (Array.isArray(response) && response.length > 0) {
+							// 如果直接返回数组
+							this.doctorList = response.map(doctor => ({
+								id: doctor.doctorId,
+								doctorId: doctor.doctorId,
+								name: doctor.doctorName,
+								doctorName: doctor.doctorName,
+								title: doctor.title || '医师',
+								specialty: doctor.specialty || '暂无',
+								availableSchedules: doctor.availableSchedules || [],
+								expanded: false
+							}))
+							return
+						}
+					} catch (springBootError) {
+						console.warn('Spring Boot 接口调用失败，降级到 Node.js 接口:', springBootError)
+					}
+					
+					// 降级：使用 Node.js AI 服务接口（不带排班信息）
 					const requestData = {
 						department_id: deptId,
 						symptoms: symptomText || this.symptomText.trim()
 					}
 
-					// 使用 AI 服务的 baseURL
 					const response = await new Promise((resolve, reject) => {
 						uni.request({
 							url: config.aiBaseURL + '/api/pre-triage/recommend-doctor',
@@ -340,7 +402,7 @@
 							header: {
 								'Content-Type': 'application/json'
 							},
-							timeout: 60000, // 60秒超时，因为AI调用可能需要较长时间
+							timeout: 60000,
 							success: (res) => {
 								if (res.statusCode === 200) {
 									resolve(res.data)
@@ -366,12 +428,15 @@
 						doctors = response.data.recommended_doctors
 					}
 
-					// 格式化医生数据，添加 expanded 字段用于展开/收起
+					// 格式化医生数据（没有排班信息）
 					this.doctorList = doctors.map(doctor => ({
 						id: doctor.id || doctor.doctor_id,
+						doctorId: doctor.id || doctor.doctor_id,
 						name: doctor.name || doctor.full_name,
+						doctorName: doctor.name || doctor.full_name,
 						title: doctor.title || '医师',
 						specialty: doctor.specialty || doctor.specialty_description || '暂无',
+						availableSchedules: [], // Node.js 接口不返回排班信息
 						expanded: false
 					}))
 
@@ -399,7 +464,101 @@
 				this.doctorList[index].expanded = !this.doctorList[index].expanded
 			},
 
-			// 挂号
+			// 选择排班并预约
+			selectSchedule(doctor, schedule) {
+				if (schedule.availableSlots === 0) {
+					uni.showToast({
+						title: '该时段已满',
+						icon: 'none'
+					})
+					return
+				}
+
+				// 确认预约
+				uni.showModal({
+					title: '确认预约',
+					content: `确认预约 ${doctor.name || doctor.doctorName} ${doctor.title}\n${this.formatDate(schedule.scheduleDate)} ${this.formatTime(schedule.startTime)}-${this.formatTime(schedule.endTime)}`,
+					success: async (res) => {
+						if (res.confirm) {
+							await this.createAppointment(doctor, schedule)
+						}
+					}
+				})
+			},
+
+			// 创建预约
+			async createAppointment(doctor, schedule) {
+				uni.showLoading({ title: '正在预约...' })
+				try {
+					const patientInfo = uni.getStorageSync('patientInfo')
+					if (!patientInfo || !patientInfo.id) {
+						uni.showToast({
+							title: '请先登录',
+							icon: 'none'
+						})
+						uni.navigateTo({
+							url: '/pages/login/patient-login'
+						})
+						return
+					}
+
+					// 构建预约数据
+					const appointmentData = {
+						patientId: patientInfo.id,
+						scheduleId: schedule.scheduleId,
+						doctorId: doctor.doctorId || doctor.id,
+						departmentId: this.selectedDeptId
+					}
+
+					const { createAppointment } = await import('../../api/appointment.js')
+					const response = await createAppointment(appointmentData)
+
+					if (response && response.code === '200') {
+						uni.showToast({
+							title: '预约成功',
+							icon: 'success'
+						})
+						// 跳转到预约详情页
+						setTimeout(() => {
+							uni.navigateTo({
+								url: `/pages/appointment/detail?appointmentId=${response.data.appointmentId}`
+							})
+						}, 1500)
+					} else {
+						uni.showToast({
+							title: response.msg || '预约失败',
+							icon: 'none'
+						})
+					}
+				} catch (error) {
+					console.error('创建预约失败:', error)
+					uni.showToast({
+						title: '预约失败，请重试',
+						icon: 'none'
+					})
+				} finally {
+					uni.hideLoading()
+				}
+			},
+
+			// 格式化日期
+			formatDate(dateString) {
+				if (!dateString) return ''
+				const date = new Date(dateString)
+				const month = date.getMonth() + 1
+				const day = date.getDate()
+				return `${month}月${day}日`
+			},
+
+			// 格式化时间
+			formatTime(timeString) {
+				if (!timeString) return ''
+				// 处理 LocalTime 格式 (HH:mm:ss) 或 (HH:mm)
+				const time = timeString.split(':')
+				return `${time[0]}:${time[1]}`
+			},
+
+			// 挂号（保留原有方法，用于没有排班信息的情况）
 			bookDoctor(doctorId) {
 				uni.showToast({
 					title: '正在前往挂号...',
@@ -605,8 +764,6 @@
 
 	/* Doctor List */
 	.doctor-card {
-		display: flex;
-		align-items: center;
 		padding: 24rpx 0;
 		border-bottom: 1rpx solid #f0f0f0;
 	}
@@ -616,11 +773,12 @@
 	}
 
 	.doctor-info {
-		flex: 1;
-		margin-right: 20rpx;
+		margin-bottom: 20rpx;
 	}
 
 	.doctor-header {
+		display: flex;
+		align-items: center;
 		margin-bottom: 12rpx;
 	}
 
@@ -665,6 +823,90 @@
 
 	.book-btn::after {
 		border: none;
+	}
+
+	/* 排班信息样式 */
+	.schedule-section {
+		margin-top: 24rpx;
+		padding-top: 24rpx;
+		border-top: 1rpx solid #eee;
+	}
+
+	.schedule-item {
+		background: #f9f9f9;
+		border-radius: 12rpx;
+		padding: 20rpx;
+		margin-bottom: 12rpx;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		border: 1rpx solid #eee;
+		transition: all 0.3s ease;
+	}
+
+	.schedule-item:active:not(.disabled) {
+		background: linear-gradient(135deg, #E6FFFA 0%, #B2F5EA 100%);
+		border-color: #4FD9C3;
+		transform: translateY(-2rpx);
+		box-shadow: 0 4rpx 12rpx rgba(79, 217, 195, 0.2);
+	}
+
+	.schedule-item.disabled {
+		opacity: 0.5;
+		background: #f5f5f5;
+	}
+
+	.schedule-time-info {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+	}
+
+	.schedule-date {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333;
+		margin-bottom: 6rpx;
+	}
+
+	.schedule-time {
+		font-size: 24rpx;
+		color: #666;
+	}
+
+	.schedule-meta {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+	}
+
+	.schedule-location {
+		font-size: 22rpx;
+		color: #999;
+		margin-bottom: 6rpx;
+	}
+
+	.schedule-slots {
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #4FD9C3;
+	}
+
+	.schedule-slots.full {
+		color: #FC8181;
+	}
+
+	.no-schedule {
+		margin-top: 24rpx;
+		padding: 30rpx;
+		text-align: center;
+		background: #f9f9f9;
+		border-radius: 12rpx;
+	}
+
+	.no-schedule-text {
+		font-size: 26rpx;
+		color: #999;
 	}
 </style>
 

@@ -57,6 +57,58 @@ public class AdminController {
     }
 
     /**
+     * 获取管理员列表（支持分页和搜索）
+     */
+    @GetMapping("/list")
+    public ResponseEntity<?> getAdminList(
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String fullName,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size) {
+        try {
+            System.out.println("AdminController: 收到管理员列表请求");
+            List<AdminResponse> admins = adminService.findAllAdmins();
+            System.out.println("AdminController: 获取到 " + admins.size() + " 个管理员");
+            
+            // 打印第一个管理员的详细信息
+            if (!admins.isEmpty()) {
+                AdminResponse first = admins.get(0);
+                System.out.println("AdminController: 第一个管理员 - " + first.getUsername());
+                System.out.println("AdminController: 角色信息 - " + first.getRoles());
+                if (first.getRoles() != null) {
+                    System.out.println("AdminController: 角色数量 - " + first.getRoles().size());
+                }
+            }
+            
+            // 简单过滤
+            if (username != null && !username.isEmpty()) {
+                admins = admins.stream()
+                    .filter(a -> a.getUsername().contains(username))
+                    .toList();
+            }
+            if (fullName != null && !fullName.isEmpty()) {
+                admins = admins.stream()
+                    .filter(a -> a.getFullName() != null && a.getFullName().contains(fullName))
+                    .toList();
+            }
+            if (status != null && !status.isEmpty()) {
+                admins = admins.stream()
+                    .filter(a -> a.getStatus().toString().equals(status))
+                    .toList();
+            }
+            
+            System.out.println("AdminController: 过滤后返回 " + admins.size() + " 个管理员");
+            return ResponseEntity.ok(createResponse("200", "success", admins));
+        } catch (Exception e) {
+            System.err.println("AdminController: 获取管理员列表失败 - " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createResponse("500", e.getMessage(), null));
+        }
+    }
+
+    /**
      * 根据ID获取管理员
      */
     @GetMapping("/{id}")
@@ -106,9 +158,18 @@ public class AdminController {
             @PathVariable Integer id,
             @RequestBody AdminUpdateRequest request) {
         try {
+            System.out.println("AdminController: 更新管理员 ID=" + id);
+            System.out.println("AdminController: 请求数据 - " + request);
+            System.out.println("AdminController: username=" + request.getUsername());
+            System.out.println("AdminController: fullName=" + request.getFullName());
+            System.out.println("AdminController: status=" + request.getStatus());
+            System.out.println("AdminController: roleIds=" + request.getRoleIds());
+            
             AdminResponse admin = adminService.updateAdmin(id, request);
             return ResponseEntity.ok(createResponse("200", "管理员更新成功", admin));
         } catch (Exception e) {
+            System.err.println("AdminController: 更新管理员失败 - " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(createResponse("400", e.getMessage(), null));
         }

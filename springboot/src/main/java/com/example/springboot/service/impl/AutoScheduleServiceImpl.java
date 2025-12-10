@@ -234,14 +234,31 @@ public class AutoScheduleServiceImpl implements AutoScheduleService {
                 generatedSchedules, existingSchedules
             );
             
-            // 6. 保存到数据库（如果不是预览模式且无冲突）
-            if (!request.getPreviewOnly() && conflicts.isEmpty()) {
-                scheduleRepository.saveAll(generatedSchedules);
-                log.info("排班已保存到数据库");
-            } else if (request.getPreviewOnly()) {
-                log.info("预览模式，排班未保存");
+            // 6. 保存到数据库（如果不是预览模式）
+            if (!request.getPreviewOnly()) {
+                // 如果启用了覆盖已有排班，先删除该科室在日期范围内的所有排班
+                if (Boolean.TRUE.equals(request.getOverwriteExisting())) {
+                    log.info("覆盖模式：删除科室{}在{}到{}的已有排班", 
+                        request.getDepartmentId(), request.getStartDate(), request.getEndDate());
+                    scheduleRepository.deleteByDepartmentAndDateRange(
+                        request.getDepartmentId(), 
+                        request.getStartDate(), 
+                        request.getEndDate()
+                    );
+                    log.info("已删除该时间范围内的已有排班");
+                    // 清空冲突列表，因为已有排班已被删除
+                    conflicts.clear();
+                }
+                
+                // 保存新排班（如果没有冲突或已启用覆盖模式）
+                if (conflicts.isEmpty()) {
+                    scheduleRepository.saveAll(generatedSchedules);
+                    log.info("排班已保存到数据库");
+                } else {
+                    log.warn("检测到{}个冲突，排班未保存", conflicts.size());
+                }
             } else {
-                log.warn("检测到{}个冲突，排班未保存", conflicts.size());
+                log.info("预览模式，排班未保存");
             }
             
             // 7. 生成统计和响应

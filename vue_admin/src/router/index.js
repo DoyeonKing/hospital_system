@@ -52,6 +52,9 @@ import SubstituteSelection from '@/views/SubstituteSelection.vue';
 // ===== 新增：导入加号审批页面组件 =====
 import SlotApproval from '@/views/SlotApproval.vue';
 
+// ===== 新增：导入管理员管理页面组件 =====
+import AdminManagement from '@/views/AdminManagement.vue';
+
 // 通用视图组件导入
 const NotFoundView = () => import('../views/404.vue');
 
@@ -148,6 +151,15 @@ const routes = [
         name: 'UserHistory',
         meta: { title: '修改用户病史', requiresAuth: true },
         component: UserHistory
+    },
+    // =======================================================
+
+    // ===== 管理员管理路由 =====
+    {
+        path: '/admin-management',
+        name: 'AdminManagement',
+        meta: { title: '管理员管理', requiresAuth: true },
+        component: AdminManagement
     },
     // =======================================================
 

@@ -8,3 +8,6 @@ ADD COLUMN IF NOT EXISTS payment_deadline DATETIME DEFAULT NULL COMMENT '支付�
 -- 再次检查表结构确认
 DESCRIBE appointments;
 
+
+
+

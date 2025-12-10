@@ -67,6 +67,20 @@
         </div>
       </router-link>
 
+      <!-- 管理员管理入口 - 仅超级管理员 (需要 user_manage 权限) -->
+      <router-link 
+        v-if="hasPermission('user_manage')"
+        to="/admin-management" 
+        class="feature-card-link">
+        <div class="feature-card super-admin-card">
+          <div class="icon-wrapper" style="background-color: #FEF3C7;">
+            <el-icon :size="32" color="#F59E0B"><Avatar /></el-icon>
+          </div>
+          <h3>管理员管理</h3>
+          <p>管理系统管理员账户与角色权限</p>
+        </div>
+      </router-link>
+
       <!-- 排班管理入口 - 需要 schedule_manage -->
       <router-link 
         v-if="hasPermission('schedule_manage')"
@@ -183,7 +197,7 @@
 </template>
 
 <script setup>
-import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Checked, Service, DocumentAdd } from '@element-plus/icons-vue';
+import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Checked, Service, DocumentAdd, Avatar } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, onMounted } from 'vue';
@@ -328,6 +342,38 @@ const handleLogout = async () => {
   font-size: 14px;
   color: #718096;
   margin: 0;
+}
+
+/* 超级管理员卡片特殊样式 */
+.super-admin-card {
+  position: relative;
+  background: white;
+  border: 1px solid #e2e8f0;
+}
+
+.super-admin-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.super-admin-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background-color: #F59E0B;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.super-admin-card h3 {
+  color: #2d3748;
+}
+
+.super-admin-card p {
+  color: #718096;
 }
 </style>
 

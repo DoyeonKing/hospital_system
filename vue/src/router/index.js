@@ -9,6 +9,7 @@ import MySchedule from '@/views/MySchedule.vue';
 import PatientInfo from '@/views/PatientInfo.vue';
 import LeaveRequest from '@/views/LeaveRequest.vue'; // 导入休假页面
 import SlotApplication from '@/views/SlotApplication.vue'; // 导入加号申请页面
+import DoctorWorkHours from '@/views/DoctorWorkHours.vue'; // 导入工时统计页面
 const NotFoundView = () => import('../views/404.vue');
 
 const routes = [
@@ -58,6 +59,14 @@ const routes = [
         name: 'SlotApplication',
         component: SlotApplication,
         meta: { title: '申请加号', requiresAuth: true }
+    },
+
+    // 医生工时统计页面
+    {
+        path: '/doctor-work-hours',
+        name: 'DoctorWorkHours',
+        component: DoctorWorkHours,
+        meta: { title: '我的工时统计', requiresAuth: true }
     },
 
     // 根路径
