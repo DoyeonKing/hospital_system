@@ -1308,23 +1308,14 @@ public class AppointmentService {
             throw new BadRequestException("该预约还未被叫号，无法标记过号");
         }
 
-        // 增加过号次数
+        // 仅增加过号次数，保留签到/叫号状态
         appointment.setMissedCallCount(
                 (appointment.getMissedCallCount() == null ? 0 : appointment.getMissedCallCount()) + 1);
 
-        // 清除签到记录，状态改回scheduled
-        appointment.setStatus(AppointmentStatus.scheduled);
-        appointment.setCheckInTime(null);
-        appointment.setCalledAt(null);
-        appointment.setRecheckInTime(null);
-        appointment.setRealTimeQueueNumber(null);
-        appointment.setIsOnTime(false);
-        appointment.setIsLate(false);
-
         appointmentRepository.save(appointment);
 
-        logger.info("标记过号成功 - 预约ID: {}, 患者: {}, 过号次数: {}, 状态已改回scheduled",
-                appointmentId, appointment.getPatient().getFullName(), appointment.getMissedCallCount());
+        logger.info("标记过号成功 - 预约ID: {}, 患者: {}, 过号次数: {}, 状态保持为 {}",
+                appointmentId, appointment.getPatient().getFullName(), appointment.getMissedCallCount(), appointment.getStatus());
 
         return convertToResponseDto(appointment);
     }
