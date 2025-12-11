@@ -140,7 +140,7 @@ public class AppointmentService {
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
         appointment.setAppointmentNumber(getNextAppointmentNumberForRebooking(schedule, patient)); // 自动分配就诊序号
-        appointment.setStatus(AppointmentStatus.scheduled); // 初始状态为待支付
+        appointment.setStatus(AppointmentStatus.PENDING_PAYMENT); // 初始状态为待支付
         appointment.setPaymentStatus(PaymentStatus.unpaid);
         appointment.setCreatedAt(LocalDateTime.now());
 

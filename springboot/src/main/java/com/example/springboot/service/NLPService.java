@@ -505,6 +505,7 @@ private void enrichWithScheduleInfo(List<DoctorRecommendationWithSchedule> recom
                 if (schedule.getLocation() != null) {
                     info.setLocationName(schedule.getLocation().getLocationName());
                 }
+                info.setFee(schedule.getFee());
 
                 scheduleInfos.add(info);
             }
@@ -742,6 +743,7 @@ public static class DoctorRecommendationWithSchedule {
         private Integer bookedSlots;
         private Integer availableSlots;
         private String locationName;
+        private java.math.BigDecimal fee;
 
         // Getters and Setters
         public Integer getScheduleId() { return scheduleId; }
@@ -767,6 +769,9 @@ public static class DoctorRecommendationWithSchedule {
 
         public String getLocationName() { return locationName; }
         public void setLocationName(String locationName) { this.locationName = locationName; }
+
+        public java.math.BigDecimal getFee() { return fee; }
+        public void setFee(java.math.BigDecimal fee) { this.fee = fee; }
     }
 }
 }

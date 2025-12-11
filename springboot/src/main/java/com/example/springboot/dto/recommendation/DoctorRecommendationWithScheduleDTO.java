@@ -1,6 +1,7 @@
 package com.example.springboot.dto.recommendation;
 
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -34,5 +35,6 @@ public class DoctorRecommendationWithScheduleDTO {
         private Integer bookedSlots;
         private Integer availableSlots; // 剩余号源
         private String locationName; // 诊室名称
+        private BigDecimal fee; // 挂号费用
     }
 }

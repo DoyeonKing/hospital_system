@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生成 TabBar 图标</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .icons-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .icon-card {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .icon-card h3 {
+            margin: 0 0 15px 0;
+            color: #555;
+            font-size: 14px;
+        }
+        canvas {
+            border: 1px solid #eee;
+            margin: 10px 0;
+        }
+        button {
+            background: #38A2AC;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2d8189;
+        }
+        .instructions {
+            background: #e8f5f7;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        .instructions h2 {
+            color: #38A2AC;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 TabBar 图标生成器</h1>
+        
+        <div class="icons-grid" id="iconsGrid"></div>
+        
+        <div class="instructions">
+            <h2>使用说明</h2>
+            <ol>
+                <li>点击每个图标下方的"下载"按钮</li>
+                <li>将下载的图片重命名为对应的文件名</li>
+                <li>将所有图标文件放到 <code>static/tabbar/</code> 目录下</li>
+                <li>重新编译运行项目即可看到图标</li>
+            </ol>
+            <p><strong>注意：</strong>这是简化版图标，建议使用专业设计工具制作更精美的图标。</p>
+        </div>
+    </div>
+
+    <script>
+        const icons = [
+            { name: 'home', label: '首页', normal: '🏠', active: '🏠' },
+            { name: 'appointment', label: '我的预约', normal: '📅', active: '📅' },
+            { name: 'message', label: '消息', normal: '💬', active: '💬' },
+            { name: 'profile', label: '我的', normal: '👤', active: '👤' }
+        ];
+
+        const colors = {
+            normal: '#999999',
+            active: '#38A2AC'
+        };
+
+        function createIcon(emoji, color, size = 81) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // 绘制emoji
+            ctx.font = `${size * 0.7}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = color;
+            ctx.fillText(emoji, size / 2, size / 2);
+            
+            return canvas;
+        }
+
+        function downloadCanvas(canvas, filename) {
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        function renderIcons() {
+            const grid = document.getElementById('iconsGrid');
+            
+            icons.forEach(icon => {
+                // 未选中状态
+                const normalCard = document.createElement('div');
+                normalCard.className = 'icon-card';
+                normalCard.innerHTML = `<h3>${icon.label} - 未选中</h3>`;
+                
+                const normalCanvas = createIcon(icon.normal, colors.normal);
+                normalCard.appendChild(normalCanvas);
+                
+                const normalBtn = document.createElement('button');
+                normalBtn.textContent = '下载';
+                normalBtn.onclick = () => downloadCanvas(normalCanvas, `${icon.name}.png`);
+                normalCard.appendChild(normalBtn);
+                
+                grid.appendChild(normalCard);
+                
+                // 选中状态
+                const activeCard = document.createElement('div');
+                activeCard.className = 'icon-card';
+                activeCard.innerHTML = `<h3>${icon.label} - 选中</h3>`;
+                
+                const activeCanvas = createIcon(icon.active, colors.active);
+                activeCard.appendChild(activeCanvas);
+                
+                const activeBtn = document.createElement('button');
+                activeBtn.textContent = '下载';
+                activeBtn.onclick = () => downloadCanvas(activeCanvas, `${icon.name}-active.png`);
+                activeCard.appendChild(activeBtn);
+                
+                grid.appendChild(activeCard);
+            });
+        }
+
+        renderIcons();
+    </script>
+</body>
+</html>

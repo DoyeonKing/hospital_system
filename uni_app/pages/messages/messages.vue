@@ -146,6 +146,11 @@
 				this.conversationList = Object.values(conversationMap).sort((a, b) => {
 					return new Date(b.latestMessage.createTime) - new Date(a.latestMessage.createTime)
 				})
+				
+				// 用户进入消息页面，清除tabBar标记
+				uni.removeTabBarBadge({
+					index: 2
+				})
 			} catch (error) {
 				console.error('加载通知列表失败:', error)
 				uni.showToast({
