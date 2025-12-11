@@ -90,8 +90,12 @@
 			}
 		},
 		onLoad(options) {
+			console.log('付费页面 - 接收到的options:', options)
+			console.log('付费页面 - fee参数:', options.fee, '类型:', typeof options.fee)
+			
 			this.scheduleId = options.scheduleId ? parseInt(options.scheduleId) : null
 			this.waitlistId = options.waitlistId ? parseInt(options.waitlistId) : null
+			this.appointmentId = options.appointmentId ? parseInt(options.appointmentId) : null
 			this.fee = parseFloat(options.fee || 0)
 			this.departmentName = decodeURIComponent(options.departmentName || '')
 			this.doctorName = decodeURIComponent(options.doctorName || '')
@@ -100,8 +104,21 @@
 			this.slotName = decodeURIComponent(options.slotName || '')
 			this.location = decodeURIComponent(options.location || '')
 			this.isWaitlist = !!this.waitlistId
+			
+			console.log('付费页面 - 解析后的fee:', this.fee)
+			console.log('付费页面 - 所有数据:', {
+				scheduleId: this.scheduleId,
+				appointmentId: this.appointmentId,
+				fee: this.fee,
+				doctorName: this.doctorName,
+				departmentName: this.departmentName
+			})
+			
 			this.loadPatientInfo()
-			this.createAppointment()
+			// 只有从候补页面跳转过来才需要创建预约
+			if (!this.appointmentId) {
+				this.createAppointment()
+			}
 		},
 		methods: {
 			loadPatientInfo() {
