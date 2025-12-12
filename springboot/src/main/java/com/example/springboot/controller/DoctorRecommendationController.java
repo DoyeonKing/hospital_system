@@ -150,6 +150,7 @@ private DoctorRecommendationWithScheduleDTO convertWithScheduleToDTO(
                             info.setBookedSlots(s.getBookedSlots());
                             info.setAvailableSlots(s.getAvailableSlots());
                             info.setLocationName(s.getLocationName());
+                            info.setFee(s.getFee());
                             return info;
                         })
                         .collect(Collectors.toList());

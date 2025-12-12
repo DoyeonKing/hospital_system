@@ -8,18 +8,21 @@ import org.springframework.web.filter.CorsFilter;
 
 /**
  * 跨域配置
+ * 注意：此配置已被 WebSecurityConfig 中的 CORS 配置替代
+ * 保留此类但禁用，避免配置冲突
  */
 @Configuration
 public class CorsConfig {
 
-    @Bean
-    public CorsFilter corsFilter() {
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        CorsConfiguration corsConfiguration = new CorsConfiguration();
-        corsConfiguration.addAllowedOrigin("*"); // 1 设置访问源地址
-        corsConfiguration.addAllowedHeader("*"); // 2 设置访问源请求头
-        corsConfiguration.addAllowedMethod("*"); // 3 设置访问源请求方法
-        source.registerCorsConfiguration("/**", corsConfiguration); // 4 对接口配置跨域设置
-        return new CorsFilter(source);
-    }
+    // 已禁用，使用 WebSecurityConfig 中的 CORS 配置
+    // @Bean
+    // public CorsFilter corsFilter() {
+    //     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    //     CorsConfiguration corsConfiguration = new CorsConfiguration();
+    //     corsConfiguration.addAllowedOrigin("*");
+    //     corsConfiguration.addAllowedHeader("*");
+    //     corsConfiguration.addAllowedMethod("*");
+    //     source.registerCorsConfiguration("/**", corsConfiguration);
+    //     return new CorsFilter(source);
+    // }
 }

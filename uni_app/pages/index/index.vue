@@ -425,6 +425,9 @@
 						const { getUnreadCount } = await import('../../api/notification.js')
 						const count = await getUnreadCount(patientInfo.id, 'patient')
 						this.unreadCount = count || 0
+						
+						// 更新消息tab的标记
+						this.updateTabBarBadge()
 					} else {
 						this.unreadCount = 0
 					}
@@ -607,6 +610,21 @@
 				uni.switchTab({
 					url: '/pages/messages/messages'
 				})
+			},
+			
+			// 更新tabBar标记
+			updateTabBarBadge() {
+				// 更新消息tab的标记（index为2，对应第3个tab）
+				if (this.unreadCount > 0) {
+					uni.setTabBarBadge({
+						index: 2,
+						text: this.unreadCount > 99 ? '99+' : String(this.unreadCount)
+					})
+				} else {
+					uni.removeTabBarBadge({
+						index: 2
+					})
+				}
 			},
 			
 			// 格式化时间

@@ -113,6 +113,14 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<UserResponse> getUserById(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "PATIENT") String role) {
+        UserResponse user = userService.getUserById(id, role);
+        return ResponseEntity.ok(user);
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> updateUser(
             @PathVariable Long id,  // 添加ID路径参数

@@ -2,7 +2,9 @@ import axios from "axios";
 import {ElMessage} from "element-plus";
 
 const request = axios.create({
-  baseURL: 'http://localhost:8080',
+  // 开发环境使用相对路径，让 Vite 代理处理请求
+  // 生产环境使用完整的 baseURL
+  baseURL: import.meta.env.DEV ? '' : 'http://localhost:8080',
   timeout: 30000  // 后台接口超时时间
 })
 
@@ -12,14 +14,25 @@ request.interceptors.request.use(config => {
   console.log('=== 请求拦截器 ===');
   console.log('请求URL:', config.baseURL + config.url);
   console.log('请求方法:', config.method);
-  console.log('请求参数:', config.params);
-  console.log('请求头:', config.headers);
-  console.log('================');
+  console.log('请求数据:', config.data);
+  console.log('请求头（设置前）:', config.headers);
+  
+  // 确保 headers 对象存在
+  if (!config.headers) {
+    config.headers = {};
+  }
   
   // 如果是FormData类型，不设置Content-Type，让浏览器自动设置（包含boundary）
+  // 否则，对于 POST/PUT/PATCH 请求，设置 Content-Type
   if (!(config.data instanceof FormData)) {
-    config.headers['Content-Type'] = 'application/json;charset=utf-8';
+    if (config.data && (config.method === 'post' || config.method === 'put' || config.method === 'patch')) {
+      config.headers['Content-Type'] = 'application/json;charset=utf-8';
+    }
   }
+  
+  console.log('请求头（设置后）:', config.headers);
+  console.log('================');
+  
   return config
 }, error => {
   return Promise.reject(error)

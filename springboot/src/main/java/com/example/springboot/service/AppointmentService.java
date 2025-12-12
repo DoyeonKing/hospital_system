@@ -7,7 +7,9 @@ import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
 import com.example.springboot.dto.appointment.CheckInRequest;
 import com.example.springboot.dto.appointment.CheckInResponse;
 import com.example.springboot.dto.appointment.QrCodeResponse;
+import com.example.springboot.dto.fee.FeeDetailDTO;
 import com.example.springboot.dto.schedule.ScheduleResponse;
+import com.example.springboot.util.FeeCalculator;
 import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.Schedule;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -140,7 +143,7 @@ public class AppointmentService {
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
         appointment.setAppointmentNumber(getNextAppointmentNumberForRebooking(schedule, patient)); // 自动分配就诊序号
-        appointment.setStatus(AppointmentStatus.scheduled); // 初始状态为待支付
+        appointment.setStatus(AppointmentStatus.PENDING_PAYMENT); // 初始状态为待支付
         appointment.setPaymentStatus(PaymentStatus.unpaid);
         appointment.setCreatedAt(LocalDateTime.now());
 
@@ -383,6 +386,31 @@ public class AppointmentService {
 
         // ScheduleResponse 包含 Doctor, TimeSlot, Clinic, Department 信息
         response.setSchedule(ScheduleResponse.fromEntity(appointment.getSchedule()));
+
+        // 计算费用详情（根据患者类型计算报销比例和实际应付费用）
+        if (appointment.getSchedule() != null && 
+            appointment.getSchedule().getFee() != null &&
+            appointment.getPatient() != null &&
+            appointment.getPatient().getPatientType() != null) {
+            
+            BigDecimal originalFee = appointment.getSchedule().getFee();
+            PatientType patientType = appointment.getPatient().getPatientType();
+            
+            BigDecimal reimbursementRate = FeeCalculator.getReimbursementRate(patientType);
+            BigDecimal reimbursementAmount = FeeCalculator.calculateReimbursementAmount(originalFee, patientType);
+            BigDecimal actualFee = FeeCalculator.calculateActualFee(originalFee, patientType);
+            String patientTypeName = FeeCalculator.getPatientTypeName(patientType);
+            
+            FeeDetailDTO feeDetail = new FeeDetailDTO(
+                originalFee, 
+                reimbursementRate, 
+                reimbursementAmount, 
+                actualFee, 
+                patientTypeName
+            );
+            
+            response.setFeeDetail(feeDetail);
+        }
 
         return response;
     }

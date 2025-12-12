@@ -492,6 +492,7 @@
 				try {
 					const patientInfo = uni.getStorageSync('patientInfo')
 					if (!patientInfo || !patientInfo.id) {
+						uni.hideLoading()
 						uni.showToast({
 							title: '请先登录',
 							icon: 'none'
@@ -513,29 +514,63 @@
 					const { createAppointment } = await import('../../api/appointment.js')
 					const response = await createAppointment(appointmentData)
 
+					uni.hideLoading()
+
 					if (response && response.code === '200') {
-						uni.showToast({
-							title: '预约成功',
-							icon: 'success'
+						// 预约创建成功，跳转到付费页面
+						const appointmentId = response.data.appointmentId || response.data.id
+						const fee = schedule.fee || schedule.registrationFee || 0
+						const slotName = `${schedule.startTime}-${schedule.endTime}`
+						uni.navigateTo({
+							url: `/pages/payment/payment?scheduleId=${schedule.scheduleId}&appointmentId=${appointmentId}&fee=${fee}&doctorName=${encodeURIComponent(doctor.name || doctor.doctorName)}&doctorTitle=${encodeURIComponent(doctor.title || '')}&departmentName=${encodeURIComponent(this.selectedDeptName)}&scheduleDate=${schedule.scheduleDate}&slotName=${encodeURIComponent(slotName)}&location=${encodeURIComponent(schedule.location || '')}`
 						})
-						// 跳转到预约详情页
-						setTimeout(() => {
-							uni.navigateTo({
-								url: `/pages/appointment/detail?appointmentId=${response.data.appointmentId}`
-							})
-						}, 1500)
 					} else {
-						uni.showToast({
-							title: response.msg || '预约失败',
-							icon: 'none'
-						})
+						// 处理各种错误情况
+						const errorMsg = response.msg || response.message || '预约失败'
+						
+						// 检查是否是重复预约错误
+						if (errorMsg.includes('已有预约') || errorMsg.includes('already has an appointment')) {
+							uni.showModal({
+								title: '提示',
+								content: '您已预约该号源，请勿重复预约',
+								showCancel: false,
+								confirmText: '我知道了'
+							})
+						} else {
+							uni.showToast({
+								title: errorMsg,
+								icon: 'none',
+								duration: 2000
+							})
+						}
 					}
 				} catch (error) {
 					console.error('创建预约失败:', error)
-					uni.showToast({
-						title: '预约失败，请重试',
-						icon: 'none'
-					})
+					uni.hideLoading()
+					
+					// 解析错误信息
+					let errorMsg = '预约失败，请重试'
+					if (error.data && error.data.msg) {
+						errorMsg = error.data.msg
+					} else if (error.errMsg) {
+						errorMsg = error.errMsg
+					}
+					
+					// 检查是否是重复预约错误
+					if (errorMsg.includes('已有预约') || errorMsg.includes('already has an appointment')) {
+						uni.showModal({
+							title: '提示',
+							content: '您已预约该号源，请勿重复预约',
+							showCancel: false,
+							confirmText: '我知道了'
+						})
+					} else {
+						uni.showToast({
+							title: errorMsg,
+							icon: 'none',
+							duration: 2000
+						})
+					}
 				} finally {
 					uni.hideLoading()
 				}

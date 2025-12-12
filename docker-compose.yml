@@ -1,0 +1,109 @@
+services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: hospital_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: hospital_07
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3307:3306"  # 外部端口改为3307，避免与本地MySQL冲突
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql语句/00_database:/docker-entrypoint-initdb.d/00_database:ro
+      - ./sql语句/01_tables:/docker-entrypoint-initdb.d/01_tables:ro
+      - ./sql语句/02_initial_data:/docker-entrypoint-initdb.d/02_initial_data:ro
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --init-connect='SET NAMES utf8mb4'
+    networks:
+      - hospital_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis 缓存（二维码Token存储）
+  redis:
+    image: redis:7-alpine
+    container_name: hospital_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hospital_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Spring Boot 后端
+  springboot:
+    build:
+      context: ./springboot
+      dockerfile: Dockerfile
+    container_name: hospital_springboot
+    ports:
+      - "8080:8080"
+    environment:
+      # 数据库连接（使用服务名 mysql）
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/hospital_07?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 123456
+      # Redis连接（使用服务名 redis）
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      # 文件上传路径
+      SPRING_FILE_UPLOAD_DIR: /app/images/doctors/
+    volumes:
+      - ./springboot/uploads:/app/uploads
+      - ./images:/app/images
+      - ./springboot/models:/app/models
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hospital_network
+    restart: unless-stopped
+
+  # Node.js AI 预问诊后端
+  ai_backend:
+    build:
+      context: ./ai_pre_triage_backend
+      dockerfile: Dockerfile
+    container_name: hospital_ai_backend
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: 123456
+      DB_NAME: hospital_07
+      PORT: 3000
+      NODE_OPTIONS: --dns-result-order=ipv4first
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - hospital_network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  hospital_network:
+    driver: bridge
+

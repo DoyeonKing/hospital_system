@@ -44,7 +44,10 @@
 				"navigationBarTitleText": "选择科室",
 				"navigationBarBackgroundColor": "#4FD9C3",
 				"navigationBarTextStyle": "white",
-				"backgroundColor": "#F8F8F8"
+				"backgroundColor": "#F8F8F8",
+				"enablePullDownRefresh": false,
+				"disableScroll": false,
+				"bounce": "none"
 			}
 		},
 		{
@@ -90,6 +93,15 @@
 				"navigationBarTitleText": "个人中心",
 				"navigationBarBackgroundColor": "#FFFFFF",
 				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F8F8F8"
+			}
+		},
+		{
+			"path": "pages/profile/edit",
+			"style": {
+				"navigationBarTitleText": "编辑资料",
+				"navigationBarBackgroundColor": "#4FD9C3",
+				"navigationBarTextStyle": "white",
 				"backgroundColor": "#F8F8F8"
 			}
 		},
@@ -171,19 +183,27 @@
 		"list": [
 			{
 				"pagePath": "pages/index/index",
-				"text": "首页"
+				"text": "首页",
+				"iconPath": "static/tabbar/home.png",
+				"selectedIconPath": "static/tabbar/home-active.png"
 			},
 			{
 				"pagePath": "pages/appointments/appointments",
-				"text": "我的预约"
+				"text": "我的预约",
+				"iconPath": "static/tabbar/appointment.png",
+				"selectedIconPath": "static/tabbar/appointment-active.png"
 			},
 			{
 				"pagePath": "pages/messages/messages",
-				"text": "消息"
+				"text": "消息",
+				"iconPath": "static/tabbar/message.png",
+				"selectedIconPath": "static/tabbar/message-active.png"
 			},
 			{
 				"pagePath": "pages/profile/profile",
-				"text": "我的"
+				"text": "我的",
+				"iconPath": "static/tabbar/profile.png",
+				"selectedIconPath": "static/tabbar/profile-active.png"
 			}
 		]
 	},

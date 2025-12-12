@@ -1,5 +1,6 @@
 package com.example.springboot.dto.appointment;
 
+import com.example.springboot.dto.fee.FeeDetailDTO; // 导入费用详情DTO
 import com.example.springboot.dto.patient.PatientResponse; // 导入患者响应DTO
 import com.example.springboot.dto.schedule.ScheduleResponse; // 导入排班响应DTO
 import com.example.springboot.entity.enums.AppointmentStatus;
@@ -24,4 +25,5 @@ public class AppointmentResponse {
     private Integer missedCallCount; // 过号次数
     private LocalDateTime recheckInTime; // 过号后重新签到时间
     private LocalDateTime createdAt;
+    private FeeDetailDTO feeDetail; // 费用详情（包含原价、报销比例、实际费用等）
 }
