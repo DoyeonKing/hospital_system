@@ -507,11 +507,17 @@ public class UserServiceImpl implements UserService {
         Patient updatedPatient = patientRepository.save(patient);
 
         // 更新患者档案
-        if (request.getIdCardNumber() != null || request.getAllergies() != null || request.getMedicalHistory() != null) {
+        if (request.getIdCardNumber() != null || request.getAllergies() != null || request.getMedicalHistory() != null
+                || request.getBirthDate() != null || request.getGender() != null || request.getHomeAddress() != null
+                || request.getEmergencyContactName() != null || request.getEmergencyContactPhone() != null
+                || request.getHeight() != null || request.getWeight() != null) {
+            
             PatientProfile profile = patientProfileRepository.findById(patientId)
                     .orElse(new PatientProfile());
 
             profile.setPatient(updatedPatient);
+            
+            // 原有字段
             if (request.getIdCardNumber() != null) {
                 profile.setIdCardNumber(request.getIdCardNumber());
             }
@@ -520,6 +526,29 @@ public class UserServiceImpl implements UserService {
             }
             if (request.getMedicalHistory() != null) {
                 profile.setMedicalHistory(request.getMedicalHistory());
+            }
+            
+            // 新增字段
+            if (request.getBirthDate() != null) {
+                profile.setBirthDate(request.getBirthDate());
+            }
+            if (request.getGender() != null) {
+                profile.setGender(request.getGender());
+            }
+            if (request.getHomeAddress() != null) {
+                profile.setHomeAddress(request.getHomeAddress());
+            }
+            if (request.getEmergencyContactName() != null) {
+                profile.setEmergencyContactName(request.getEmergencyContactName());
+            }
+            if (request.getEmergencyContactPhone() != null) {
+                profile.setEmergencyContactPhone(request.getEmergencyContactPhone());
+            }
+            if (request.getHeight() != null) {
+                profile.setHeight(request.getHeight());
+            }
+            if (request.getWeight() != null) {
+                profile.setWeight(request.getWeight());
             }
 
             patientProfileRepository.save(profile);
@@ -626,5 +655,27 @@ public class UserServiceImpl implements UserService {
         } else {
             throw new BadRequestException("不支持的用户角色: " + role);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponse getUserById(Long id, String role) {
+        UserResponse response = new UserResponse();
+        
+        if ("PATIENT".equalsIgnoreCase(role)) {
+            Patient patient = patientRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("患者不存在: " + id));
+            response.setRole("PATIENT");
+            response.setUserDetails(patientService.convertToResponseDto(patient));
+        } else if ("DOCTOR".equalsIgnoreCase(role)) {
+            Doctor doctor = doctorRepository.findById(Integer.valueOf(id.intValue()))
+                    .orElseThrow(() -> new ResourceNotFoundException("医生不存在: " + id));
+            response.setRole("DOCTOR");
+            response.setUserDetails(doctorService.convertToResponseDto(doctor));
+        } else {
+            throw new BadRequestException("不支持的用户角色: " + role);
+        }
+        
+        return response;
     }
 }

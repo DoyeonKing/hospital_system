@@ -130,10 +130,8 @@
 				}
 			},
 			navigateToEditProfile() {
-				uni.showToast({
-					title: '编辑资料功能开发中',
-					icon: 'none',
-					duration: 2000
+				uni.navigateTo({
+					url: '/pages/profile/edit'
 				})
 			},
 			navigateToSettings() {

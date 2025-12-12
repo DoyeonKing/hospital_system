@@ -51,16 +51,12 @@ public class WebSecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 💡 允许的来源（支持 credentials 时必须指定具体源，不能使用通配符）
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:8000",  // HTTP 服务器
-            "http://localhost:3000",   // React 开发服务器
-            "http://localhost:5173",   // Vite 开发服务器（默认端口）
-            "http://localhost:5174",   // Vite 备用端口
-            "http://127.0.0.1:8000",   // 备用地址
-            "http://127.0.0.1:3000",   // 备用地址
-            "http://127.0.0.1:5173",   // Vite 备用地址
-            "http://127.0.0.1:5174"    // Vite 备用地址
+        // 💡 使用allowedOriginPatterns支持通配符和null origin
+        // 这样可以同时支持HTTP服务器和file://协议打开的HTML文件
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:*",      // 允许所有localhost端口
+            "http://127.0.0.1:*",      // 允许所有127.0.0.1端口
+            "null"                      // 允许file://协议（浏览器发送null作为origin）
         ));
 
         // 允许常用方法 (GET, POST, PUT, DELETE, OPTIONS)
@@ -69,7 +65,8 @@ public class WebSecurityConfig {
         // 允许所有请求头
         configuration.setAllowedHeaders(Arrays.asList("*"));
 
-        // 允许发送 Cookie 或认证信息（必须设为 true 以支持 credentials: 'include'）
+        // 允许发送 Cookie 或认证信息
+        // 注意：使用allowedOriginPatterns时，可以设置allowCredentials为true
         configuration.setAllowCredentials(true);
 
         // 暴露响应头（允许前端访问）

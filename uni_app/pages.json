@@ -97,6 +97,15 @@
 			}
 		},
 		{
+			"path": "pages/profile/edit",
+			"style": {
+				"navigationBarTitleText": "编辑资料",
+				"navigationBarBackgroundColor": "#4FD9C3",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F8F8F8"
+			}
+		},
+		{
 			"path": "pages/messages/message-conversation",
 			"style": {
 				"navigationBarTitleText": "对话详情",

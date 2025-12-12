@@ -30,4 +30,6 @@ public interface UserService {
     MedicalHistoryResponse updateMedicalHistory(Long id, MedicalHistoryUpdateRequest request);
 
     void softDeleteUser(Long userId, String role);
+
+    UserResponse getUserById(Long id, String role);
 }
