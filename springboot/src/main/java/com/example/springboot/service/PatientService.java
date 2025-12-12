@@ -191,6 +191,7 @@ import com.example.springboot.dto.common.PageResponse; // 导入新增方法所�
 import com.example.springboot.dto.patient.MedicalHistoryResponse; // 导入新增方法所需的DTO
 import com.example.springboot.dto.patient.MedicalHistoryUpdateRequest; // 导入新增方法所需的DTO
 import com.example.springboot.dto.patient.PatientResponse;
+import com.example.springboot.dto.patient.PatientProfileResponse;
 import com.example.springboot.dto.patient.PatientSimpleResponse;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.PatientProfile;
@@ -435,6 +436,21 @@ public class PatientService {
 
         PatientResponse response = new PatientResponse();
         BeanUtils.copyProperties(patient, response);  // Copy properties from patient to response
+        
+        // 加载并转换患者档案信息
+        if (patient.getPatientId() != null) {
+            Optional<PatientProfile> profileOpt = patientProfileRepository.findById(patient.getPatientId());
+            if (profileOpt.isPresent()) {
+                PatientProfile profile = profileOpt.get();
+                PatientProfileResponse profileResponse = new PatientProfileResponse();
+                BeanUtils.copyProperties(profile, profileResponse);
+                if (profile.getBlacklistStatus() != null) {
+                    profileResponse.setBlacklistStatus(profile.getBlacklistStatus().name());
+                }
+                response.setPatientProfile(profileResponse);
+            }
+        }
+        
         return response;
     }
 

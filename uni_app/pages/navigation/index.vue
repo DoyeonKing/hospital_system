@@ -3,6 +3,22 @@
 	<view class="container">
 		<!-- 控制面板 -->
 		<view class="control-panel">
+			<!-- 楼栋选择器 -->
+			<view class="building-selector" v-if="availableBuildings.length > 1">
+				<text class="info-label">选择楼栋：</text>
+				<view class="building-buttons">
+					<view 
+						v-for="building in availableBuildings" 
+						:key="building"
+						class="building-btn"
+						:class="{ 'active': currentBuilding === building }"
+						@click="switchBuilding(building)"
+					>
+						{{ building }}
+					</view>
+				</view>
+			</view>
+			
 			<!-- 楼层选择器 -->
 			<view class="floor-selector" v-if="availableFloors.length > 1">
 				<text class="info-label">当前楼层：</text>
@@ -44,6 +60,27 @@
 				<text class="hint-text">💡 下一步：{{ nextStep.instruction }}</text>
 			</view>
 			
+			<!-- 完整路线说明（折叠/展开） -->
+			<view class="route-overview" v-if="navigationSteps && navigationSteps.length > 0">
+				<view class="route-header" @click="toggleRouteDetail">
+					<text class="route-icon">🗺️</text>
+					<text class="route-title">完整路线（{{ navigationSteps.length }}步）</text>
+					<text class="route-toggle">{{ showRouteDetail ? '▼' : '▶' }}</text>
+				</view>
+				<view class="route-steps" v-if="showRouteDetail">
+					<view 
+						v-for="(step, index) in navigationSteps" 
+						:key="index"
+						class="route-step"
+						:class="{ 'current-step': index === currentStepIndex, 'completed-step': index < currentStepIndex }"
+					>
+						<text class="step-number">{{ index + 1 }}.</text>
+						<text class="step-icon">{{ index < currentStepIndex ? '✅' : (index === currentStepIndex ? '👉' : '⭕') }}</text>
+						<text class="step-text">{{ step.toNodeName || step.instruction }}</text>
+					</view>
+				</view>
+			</view>
+			
 			<view class="info-row">
 				<text class="info-label">正在前往：</text>
 				<text class="info-value">{{ targetNodeName || '加载中...' }}</text>
@@ -51,6 +88,9 @@
 			<view class="control-buttons">
 				<view class="control-btn" @click.stop="scanLocationCode" style="background: #52C41A;">
 					<text class="btn-text">📷 扫码定位</text>
+				</view>
+				<view class="control-btn" @click.stop="toggleLabels" :style="{background: showAllLabels ? '#1890FF' : '#999999'}">
+					<text class="btn-text">{{ showAllLabels ? '🔍 隐藏标签' : '🔍 显示所有' }}</text>
 				</view>
 			</view>
 		</view>
@@ -172,6 +212,16 @@ class SimpleAStar {
 		console.log('[A*算法] 开始寻路，起点:', startX, startY, '终点:', endX, endY)
 		console.log('[A*算法] 网格尺寸:', this.width, 'x', this.height)
 		
+		// 先检查坐标是否在网格范围内
+		if (startX < 0 || startX >= this.width || startY < 0 || startY >= this.height) {
+			console.error('[A*算法] 起点坐标超出范围:', startX, startY, '网格范围: 0-' + (this.width-1) + ', 0-' + (this.height-1))
+			return []
+		}
+		if (endX < 0 || endX >= this.width || endY < 0 || endY >= this.height) {
+			console.error('[A*算法] 终点坐标超出范围:', endX, endY, '网格范围: 0-' + (this.width-1) + ', 0-' + (this.height-1))
+			return []
+		}
+		
 		// 检查起点和终点是否可通行
 		if (this.grid[startY][startX] === 1) {
 			console.error('[A*算法] 起点在障碍物上')
@@ -288,6 +338,11 @@ export default {
 			canvasHeight: 600,
 			scaleX: 1,
 			scaleY: 1,
+			// 坐标变换参数（用于自动缩放和居中）
+			coordOffsetX: 0, // X坐标偏移量
+			coordOffsetY: 0, // Y坐标偏移量
+			coordScaleX: 1,  // X坐标缩放比例
+			coordScaleY: 1,  // Y坐标缩放比例
 			currentPathIndex: 0,
 			animationTimer: null,
 			locationTimer: null, // 定位定时器
@@ -308,6 +363,12 @@ export default {
 			availableFloors: [1, 2, 3], // 可用楼层列表
 			floorLayouts: FLOOR_LAYOUTS,
 			currentNode: null, // 当前节点信息（包含楼层）
+			// 楼栋相关
+			currentBuilding: null, // 当前选择的楼栋（null表示显示所有楼栋）
+			availableBuildings: [], // 可用楼栋列表（从节点数据中提取）
+			// 标签显示控制
+			showAllLabels: false, // 是否显示所有标签（默认只显示重要节点）
+			showRouteDetail: false, // 是否显示完整路线详情（默认折叠）
 			// 真实定位相关
 			isRealTimeMode: false, // 是否开启实时定位模式
 			currentLocation: null, // 当前实际位置 {x, y} (整数网格坐标)
@@ -391,6 +452,7 @@ export default {
 	onReady() {
 		// 获取canvas上下文
 		this.ctx = uni.createCanvasContext('mapCanvas', this)
+		console.log('[onReady] Canvas上下文已创建:', !!this.ctx)
 		
 		// 获取Canvas实际尺寸
 		const query = uni.createSelectorQuery().in(this)
@@ -398,14 +460,33 @@ export default {
 			if (rect) {
 				this.canvasWidth = rect.width || 750
 				this.canvasHeight = rect.height || 600
-				console.log('Canvas尺寸:', this.canvasWidth, this.canvasHeight)
+				console.log('[onReady] Canvas尺寸:', this.canvasWidth, this.canvasHeight)
 			}
-			// 延迟绘制，确保数据已加载
-			setTimeout(() => {
-				if (this.gridMatrix) {
+			
+			// 确保绘制地图（多次尝试，直到数据加载完成）
+			const tryDrawMap = () => {
+				if (this.ctx && this.gridMatrix) {
+					console.log('[onReady] 条件满足，开始绘制地图')
 					this.drawMap()
+				} else {
+					console.log('[onReady] 等待数据加载...', {
+						hasCtx: !!this.ctx,
+						hasGridMatrix: !!this.gridMatrix
+					})
+					// 如果数据还没加载，延迟重试
+					setTimeout(() => {
+						if (this.ctx && this.gridMatrix) {
+							this.drawMap()
+						}
+					}, 300)
 				}
-			}, 500)
+			}
+			
+			// 立即尝试一次
+			tryDrawMap()
+			
+			// 延迟再尝试一次（防止数据加载较慢）
+			setTimeout(tryDrawMap, 500)
 		}).exec()
 	},
 	onUnload() {
@@ -538,12 +619,328 @@ export default {
 					this.gridMatrix = config.grid.gridMatrix
 					this.nodes = config.nodes || []
 					
+					// 从API响应中获取可用楼层列表（如果存在）
+					if (config.availableFloors && Array.isArray(config.availableFloors) && config.availableFloors.length > 0) {
+						this.availableFloors = config.availableFloors.sort((a, b) => a - b) // 确保升序排列
+						console.log('✅ 从API获取到可用楼层:', this.availableFloors)
+					} else {
+						// 如果API没有返回楼层列表，从节点中提取
+						const floorsFromNodes = [...new Set(this.nodes.map(n => n.floorLevel).filter(f => f != null && f > 0))].sort((a, b) => a - b)
+						if (floorsFromNodes.length > 0) {
+							this.availableFloors = floorsFromNodes
+							console.log('✅ 从节点中提取到可用楼层:', this.availableFloors)
+						} else {
+							console.warn('⚠️ 无法获取楼层信息，使用默认楼层 [1, 2, 3]')
+							this.availableFloors = [1, 2, 3]
+						}
+					}
+					
+					// 从节点中提取可用楼栋列表
+					const buildingsFromNodes = [...new Set(this.nodes.map(n => n.building).filter(b => b != null && b.trim() !== ''))]
+					if (buildingsFromNodes.length > 0) {
+						this.availableBuildings = buildingsFromNodes.sort()
+						console.log('✅ 从节点中提取到可用楼栋:', this.availableBuildings)
+					} else {
+						console.warn('⚠️ 无法获取楼栋信息')
+						this.availableBuildings = []
+					}
+					
+					// 验证和修复节点坐标，并计算缩放和居中参数
+					if (this.nodes && this.nodes.length > 0) {
+						console.log('节点坐标验证:')
+						this.nodes.forEach((node, index) => {
+							// 确保坐标是数字
+							if (typeof node.x !== 'number' || isNaN(node.x)) {
+								console.warn(`节点 ${index} (${node.name}) X坐标无效:`, node.x)
+								node.x = 0
+							}
+							if (typeof node.y !== 'number' || isNaN(node.y)) {
+								console.warn(`节点 ${index} (${node.name}) Y坐标无效:`, node.y)
+								node.y = 0
+							}
+							console.log(`  节点 ${index}: ${node.name || '未命名'} - 坐标(${node.x}, ${node.y})`)
+						})
+						
+						// 计算节点坐标范围
+						const xs = this.nodes.map(n => n.x).filter(x => typeof x === 'number' && !isNaN(x))
+						const ys = this.nodes.map(n => n.y).filter(y => typeof y === 'number' && !isNaN(y))
+						
+						// 在外部定义变量，确保在整个作用域内可用
+						let minX = 0, maxX = 0, minY = 0, maxY = 0
+						
+						if (xs.length > 0 && ys.length > 0) {
+							minX = Math.min(...xs)
+							maxX = Math.max(...xs)
+							minY = Math.min(...ys)
+							maxY = Math.max(...ys)
+							
+							const nodeRangeX = maxX - minX
+							const nodeRangeY = maxY - minY
+							
+							console.log(`节点坐标范围: X[${minX}, ${maxX}] (范围: ${nodeRangeX}), Y[${minY}, ${maxY}] (范围: ${nodeRangeY})`)
+							
+							// 如果节点范围太小（<15），自动分散节点到更大的范围
+							const minDesiredRange = 20 // 期望的最小范围
+							if (nodeRangeX < minDesiredRange || nodeRangeY < minDesiredRange) {
+								console.warn(`⚠️ 节点范围太小 (X:${nodeRangeX}, Y:${nodeRangeY})，自动分散节点`)
+								
+								// 计算目标范围（使用画布尺寸的80%）
+								const targetRangeX = Math.max(minDesiredRange, this.canvasWidth * 0.8 / 20) // 假设20像素/单位
+								const targetRangeY = Math.max(minDesiredRange, this.canvasHeight * 0.8 / 20)
+								
+								// 计算缩放因子
+								const scaleFactorX = nodeRangeX > 0 ? targetRangeX / nodeRangeX : 1
+								const scaleFactorY = nodeRangeY > 0 ? targetRangeY / nodeRangeY : 1
+								
+								// 分散节点：以中心为基准，按比例扩展
+								const centerX = (minX + maxX) / 2
+								const centerY = (minY + maxY) / 2
+								
+								this.nodes.forEach(node => {
+									if (typeof node.x === 'number' && !isNaN(node.x) && 
+									    typeof node.y === 'number' && !isNaN(node.y)) {
+										// 相对于中心点的偏移
+										const offsetX = node.x - centerX
+										const offsetY = node.y - centerY
+										// 按比例扩展
+										node.x = centerX + offsetX * scaleFactorX
+										node.y = centerY + offsetY * scaleFactorY
+									}
+								})
+								
+								// 重新计算范围
+								const xsNew = this.nodes.map(n => n.x).filter(x => typeof x === 'number' && !isNaN(x))
+								const ysNew = this.nodes.map(n => n.y).filter(y => typeof y === 'number' && !isNaN(y))
+								const minXNew = Math.min(...xsNew)
+								const maxXNew = Math.max(...xsNew)
+								const minYNew = Math.min(...ysNew)
+								const maxYNew = Math.max(...ysNew)
+								const nodeRangeXNew = maxXNew - minXNew
+								const nodeRangeYNew = maxYNew - minYNew
+								
+								console.log(`节点分散后范围: X[${minXNew.toFixed(1)}, ${maxXNew.toFixed(1)}] (范围: ${nodeRangeXNew.toFixed(1)}), Y[${minYNew.toFixed(1)}, ${maxYNew.toFixed(1)}] (范围: ${nodeRangeYNew.toFixed(1)})`)
+								
+								// 使用新的范围计算缩放
+								const padding = 40 // 增大边距
+								const availableWidth = this.canvasWidth - padding * 2
+								const availableHeight = this.canvasHeight - padding * 2
+								
+								const effectiveRangeX = Math.max(nodeRangeXNew, 10)
+								const effectiveRangeY = Math.max(nodeRangeYNew, 10)
+								
+								const scaleX = availableWidth / effectiveRangeX
+								const scaleY = availableHeight / effectiveRangeY
+								const scale = Math.min(scaleX, scaleY) * 0.85 // 稍微减小比例，留更多边距
+								
+								const centerXNew = (minXNew + maxXNew) / 2
+								const centerYNew = (minYNew + maxYNew) / 2
+								const canvasCenterX = this.canvasWidth / 2
+								const canvasCenterY = this.canvasHeight / 2
+								
+								this.coordScaleX = scale
+								this.coordScaleY = scale
+								this.coordOffsetX = canvasCenterX - centerXNew * scale
+								this.coordOffsetY = canvasCenterY - centerYNew * scale
+								
+								console.log(`坐标变换参数: 缩放=${scale.toFixed(2)}, 偏移=(${this.coordOffsetX.toFixed(1)}, ${this.coordOffsetY.toFixed(1)})`)
+							} else {
+								// 节点范围足够大，正常计算缩放
+								const padding = 40 // 增大边距
+								const availableWidth = this.canvasWidth - padding * 2
+								const availableHeight = this.canvasHeight - padding * 2
+								
+								const effectiveRangeX = Math.max(nodeRangeX, 10)
+								const effectiveRangeY = Math.max(nodeRangeY, 10)
+								
+								const scaleX = availableWidth / effectiveRangeX
+								const scaleY = availableHeight / effectiveRangeY
+								const scale = Math.min(scaleX, scaleY) * 0.85
+								
+								const centerX = (minX + maxX) / 2
+								const centerY = (minY + maxY) / 2
+								const canvasCenterX = this.canvasWidth / 2
+								const canvasCenterY = this.canvasHeight / 2
+								
+								this.coordScaleX = scale
+								this.coordScaleY = scale
+								this.coordOffsetX = canvasCenterX - centerX * scale
+								this.coordOffsetY = canvasCenterY - centerY * scale
+								
+								console.log(`坐标变换参数: 缩放=${scale.toFixed(2)}, 偏移=(${this.coordOffsetX.toFixed(1)}, ${this.coordOffsetY.toFixed(1)})`)
+							}
+						}
+						
+						// 检查节点密度和重复坐标
+						const coordMap = new Map()
+						const duplicates = []
+						const closeNodes = [] // 记录距离过近的节点对
+						
+						this.nodes.forEach((node, index) => {
+							const key = `${Math.round(node.x)},${Math.round(node.y)}`
+							if (coordMap.has(key)) {
+								duplicates.push({ index, node, key })
+							} else {
+								coordMap.set(key, { index, node })
+							}
+							
+							// 检查与其他节点的距离（如果距离<3，认为太近）
+							this.nodes.forEach((otherNode, otherIndex) => {
+								if (otherIndex !== index) {
+									const dist = Math.sqrt(
+										Math.pow(node.x - otherNode.x, 2) + 
+										Math.pow(node.y - otherNode.y, 2)
+									)
+									if (dist < 3) {
+										closeNodes.push({ node1: node, node2: otherNode, dist })
+									}
+								}
+							})
+						})
+						
+						// 如果节点太密集（超过30%的节点距离过近），使用网格布局分散
+						const densityThreshold = this.nodes.length * 0.3
+						if (closeNodes.length > densityThreshold || duplicates.length > 0) {
+							console.warn(`⚠️ 节点过于密集 (${closeNodes.length}对节点距离<3, ${duplicates.length}个重复坐标)，使用网格布局分散`)
+							
+							// 重新计算当前节点范围（可能已经被前面的代码修改过）
+							const xsCurrent = this.nodes.map(n => n.x).filter(x => typeof x === 'number' && !isNaN(x))
+							const ysCurrent = this.nodes.map(n => n.y).filter(y => typeof y === 'number' && !isNaN(y))
+							
+							if (xsCurrent.length > 0 && ysCurrent.length > 0) {
+								minX = Math.min(...xsCurrent)
+								maxX = Math.max(...xsCurrent)
+								minY = Math.min(...ysCurrent)
+								maxY = Math.max(...ysCurrent)
+							}
+							
+							// 计算网格布局参数
+							const nodeCount = this.nodes.length
+							const cols = Math.ceil(Math.sqrt(nodeCount))
+							const rows = Math.ceil(nodeCount / cols)
+							
+							// 计算网格范围（使用画布的80%）
+							const gridPadding = 0.1
+							const nodeRangeX = maxX - minX
+							const nodeRangeY = maxY - minY
+							const gridWidth = nodeRangeX > 0 ? nodeRangeX * (1 - gridPadding * 2) : 30
+							const gridHeight = nodeRangeY > 0 ? nodeRangeY * (1 - gridPadding * 2) : 20
+							
+							const cellWidth = gridWidth / cols
+							const cellHeight = gridHeight / rows
+							
+							// 按节点类型和重要性排序（重要节点优先选择好位置）
+							const sortedNodes = [...this.nodes].sort((a, b) => {
+								const aName = (a.name || '').toLowerCase()
+								const bName = (b.name || '').toLowerCase()
+								const aImportant = aName.includes('大门') || aName.includes('大厅') || aName.includes('分诊台')
+								const bImportant = bName.includes('大门') || bName.includes('大厅') || bName.includes('分诊台')
+								if (aImportant !== bImportant) return bImportant ? 1 : -1
+								return 0
+							})
+							
+							// 将节点分配到网格位置
+							sortedNodes.forEach((node, index) => {
+								const col = index % cols
+								const row = Math.floor(index / cols)
+								
+								// 计算网格中心位置
+								const gridCenterX = minX + gridPadding * (maxX - minX) + (col + 0.5) * cellWidth
+								const gridCenterY = minY + gridPadding * (maxY - minY) + (row + 0.5) * cellHeight
+								
+								// 添加随机偏移，避免完全对齐
+								const randomOffsetX = (Math.random() - 0.5) * cellWidth * 0.3
+								const randomOffsetY = (Math.random() - 0.5) * cellHeight * 0.3
+								
+								node.x = gridCenterX + randomOffsetX
+								node.y = gridCenterY + randomOffsetY
+								
+								console.log(`  节点 ${index} (${node.name}) 分配到网格位置: (${node.x.toFixed(1)}, ${node.y.toFixed(1)})`)
+							})
+							
+							// 重新计算范围
+							const xsNew = this.nodes.map(n => n.x).filter(x => typeof x === 'number' && !isNaN(x))
+							const ysNew = this.nodes.map(n => n.y).filter(y => typeof y === 'number' && !isNaN(y))
+							const minXNew = Math.min(...xsNew)
+							const maxXNew = Math.max(...xsNew)
+							const minYNew = Math.min(...ysNew)
+							const maxYNew = Math.max(...ysNew)
+							
+							// 重新计算缩放参数
+							const padding = 40
+							const availableWidth = this.canvasWidth - padding * 2
+							const availableHeight = this.canvasHeight - padding * 2
+							const nodeRangeXNew = maxXNew - minXNew
+							const nodeRangeYNew = maxYNew - minYNew
+							const effectiveRangeX = Math.max(nodeRangeXNew, 10)
+							const effectiveRangeY = Math.max(nodeRangeYNew, 10)
+							const scaleX = availableWidth / effectiveRangeX
+							const scaleY = availableHeight / effectiveRangeY
+							const scale = Math.min(scaleX, scaleY) * 0.85
+							
+							const centerXNew = (minXNew + maxXNew) / 2
+							const centerYNew = (minYNew + maxYNew) / 2
+							const canvasCenterX = this.canvasWidth / 2
+							const canvasCenterY = this.canvasHeight / 2
+							
+							this.coordScaleX = scale
+							this.coordScaleY = scale
+							this.coordOffsetX = canvasCenterX - centerXNew * scale
+							this.coordOffsetY = canvasCenterY - centerYNew * scale
+							
+							console.log(`网格分散后坐标变换参数: 缩放=${scale.toFixed(2)}, 偏移=(${this.coordOffsetX.toFixed(1)}, ${this.coordOffsetY.toFixed(1)})`)
+						} else if (duplicates.length > 0) {
+							console.warn(`⚠️ 发现 ${duplicates.length} 个节点坐标重复，将自动分散显示`)
+							// 自动分散重叠的节点
+							duplicates.forEach((dup, i) => {
+								const baseX = dup.node.x
+								const baseY = dup.node.y
+								// 按圆形分散，半径更大
+								const angle = (i * 2 * Math.PI) / duplicates.length
+								const radius = 5 // 从2增加到5
+								dup.node.x = baseX + radius * Math.cos(angle)
+								dup.node.y = baseY + radius * Math.sin(angle)
+								console.log(`  节点 ${dup.index} (${dup.node.name}) 分散到: (${dup.node.x.toFixed(1)}, ${dup.node.y.toFixed(1)})`)
+							})
+							
+							// 重新计算缩放参数（因为节点坐标改变了）
+							const xs2 = this.nodes.map(n => n.x).filter(x => typeof x === 'number' && !isNaN(x))
+							const ys2 = this.nodes.map(n => n.y).filter(y => typeof y === 'number' && !isNaN(y))
+							if (xs2.length > 0 && ys2.length > 0) {
+								const minX2 = Math.min(...xs2)
+								const maxX2 = Math.max(...xs2)
+								const minY2 = Math.min(...ys2)
+								const maxY2 = Math.max(...ys2)
+								const nodeRangeX2 = maxX2 - minX2
+								const nodeRangeY2 = maxY2 - minY2
+								
+								const padding2 = 20
+								const availableWidth2 = this.canvasWidth - padding2 * 2
+								const availableHeight2 = this.canvasHeight - padding2 * 2
+								const effectiveRangeX2 = Math.max(nodeRangeX2, 5)
+								const effectiveRangeY2 = Math.max(nodeRangeY2, 5)
+								const scaleX2 = availableWidth2 / effectiveRangeX2
+								const scaleY2 = availableHeight2 / effectiveRangeY2
+								const scale2 = Math.min(scaleX2, scaleY2) * 0.9
+								
+								const centerX2 = (minX2 + maxX2) / 2
+								const centerY2 = (minY2 + maxY2) / 2
+								const canvasCenterX2 = this.canvasWidth / 2
+								const canvasCenterY2 = this.canvasHeight / 2
+								
+								this.coordScaleX = scale2
+								this.coordScaleY = scale2
+								this.coordOffsetX = canvasCenterX2 - centerX2 * scale2
+								this.coordOffsetY = canvasCenterY2 - centerY2 * scale2
+							}
+						}
+					}
+					
 					console.log('地图数据加载成功:', {
 						gridWidth: this.gridWidth,
 						gridHeight: this.gridHeight,
 						gridMatrixSize: this.gridMatrix ? this.gridMatrix.length : 0,
 						nodesCount: this.nodes.length,
-						nodes: this.nodes
+						nodes: this.nodes.map(n => ({ name: n.name, x: n.x, y: n.y }))
 					})
 					
 					// 如果nodes为空或只有一个，使用默认节点
@@ -560,6 +957,21 @@ export default {
 					
 					// 获取目标节点
 					await this.loadTargetNode()
+					
+					// 数据加载完成后，确保绘制地图
+					this.$nextTick(() => {
+						if (this.ctx && this.gridMatrix) {
+							console.log('[loadMapData] 数据加载完成，开始绘制地图')
+							this.drawMap()
+						} else {
+							console.warn('[loadMapData] Canvas或数据未就绪，延迟绘制')
+							setTimeout(() => {
+								if (this.ctx && this.gridMatrix) {
+									this.drawMap()
+								}
+							}, 300)
+						}
+					})
 				} else {
 					console.error('地图配置响应格式错误:', configResponse)
 					// 如果API失败，使用模拟数据
@@ -772,11 +1184,38 @@ export default {
 						x: nodeData.x,
 						y: nodeData.y,
 						nodeId: nodeData.nodeId,
-						name: nodeData.name,
+						name: nodeData.name || '',
 						locationId: nodeData.locationId
 					}
-					this.targetNodeName = this.targetNode.name || '诊室'
-					console.log('✅ 成功获取目标节点:', this.targetNode)
+					// 确保名称正确显示，处理可能的编码问题
+					let nodeName = (nodeData.name || '').trim()
+					
+					// 检查是否是乱码（包含非正常字符）
+					const isGarbled = /[^\u4e00-\u9fa5a-zA-Z0-9\s\-\(\)（）0-9]/.test(nodeName) && 
+					                  nodeName.length > 0 &&
+					                  !/^[\u4e00-\u9fa5a-zA-Z0-9\s\-\(\)（）]+$/.test(nodeName)
+					
+					// 如果名称是乱码或为空，尝试从节点列表查找
+					if (!nodeName || nodeName.length === 0 || isGarbled) {
+						console.warn('⚠️ 节点名称异常，尝试从节点列表查找:', nodeName)
+						const foundNode = this.nodes.find(n => n.nodeId === nodeData.nodeId)
+						if (foundNode && foundNode.name) {
+							nodeName = foundNode.name.trim()
+							console.log('✅ 从节点列表找到名称:', nodeName)
+						} else {
+							// 尝试从 location 信息获取
+							nodeName = `诊室${this.locationId || ''}`
+							console.warn('⚠️ 使用默认名称:', nodeName)
+						}
+					}
+					
+					// 确保名称不为空
+					if (!nodeName || nodeName.length === 0) {
+						nodeName = `诊室${this.locationId || ''}`
+					}
+					
+					this.targetNodeName = nodeName
+					console.log('✅ 成功获取目标节点:', this.targetNode, '名称:', this.targetNodeName)
 			} else {
 				// 如果API失败，尝试从nodes中找到对应的节点
 				console.warn('⚠️ 目标节点API失败，尝试从节点列表查找')
@@ -784,8 +1223,13 @@ export default {
 				
 				if (foundNode) {
 					this.targetNode = foundNode
-					this.targetNodeName = this.targetNode.name || '诊室'
-					console.log('✅ 从节点列表找到目标节点:', this.targetNode)
+					// 确保名称正确显示
+					let nodeName = foundNode.name || ''
+					if (!nodeName || nodeName.length === 0) {
+						nodeName = '诊室'
+					}
+					this.targetNodeName = nodeName
+					console.log('✅ 从节点列表找到目标节点:', this.targetNode, '名称:', this.targetNodeName)
 				} else {
 					// ❌ 无法找到目标节点，给出明确错误提示
 					console.error('❌ 无法找到locationId=' + this.locationId + '的节点')
@@ -880,6 +1324,8 @@ export default {
 						this.targetNode.nodeId
 					)
 					
+					console.log('🔍 导航API完整响应:', JSON.stringify(response, null, 2))
+					
 					if (response && response.code === '200' && response.data) {
 						const pathData = response.data
 						this.navigationSteps = pathData.steps || []
@@ -942,10 +1388,24 @@ export default {
 							})
 						}
 					} else {
-						throw new Error('后端API返回错误：' + (response?.message || '未知错误'))
+						const errorMsg = response?.message || response?.msg || '未知错误'
+						const errorCode = response?.code || '无code'
+						console.error('❌ 后端API返回错误:', {
+							code: errorCode,
+							message: errorMsg,
+							完整响应: response
+						})
+						throw new Error(`后端API返回错误(code:${errorCode}): ${errorMsg}`)
 					}
 				} catch (error) {
 					console.error('真实导航API调用失败，降级到网格路径规划:', error)
+					
+					uni.showModal({
+						title: '后端路径规划失败',
+						content: '后端路径数据不完整，将使用简化路径规划。建议联系管理员补充地图数据。\n\n' + (error.message || ''),
+						showCancel: false,
+						confirmText: '知道了'
+					})
 					// 降级到原来的网格路径规划
 				}
 			}
@@ -954,6 +1414,8 @@ export default {
 			if (realNavigationSucceeded) {
 				return
 			}
+			
+			console.log('⚠️ 使用降级方案：前端网格路径规划')
 			if (!this.gridMatrix || !this.startNode || !this.targetNode) {
 				console.error('缺少必要数据，无法计算路径', {
 					hasGridMatrix: !!this.gridMatrix,
@@ -1051,16 +1513,22 @@ export default {
 			}
 			
 			if (this.path.length === 0) {
-				console.error('路径计算失败，可能原因：')
-				console.error('1. 起点和终点之间没有通路')
-				console.error('2. 起点或终点被障碍物包围')
-				console.error('3. 网格数据有问题')
-				uni.showToast({
-					title: '无法找到路径，请检查地图配置',
-					icon: 'none',
-					duration: 3000
+				console.error('❌ A*路径计算失败，使用直线兜底方案')
+				console.error('可能原因：起点和终点之间没有通路、被障碍物包围、或坐标超出网格范围')
+				
+				// 最终兜底：使用直线连接起点和终点
+				this.path = [
+					{ x: this.startNode.x, y: this.startNode.y },
+					{ x: this.targetNode.x, y: this.targetNode.y }
+				]
+				console.log('✅ 使用直线路径作为兜底方案')
+				
+				uni.showModal({
+					title: '路径规划降级',
+					content: '无法找到最优路径，将显示直线指引。这可能是因为地图数据不完整，建议联系管理员。',
+					showCancel: false,
+					confirmText: '知道了'
 				})
-				return
 			}
 			
 			// 计算剩余距离（网格单位，假设每个网格1米）
@@ -1143,23 +1611,44 @@ export default {
 		
 		drawMap() {
 			console.log('[绘制地图] ========== 开始绘制地图 ==========')
-			console.log('[绘制地图] 检查条件:', {
-				hasCtx: !!this.ctx,
-				hasGridMatrix: !!this.gridMatrix,
-				isRealTimeMode: this.isRealTimeMode,
-				currentLocation: this.currentLocation,
-				currentLocationFloat: this.currentLocationFloat,
-				startNode: this.startNode
-			})
+				console.log('[绘制地图] 检查条件:', {
+					hasCtx: !!this.ctx,
+					hasGridMatrix: !!this.gridMatrix,
+					gridWidth: this.gridWidth,
+					gridHeight: this.gridHeight,
+					isRealTimeMode: this.isRealTimeMode,
+					currentLocation: this.currentLocation,
+					currentLocationFloat: this.currentLocationFloat,
+					startNode: this.startNode
+				})
+				
+				if (!this.ctx) {
+					console.warn('[绘制地图] ❌ Canvas上下文未初始化')
+					// 尝试重新初始化
+					this.$nextTick(() => {
+						this.ctx = uni.createCanvasContext('mapCanvas', this)
+						if (this.ctx) {
+							console.log('[绘制地图] ✅ Canvas上下文已重新初始化')
+							this.drawMap()
+						}
+					})
+					return
+				}
 			
-			if (!this.ctx) {
-				console.warn('[绘制地图] ❌ Canvas上下文未初始化')
-				return
+			// 如果没有网格数据，使用默认值
+			if (!this.gridMatrix) {
+				console.warn('[绘制地图] ⚠️ 地图数据未加载，使用默认网格')
+				this.gridWidth = this.gridWidth || 40
+				this.gridHeight = this.gridHeight || 30
+				// 创建默认网格（全部可通行）
+				this.gridMatrix = Array(this.gridHeight).fill(0).map(() => Array(this.gridWidth).fill(0))
 			}
 			
-			if (!this.gridMatrix) {
-				console.warn('[绘制地图] ❌ 地图数据未加载')
-				return
+			// 确保网格尺寸有效
+			if (!this.gridWidth || !this.gridHeight) {
+				console.warn('[绘制地图] ⚠️ 网格尺寸无效，使用默认值')
+				this.gridWidth = 40
+				this.gridHeight = 30
 			}
 			
 			console.log('[绘制地图] ✅ 条件满足，开始绘制，实时模式:', this.isRealTimeMode, '当前位置:', JSON.stringify(this.currentLocation))
@@ -1167,28 +1656,44 @@ export default {
 			console.log('网格尺寸:', this.gridWidth, this.gridHeight)
 			
 			const ctx = this.ctx
+			
+			// 确保 Canvas 尺寸有效
+			if (!this.canvasWidth || !this.canvasHeight) {
+				this.canvasWidth = 750
+				this.canvasHeight = 600
+				console.warn('[绘制地图] ⚠️ Canvas尺寸无效，使用默认值:', this.canvasWidth, this.canvasHeight)
+			}
+			
 			const cellWidth = this.canvasWidth / this.gridWidth
 			const cellHeight = this.canvasHeight / this.gridHeight
 			
 			console.log('单元格尺寸:', cellWidth, cellHeight)
 			
+			// 检查单元格尺寸是否有效
+			if (!cellWidth || !cellHeight || isNaN(cellWidth) || isNaN(cellHeight)) {
+				console.error('[绘制地图] ❌ 单元格尺寸无效:', cellWidth, cellHeight)
+				return
+			}
+			
 			// 清空画布
 			ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight)
 			
-			// 柔和背景
-			const bgGradient = ctx.createLinearGradient(0, 0, this.canvasWidth, this.canvasHeight)
-			bgGradient.addColorStop(0, '#f6fbff')
-			bgGradient.addColorStop(1, '#ecf7ff')
-			ctx.setFillStyle(bgGradient)
+			// 更美观的背景（浅灰色，更专业）
+			ctx.setFillStyle('#F5F5F5')
 			ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight)
 			
 			// 绘制楼层预设布局（走廊/房间）
-			this.drawFloorLayout(ctx, cellWidth, cellHeight)
+			try {
+				this.drawFloorLayout(ctx, cellWidth, cellHeight)
+			} catch (error) {
+				console.error('[绘制地图] 绘制楼层布局失败:', error)
+				// 即使布局绘制失败，也继续绘制其他内容
+			}
 			
-			// 可选的网格线（仅在调试模式下显示）
+			// 可选的网格线（仅在调试模式下显示，更淡的颜色）
 			if (this.showDebugGrid) {
-				ctx.setStrokeStyle('rgba(0, 0, 0, 0.05)')
-				ctx.setLineWidth(1)
+				ctx.setStrokeStyle('rgba(0, 0, 0, 0.03)')
+				ctx.setLineWidth(0.5)
 				for (let x = 0; x <= this.gridWidth; x++) {
 					const px = x * cellWidth
 					ctx.beginPath()
@@ -1205,8 +1710,8 @@ export default {
 				}
 			}
 			
-			// 绘制障碍/房间区域（淡色）
-			ctx.setFillStyle('rgba(255, 180, 180, 0.25)')
+			// 绘制障碍/房间区域（更柔和的颜色）
+			ctx.setFillStyle('rgba(200, 200, 200, 0.2)')
 			for (let y = 0; y < this.gridHeight; y++) {
 				for (let x = 0; x < this.gridWidth; x++) {
 					if (this.gridMatrix[y][x] === 1) {
@@ -1215,23 +1720,77 @@ export default {
 				}
 			}
 			
-			// 只绘制从当前位置到下一步节点的路径段（简化显示，避免整条路径太乱）
+			// 绘制导航路径（重要：应该指向下一步目标，不是最终终点！）
 			let pathToDraw = []
+			let pathTarget = null // 路径的目标点
 			
+			// 坐标转换函数（用于路径绘制）
+			const pathToCanvasX = (x) => x * this.coordScaleX + this.coordOffsetX
+			const pathToCanvasY = (y) => y * this.coordScaleY + this.coordOffsetY
+			
+			// 确定路径目标：优先是下一步节点，其次是终点
+			if (this.currentStep && this.currentStep.toNodeId && this.nodes) {
+				console.log('[路径目标] 当前步骤toNodeId:', this.currentStep.toNodeId)
+				console.log('[路径目标] 当前楼层:', this.currentFloor)
+				console.log('[路径目标] 节点总数:', this.nodes.length)
+				
+				const nextNode = this.nodes.find(n => n.nodeId === this.currentStep.toNodeId)
+				if (nextNode) {
+					console.log('[路径目标] 找到节点:', nextNode.name, '坐标:', nextNode.x, nextNode.y)
+					if (nextNode.x !== undefined && nextNode.y !== undefined) {
+						pathTarget = nextNode
+						console.log('[路径] ✅ 目标是下一步节点:', nextNode.name)
+					} else {
+						console.warn('[路径] ⚠️ 下一步节点坐标无效')
+					}
+				} else {
+					console.warn('[路径] ⚠️ 找不到下一步节点ID:', this.currentStep.toNodeId)
+					// 输出前5个节点ID供参考
+					console.log('[路径目标] 节点列表示例:', this.nodes.slice(0, 5).map(n => ({ id: n.nodeId, name: n.name })))
+				}
+			}
+			if (!pathTarget && this.targetNode) {
+				pathTarget = this.targetNode
+				console.log('[路径] ⚠️ 降级到终点:', this.targetNode.name)
+			}
+			
+			if (!pathTarget) {
+				console.error('[路径] ❌ 没有路径目标！')
+			}
+			
+			// 尝试生成路径
 			if (this.currentStep && this.currentStep.fromNodeId && this.currentStep.toNodeId) {
-				// 只绘制当前这一步的路径
+				// 方式1：生成当前步骤的路径
 				const currentStepPath = this.generatePathFromSteps([this.currentStep])
 				if (currentStepPath && currentStepPath.length > 0) {
 					pathToDraw = currentStepPath
-					console.log('绘制当前步骤路径，点数:', pathToDraw.length, '从', this.currentStep.fromNodeName, '到', this.currentStep.toNodeName)
+					console.log('[路径] 使用当前步骤路径，点数:', pathToDraw.length)
 				}
-			} else if (this.path && this.path.length > 0) {
-				// 如果没有当前步骤，回退到显示完整路径（但这种情况应该很少）
-				pathToDraw = this.path
-				console.log('绘制完整路径，路径点数:', pathToDraw.length)
 			}
 			
-			if (pathToDraw && pathToDraw.length > 0) {
+			// 如果当前步骤路径为空，尝试使用完整路径
+			if (pathToDraw.length === 0 && this.path && this.path.length > 0) {
+				pathToDraw = this.path
+				console.log('[路径] 使用完整路径，点数:', pathToDraw.length)
+			}
+			
+			// 如果还是没有路径，绘制从当前位置到【下一步目标】的直线（不是终点！）
+			if (pathToDraw.length === 0 && pathTarget) {
+				const startPos = this.isRealTimeMode && this.currentLocation 
+					? this.currentLocation 
+					: (this.startNode || null)
+				
+				if (startPos) {
+					pathToDraw = [
+						{ x: startPos.x, y: startPos.y },
+						{ x: pathTarget.x, y: pathTarget.y }
+					]
+					console.log('[路径] 使用直线指向:', pathTarget.name || '目标')
+				}
+			}
+			
+			if (pathToDraw && pathToDraw.length >= 2) {
+				// 绘制渐变路径线
 				const gradient = ctx.createLinearGradient(0, 0, this.canvasWidth, this.canvasHeight)
 				gradient.addColorStop(0, '#52C41A')
 				gradient.addColorStop(0.5, '#13C2C2')
@@ -1246,8 +1805,8 @@ export default {
 				
 				for (let i = 0; i < pathToDraw.length; i++) {
 					const point = pathToDraw[i]
-					const x = point.x * cellWidth + cellWidth / 2
-					const y = point.y * cellHeight + cellHeight / 2
+					const x = pathToCanvasX(point.x)
+					const y = pathToCanvasY(point.y)
 					
 					if (i === 0) {
 						ctx.moveTo(x, y)
@@ -1260,131 +1819,267 @@ export default {
 				if (canSetShadow) {
 					ctx.setShadow(0, 0, 0, 'rgba(0,0,0,0)')
 				}
-			} else {
-				console.warn('没有路径数据可绘制')
+			} else if (this.isRealTimeMode && this.currentLocation && pathTarget) {
+				// 即使没有完整路径，也显示一条从当前位置指向【下一步目标】的虚线
+				const fromX = pathToCanvasX(this.currentLocation.x)
+				const fromY = pathToCanvasY(this.currentLocation.y)
+				const toX = pathToCanvasX(pathTarget.x)
+				const toY = pathToCanvasY(pathTarget.y)
+				
+				ctx.setStrokeStyle('#1890FF')
+				ctx.setLineWidth(3)
+				ctx.setLineDash([10, 5]) // 虚线
+				ctx.beginPath()
+				ctx.moveTo(fromX, fromY)
+				ctx.lineTo(toX, toY)
+				ctx.stroke()
+				ctx.setLineDash([]) // 重置为实线
+				console.log('[路径] 绘制虚线指向:', pathTarget.name || '目标')
 			}
 			
-			// ========= 绘制关键节点和可视化辅助元素 =========
+			// 坐标转换函数
+			const toCanvasX = (x) => x * this.coordScaleX + this.coordOffsetX
+			const toCanvasY = (y) => y * this.coordScaleY + this.coordOffsetY
 			
-			// 高亮“下一步要到达的节点”（当前指引的目标点）
-			// 但不要和箭头位置重合
-			if (this.currentStep && this.currentStep.toNodeId && this.nodes && this.nodes.length > 0) {
-				const nextNode = this.nodes.find(n => n.nodeId === this.currentStep.toNodeId)
-				if (nextNode && nextNode.x !== undefined && nextNode.y !== undefined) {
-					// 检查是否和当前箭头位置重合
-					let isOverlapping = false
-					if (this.isRealTimeMode && this.currentLocation) {
-						const dx = Math.abs(nextNode.x - this.currentLocation.x)
-						const dy = Math.abs(nextNode.y - this.currentLocation.y)
-						// 如果距离小于2个网格单位，认为是重合
-						if (dx < 2 && dy < 2) {
-							isOverlapping = true
-						}
-					}
-					
-					// 只有不重合时才画黄圈
-					if (!isOverlapping) {
-						const nx = nextNode.x * cellWidth + cellWidth / 2
-						const ny = nextNode.y * cellHeight + cellHeight / 2
-						
-						// 使用黄色描边圈出下一步节点
-						ctx.setStrokeStyle('#FAAD14')
-						ctx.setLineWidth(3)
-						ctx.beginPath()
-						ctx.arc(nx, ny, 14, 0, Math.PI * 2)
-						ctx.stroke()
-					}
-				}
-			}
+			// ============ 地图节点绘制 ============
+			// 始终显示：标志性地点（电梯、楼梯、大门、分诊台）+ 起点、终点、下一步
+			// 显示所有模式：额外显示所有普通节点
 			
-			// 在地图上标出少量关键节点名称（防止文字重叠）
 			if (this.nodes && this.nodes.length > 0) {
-				const focusIds = new Set()
-				if (this.targetNode && this.targetNode.nodeId) focusIds.add(this.targetNode.nodeId)
-				if (this.currentNode && this.currentNode.nodeId) focusIds.add(this.currentNode.nodeId)
-				if (this.currentStep && this.currentStep.toNodeId) focusIds.add(this.currentStep.toNodeId)
-				if (this.currentStep && this.currentStep.fromNodeId) focusIds.add(this.currentStep.fromNodeId)
-				if (this.startNode && this.startNode.nodeId) focusIds.add(this.startNode.nodeId)
+				const nodesToDraw = this.currentBuilding 
+					? this.nodes.filter(node => node.building === this.currentBuilding)
+					: this.nodes
 				
-				ctx.setFontSize(11)
+				// 收集已绘制标签的位置，避免重叠
+				const drawnLabels = []
 				
-				this.nodes.forEach(node => {
+				// 判断节点是否为标志性地点
+				const isLandmark = (node) => {
+					const nodeType = (node.nodeType || '').toLowerCase()
+					const name = (node.name || '').toLowerCase()
+					return nodeType === 'elevator' || name.includes('电梯') ||
+					       nodeType === 'stairs' || name.includes('楼梯') ||
+					       nodeType === 'entrance' || name.includes('大门') || name.includes('入口') ||
+					       name.includes('分诊台') || name.includes('大厅') ||
+					       name.includes('服务台') || name.includes('药房') ||
+					       name.includes('收费') || name.includes('挂号')
+				}
+				
+				// 判断是否为焦点节点
+				const isFocusNode = (node) => {
+					return (this.startNode && this.startNode.nodeId === node.nodeId) ||
+					       (this.targetNode && this.targetNode.nodeId === node.nodeId) ||
+					       (this.currentStep && this.currentStep.toNodeId === node.nodeId)
+				}
+				
+				// 第一遍：绘制普通节点（小灰点）
+				nodesToDraw.forEach(node => {
 					if (node.x === undefined || node.y === undefined) return
+					if (isFocusNode(node) || isLandmark(node)) return // 焦点和标志性节点后面单独绘制
 					
-					const name = node.name || ''
-					const isFocus = focusIds.has(node.nodeId)
-					const isAnchor = !isFocus && name && (
-						name.includes('门诊大厅') ||
-						name.includes('分诊台') ||
-						name.includes('电梯') ||
-						name.includes('楼梯')
+					if (this.showAllLabels) {
+						const cx = toCanvasX(node.x)
+						const cy = toCanvasY(node.y)
+						ctx.setFillStyle('rgba(180, 180, 180, 0.5)')
+						ctx.beginPath()
+						ctx.arc(cx, cy, 3, 0, Math.PI * 2)
+						ctx.fill()
+					}
+				})
+				
+				// 第二遍：绘制标志性地点（始终显示，用图标区分）
+				// 注意：即使是焦点节点，如果是标志性地点（如电梯），也要绘制圆点（但不绘制标签，标签由焦点节点逻辑绘制）
+				nodesToDraw.forEach(node => {
+					if (node.x === undefined || node.y === undefined) return
+					if (!isLandmark(node)) return
+					
+					// 如果是终点，跳过（终点会单独绘制红色）
+					const isTarget = this.targetNode && this.targetNode.nodeId === node.nodeId
+					if (isTarget) return
+					
+					const cx = toCanvasX(node.x)
+					const cy = toCanvasY(node.y)
+					const name = (node.name || '').toLowerCase()
+					
+					// 根据类型选择颜色和图标
+					let color = '#722ED1' // 紫色默认
+					let icon = '📍'
+					let size = 5
+					
+					if (name.includes('电梯')) {
+						color = '#722ED1' // 紫色
+						icon = '🛗'
+						size = 6
+					} else if (name.includes('楼梯')) {
+						color = '#FA8C16' // 橙色
+						icon = '🪜'
+						size = 5
+					} else if (name.includes('大门') || name.includes('入口')) {
+						color = '#52C41A' // 绿色
+						icon = '🚪'
+						size = 6
+					} else if (name.includes('分诊台') || name.includes('服务台')) {
+						color = '#13C2C2' // 青色
+						icon = '🏥'
+						size = 6
+					} else if (name.includes('药房')) {
+						color = '#EB2F96' // 粉色
+						icon = '💊'
+						size = 5
+					} else if (name.includes('收费') || name.includes('挂号')) {
+						color = '#1890FF' // 蓝色
+						icon = '💳'
+						size = 5
+					}
+					
+					// 检查是否是下一步目标节点
+					const isNextStep = this.currentStep && this.currentStep.toNodeId === node.nodeId
+					
+					// 绘制圆点（下一步节点用蓝色边框，其他用填充）
+					if (isNextStep) {
+						// 下一步节点：不在这里绘制，由后面的焦点节点逻辑绘制蓝色边框
+						return
+					} else {
+						ctx.setFillStyle(color)
+						ctx.beginPath()
+						ctx.arc(cx, cy, size, 0, Math.PI * 2)
+						ctx.fill()
+					}
+					
+					// 绘制标签（检查是否重叠）
+					const labelText = node.name || '' // 显示完整名称
+					const labelY = cy - 12
+					
+					// 简单的重叠检测（增大检测范围避免文字重叠）
+					const isOverlapping = drawnLabels.some(pos => 
+						Math.abs(pos.x - cx) < 80 && Math.abs(pos.y - labelY) < 18
 					)
 					
-					// 只绘制当前相关节点 + 少量核心锚点，避免全屏文字
-					if (!isFocus && !isAnchor) return
-					
-					const cx = node.x * cellWidth + cellWidth / 2
-					const cy = node.y * cellHeight + cellHeight / 2
-					
-					const label = name
-					const textWidth = label.length * 11
-					const paddingX = 6
-					const paddingY = 3
-					const bw = textWidth + paddingX * 2
-					const bh = 18
-					const bx = cx - bw / 2
-					const by = cy - 24
-					
-					// 背景气泡
-					ctx.setFillStyle(isFocus ? 'rgba(0, 0, 0, 0.75)' : 'rgba(255, 255, 255, 0.9)')
-					ctx.fillRect(bx, by, bw, bh)
-					
-					// 文本
-					ctx.setFillStyle(isFocus ? '#FFFFFF' : '#333333')
-					ctx.setTextAlign('center')
-					ctx.fillText(label, cx, by + bh - 5)
-					ctx.setTextAlign('left')
+					if (!isOverlapping || this.showAllLabels) {
+						ctx.setFontSize(10)
+						ctx.setTextAlign('center')
+						ctx.setFillStyle(color)
+						ctx.fillText(labelText, cx, labelY)
+						ctx.setTextAlign('left')
+						drawnLabels.push({ x: cx, y: labelY })
+					}
 				})
 			}
 			
-			// 箭头将在最后绘制（在所有元素之后），确保在最上层
+			// ============ 绘制3个关键节点（最后绘制，确保在最上层） ============
 			
-			// 绘制起点（实时定位模式下不显示起点，只显示箭头）
+			// 1. 绘制起点（蓝色，实时定位模式下不显示，用箭头代替）
 			if (this.startNode && !this.isRealTimeMode) {
-				// 非实时定位模式：绘制蓝色圆点作为起点
-				const centerX = this.startNode.x * cellWidth + cellWidth / 2
-				const centerY = this.startNode.y * cellHeight + cellHeight / 2
+				const centerX = toCanvasX(this.startNode.x)
+				const centerY = toCanvasY(this.startNode.y)
+				
+				// 蓝色圆点
 				ctx.setFillStyle('#1890FF')
 				ctx.beginPath()
 				ctx.arc(centerX, centerY, 8, 0, Math.PI * 2)
 				ctx.fill()
 				
+				// 标签
 				ctx.setFontSize(12)
 				ctx.setTextAlign('center')
-				ctx.setFillStyle('#0b4991')
-				ctx.fillText('起点', centerX, centerY - 12)
+				ctx.setFillStyle('#0050B3')
+				ctx.fillText('📍 起点', centerX, centerY - 14)
 				ctx.setTextAlign('left')
 			}
 			
-			// 绘制终点
+			// 2. 绘制下一步节点（蓝色边框圈，醒目标识）
+			if (this.currentStep && this.currentStep.toNodeId) {
+				// 从所有节点中查找（不仅仅是当前楼栋）
+				const nextNode = this.nodes ? this.nodes.find(n => n.nodeId === this.currentStep.toNodeId) : null
+				// 确保下一步不是终点（终点会单独绘制红色）
+				const isAlsoTarget = this.targetNode && this.targetNode.nodeId === this.currentStep.toNodeId
+				
+				console.log('[绘制下一步] 查找节点:', {
+					toNodeId: this.currentStep.toNodeId,
+					toNodeName: this.currentStep.toNodeName,
+					found: !!nextNode,
+					nextNode: nextNode ? { name: nextNode.name, x: nextNode.x, y: nextNode.y, floor: nextNode.floorLevel } : null,
+					isAlsoTarget,
+					currentFloor: this.currentFloor
+				})
+				
+				if (nextNode && nextNode.x !== undefined && nextNode.y !== undefined && !isAlsoTarget) {
+					// 检查节点是否在当前楼层
+					const isOnCurrentFloor = !nextNode.floorLevel || nextNode.floorLevel === this.currentFloor
+					
+					if (isOnCurrentFloor) {
+						const nx = toCanvasX(nextNode.x)
+						const ny = toCanvasY(nextNode.y)
+						
+						// 蓝色边框圈（更醒目）
+						ctx.setStrokeStyle('#1890FF')
+						ctx.setLineWidth(4)
+						ctx.beginPath()
+						ctx.arc(nx, ny, 14, 0, Math.PI * 2)
+						ctx.stroke()
+						
+						// 内部浅蓝色填充
+						ctx.setFillStyle('rgba(24, 144, 255, 0.15)')
+						ctx.beginPath()
+						ctx.arc(nx, ny, 12, 0, Math.PI * 2)
+						ctx.fill()
+						
+						// 标签（显示完整名称）
+						const nextName = nextNode.name || '下一步'
+						ctx.setFontSize(11)
+						ctx.setTextAlign('center')
+						ctx.setFillStyle('#1890FF')
+						ctx.fillText(`➡️ ${nextName}`, nx, ny - 20)
+						ctx.setTextAlign('left')
+					} else {
+						console.warn('[绘制下一步] ⚠️ 下一步节点在不同楼层:', nextNode.floorLevel, '当前楼层:', this.currentFloor)
+						// 跨楼层导航：在地图中心显示提示文字
+						ctx.setFontSize(14)
+						ctx.setTextAlign('center')
+						ctx.setFillStyle('#1890FF')
+						ctx.fillText(`⬇️ 需要前往 ${nextNode.floorLevel || '?'}楼`, this.canvasWidth / 2, this.canvasHeight / 2 - 20)
+						ctx.setFontSize(12)
+						ctx.setFillStyle('#666666')
+						ctx.fillText(nextNode.name || '下一步', this.canvasWidth / 2, this.canvasHeight / 2 + 5)
+						ctx.setTextAlign('left')
+					}
+				} else if (!nextNode) {
+					console.warn('[绘制下一步] ⚠️ 找不到下一步节点:', this.currentStep.toNodeId)
+					// 显示当前步骤名称作为提示
+					if (this.currentStep.toNodeName) {
+						ctx.setFontSize(14)
+						ctx.setTextAlign('center')
+						ctx.setFillStyle('#1890FF')
+						ctx.fillText(`➡️ ${this.currentStep.toNodeName}`, this.canvasWidth / 2, this.canvasHeight / 2)
+						ctx.setTextAlign('left')
+					}
+				}
+			}
+			
+			// 3. 绘制终点（红色，最醒目）
 			if (this.targetNode) {
-				const targetX = this.targetNode.x * cellWidth + cellWidth / 2
-				const targetY = this.targetNode.y * cellHeight + cellHeight / 2
+				const targetX = toCanvasX(this.targetNode.x)
+				const targetY = toCanvasY(this.targetNode.y)
+				
+				// 红色圆点
 				ctx.setFillStyle('#FF4D4F')
 				ctx.beginPath()
-				ctx.arc(
-					targetX,
-					targetY,
-					10,
-					0,
-					Math.PI * 2
-				)
+				ctx.arc(targetX, targetY, 10, 0, Math.PI * 2)
 				ctx.fill()
 				
+				// 白色外圈
+				ctx.setStrokeStyle('#FFFFFF')
+				ctx.setLineWidth(2)
+				ctx.beginPath()
+				ctx.arc(targetX, targetY, 10, 0, Math.PI * 2)
+				ctx.stroke()
+				
+				// 标签（显示完整目的地名称）
+				const targetName = this.targetNode.name || '目的地'
 				ctx.setFontSize(12)
 				ctx.setTextAlign('center')
-				ctx.setFillStyle('#B50B27')
-				ctx.fillText(`终点 · ${this.targetNode.name || ''}`, targetX, targetY - 14)
+				ctx.setFillStyle('#CF1322')
+				ctx.fillText(`🎯 ${targetName}`, targetX, targetY - 16)
 				ctx.setTextAlign('left')
 			}
 			
@@ -1433,8 +2128,9 @@ export default {
 					console.log('[绘制箭头] ✅ 实时定位模式，绘制箭头，位置:', JSON.stringify(locationToDraw), '朝向:', this.locationHeading.toFixed(1) + '°')
 					// 实时GPS定位：绘制带方向的箭头
 					// 使用浮点数坐标，让箭头平滑移动（像苹果地图一样）
-					const centerX = locationToDraw.x * cellWidth
-					const centerY = locationToDraw.y * cellHeight
+					// 使用坐标转换函数
+					const centerX = toCanvasX(locationToDraw.x)
+					const centerY = toCanvasY(locationToDraw.y)
 				
 				console.log('[绘制箭头] 计算的中心坐标:', { 
 					centerX, 
@@ -1450,8 +2146,9 @@ export default {
 					ctx.setStrokeStyle('rgba(255, 77, 79, 0.3)')
 					ctx.setLineWidth(2)
 					ctx.beginPath()
-					// 将精度（米）转换为像素（假设1米=10像素）
-					const radius = Math.min(this.locationAccuracy * 10, Math.min(cellWidth, cellHeight) * 5)
+					// 将精度（米）转换为像素（根据缩放比例调整）
+					const scale = Math.min(this.coordScaleX, this.coordScaleY)
+					const radius = Math.min(this.locationAccuracy * scale, 50) // 最大50像素
 					ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
 					ctx.stroke()
 				}
@@ -1513,15 +2210,264 @@ export default {
 				}
 			}
 			
-			ctx.draw(false, () => {
-				console.log('Canvas绘制完成')
+			try {
+				ctx.draw(false, () => {
+					console.log('[绘制地图] ✅ Canvas绘制完成')
+				})
+			} catch (error) {
+				console.error('[绘制地图] ❌ Canvas绘制失败:', error)
+				// 尝试使用同步绘制
+				try {
+					ctx.draw()
+					console.log('[绘制地图] ✅ Canvas同步绘制完成')
+				} catch (e) {
+					console.error('[绘制地图] ❌ Canvas同步绘制也失败:', e)
+				}
+			}
+		},
+		
+		/**
+		 * 估算文字宽度（中文字符更宽）
+		 */
+		estimateTextWidth(text, fontSize) {
+			let width = 0
+			for (let i = 0; i < text.length; i++) {
+				const char = text[i]
+				// 中文字符、全角字符宽度约为字体大小的1倍
+				// 英文字符、数字宽度约为字体大小的0.6倍
+				if (/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/.test(char)) {
+					width += fontSize
+				} else {
+					width += fontSize * 0.6
+				}
+			}
+			return width
+		},
+		
+		/**
+		 * 根据节点坐标动态生成地图布局（优化版）
+		 * @param {number} floor 楼层号
+		 * @returns {Object|null} 布局对象，包含 corridors 和 rooms
+		 */
+		generateFloorLayoutFromNodes(floor) {
+			if (!this.nodes || this.nodes.length === 0) {
+				console.warn('[动态布局] 节点数据为空，无法生成布局')
+				return null
+			}
+			
+			// 过滤当前楼层的节点
+			const floorNodes = this.nodes.filter(n => {
+				if (n.floorLevel !== undefined && n.floorLevel !== null) {
+					return n.floorLevel === floor
+				}
+				return floor === 1
 			})
+			
+			if (floorNodes.length === 0) {
+				console.warn(`[动态布局] 楼层 ${floor} 没有节点数据`)
+				return null
+			}
+			
+			console.log(`[动态布局] 为楼层 ${floor} 生成布局，节点数量: ${floorNodes.length}`)
+			
+			// 计算坐标范围
+			const xs = floorNodes.map(n => n.x || 0).filter(x => x > 0)
+			const ys = floorNodes.map(n => n.y || 0).filter(y => y > 0)
+			
+			if (xs.length === 0 || ys.length === 0) {
+				console.warn('[动态布局] 节点坐标无效')
+				return null
+			}
+			
+			const minX = Math.min(...xs)
+			const maxX = Math.max(...xs)
+			const minY = Math.min(...ys)
+			const maxY = Math.max(...ys)
+			
+			console.log(`[动态布局] 坐标范围: X[${minX}, ${maxX}], Y[${minY}, ${maxY}]`)
+			
+			// 识别不同类型的节点
+			const hallwayNodes = floorNodes.filter(n => {
+				const nodeType = (n.nodeType || '').toLowerCase()
+				const name = (n.name || '').toLowerCase()
+				return nodeType === 'hallway' || 
+				       name.includes('走廊') || 
+				       name.includes('大厅') ||
+				       name.includes('分诊台') ||
+				       name.includes('路口')
+			})
+			
+			const roomNodes = floorNodes.filter(n => {
+				const nodeType = (n.nodeType || '').toLowerCase()
+				const name = (n.name || '').toLowerCase()
+				return nodeType === 'room' || 
+				       n.locationId !== null && n.locationId !== undefined ||
+				       name.includes('诊室') ||
+				       (name.includes('室') && !name.includes('入口'))
+			})
+			
+			// 生成走廊区域（改进算法）
+			const corridors = []
+			const corridorSet = new Set() // 用于去重
+			
+			// 方法1: 根据走廊节点生成纵向和横向走廊
+			if (hallwayNodes.length >= 2) {
+				// 纵向走廊：按X坐标分组，Y坐标相近的节点连接
+				const xGroups = {}
+				hallwayNodes.forEach(node => {
+					const x = Math.round(node.x)
+					if (!xGroups[x]) xGroups[x] = []
+					xGroups[x].push(node)
+				})
+				
+				Object.keys(xGroups).forEach(xStr => {
+					const x = parseInt(xStr)
+					const group = xGroups[xStr].sort((a, b) => a.y - b.y)
+					
+					// 如果同一X坐标有多个节点，生成纵向走廊连接它们
+					if (group.length >= 2) {
+						for (let i = 0; i < group.length - 1; i++) {
+							const startY = Math.min(group[i].y, group[i + 1].y)
+							const endY = Math.max(group[i].y, group[i + 1].y)
+							const key = `v_${x}_${startY}_${endY}`
+							
+							if (!corridorSet.has(key)) {
+								corridorSet.add(key)
+								corridors.push({
+									x: Math.max(0, x - 1),
+									y: Math.max(0, startY - 1),
+									width: 3,
+									height: endY - startY + 2,
+									color: 'rgba(255,255,255,0.9)'
+								})
+							}
+						}
+					}
+				})
+				
+				// 横向走廊：按Y坐标分组，X坐标相近的节点连接
+				const yGroups = {}
+				hallwayNodes.forEach(node => {
+					const y = Math.round(node.y)
+					if (!yGroups[y]) yGroups[y] = []
+					yGroups[y].push(node)
+				})
+				
+				Object.keys(yGroups).forEach(yStr => {
+					const y = parseInt(yStr)
+					const group = yGroups[yStr].sort((a, b) => a.x - b.x)
+					
+					if (group.length >= 2) {
+						for (let i = 0; i < group.length - 1; i++) {
+							const startX = Math.min(group[i].x, group[i + 1].x)
+							const endX = Math.max(group[i].x, group[i + 1].x)
+							const key = `h_${y}_${startX}_${endX}`
+							
+							if (!corridorSet.has(key)) {
+								corridorSet.add(key)
+								corridors.push({
+									x: Math.max(0, startX - 1),
+									y: Math.max(0, y - 1),
+									width: endX - startX + 2,
+									height: 3,
+									color: 'rgba(255,255,255,0.9)'
+								})
+							}
+						}
+					}
+				})
+			}
+			
+			// 方法2: 如果走廊节点太少，生成主走廊连接所有重要节点
+			if (corridors.length === 0) {
+				// 找到所有重要节点（走廊、入口、电梯等）
+				const importantNodes = floorNodes.filter(n => {
+					const nodeType = (n.nodeType || '').toLowerCase()
+					const name = (n.name || '').toLowerCase()
+					return nodeType === 'hallway' || 
+					       nodeType === 'entrance' ||
+					       nodeType === 'elevator' ||
+					       name.includes('大厅') ||
+					       name.includes('分诊台')
+				})
+				
+				if (importantNodes.length >= 2) {
+					// 生成十字形主走廊
+					const centerX = Math.round((minX + maxX) / 2)
+					const centerY = Math.round((minY + maxY) / 2)
+					
+					corridors.push({
+						x: Math.max(0, centerX - 1),
+						y: Math.max(0, minY - 1),
+						width: 3,
+						height: maxY - minY + 2,
+						color: 'rgba(255,255,255,0.9)'
+					})
+					corridors.push({
+						x: Math.max(0, minX - 1),
+						y: Math.max(0, centerY - 1),
+						width: maxX - minX + 2,
+						height: 3,
+						color: 'rgba(255,255,255,0.9)'
+					})
+				}
+			}
+			
+			// 生成房间区域（改进：根据节点类型和位置生成不同大小的房间）
+			const rooms = roomNodes.map(node => {
+				// 根据节点名称判断房间大小
+				const name = (node.name || '').toLowerCase()
+				let width = 2
+				let height = 2
+				
+				if (name.includes('大厅') || name.includes('候诊')) {
+					width = 4
+					height = 3
+				} else if (name.includes('诊室') || name.includes('室')) {
+					width = 2
+					height = 2
+				}
+				
+				return {
+					x: Math.max(0, (node.x || 0) - Math.floor(width / 2)),
+					y: Math.max(0, (node.y || 0) - Math.floor(height / 2)),
+					width: width,
+					height: height,
+					label: node.name || '房间',
+					color: 'rgba(240, 248, 255, 0.8)',
+					nodeId: node.nodeId
+				}
+			})
+			
+			const layout = {
+				corridors: corridors,
+				rooms: rooms,
+				bounds: { minX, maxX, minY, maxY }
+			}
+			
+			console.log(`[动态布局] 生成完成: ${corridors.length} 个走廊, ${rooms.length} 个房间`)
+			return layout
 		},
 		
 		drawFloorLayout(ctx, cellWidth, cellHeight) {
-			if (!this.floorLayouts) return
-			const layout = this.floorLayouts[this.currentFloor]
-			if (!layout) return
+			// 优先使用动态生成的布局
+			let layout = this.generateFloorLayoutFromNodes(this.currentFloor)
+			
+			// 如果动态生成失败，回退到硬编码布局
+			if (!layout) {
+				if (!this.floorLayouts) {
+					console.warn('[绘制布局] 没有可用的布局数据')
+					return
+				}
+				layout = this.floorLayouts[this.currentFloor]
+				if (!layout) {
+					console.warn(`[绘制布局] 楼层 ${this.currentFloor} 没有硬编码布局`)
+					return
+				}
+				console.log('[绘制布局] 使用硬编码布局')
+			} else {
+				console.log('[绘制布局] 使用动态生成的布局')
+			}
 			
 			ctx.save()
 			
@@ -1537,6 +2483,8 @@ export default {
 				})
 			}
 			
+			// 房间区域绘制（只绘制背景色块，不绘制标签，避免视觉混乱）
+			// 标签由关键节点绘制逻辑统一处理
 			if (layout.rooms) {
 				layout.rooms.forEach(room => {
 					ctx.setFillStyle(room.color || 'rgba(255,255,255,0.65)')
@@ -1546,17 +2494,18 @@ export default {
 						room.width * cellWidth,
 						room.height * cellHeight
 					)
-					if (room.label) {
-						ctx.setFontSize(12)
-						ctx.setTextAlign('center')
-						ctx.setFillStyle('rgba(0, 0, 0, 0.45)')
-						ctx.fillText(
-							room.label,
-							(room.x + room.width / 2) * cellWidth,
-							(room.y + room.height / 2) * cellHeight + 4
-						)
-						ctx.setTextAlign('left')
-					}
+					// 注释掉房间标签绘制，避免与节点标签重叠
+					// if (room.label) {
+					// 	ctx.setFontSize(12)
+					// 	ctx.setTextAlign('center')
+					// 	ctx.setFillStyle('rgba(0, 0, 0, 0.45)')
+					// 	ctx.fillText(
+					// 		room.label,
+					// 		(room.x + room.width / 2) * cellWidth,
+					// 		(room.y + room.height / 2) * cellHeight + 4
+					// 	)
+					// 	ctx.setTextAlign('left')
+					// }
 				})
 			}
 			
@@ -2716,20 +3665,63 @@ export default {
 						await this.loadTargetNode()
 					}
 					
-					// 重新计算路径（从扫码位置到目的地）
-					console.log('扫码定位：开始计算路径', {
-						起点: this.startNode,
-						终点: this.targetNode
-					})
-					await this.calculatePath()
+					// 检查扫码位置是否在当前路径上
+					let onExistingPath = false
+					if (this.navigationSteps && this.navigationSteps.length > 0) {
+						// 查找扫码节点在当前路径中的位置
+						const stepIndex = this.navigationSteps.findIndex(step => 
+							step.fromNodeId === nodeId || step.toNodeId === nodeId
+						)
 						
-						uni.showToast({
-							title: `定位成功：${nodeName}`,
-							icon: 'success',
-							duration: 2000
+						if (stepIndex >= 0) {
+							// 扫码位置在当前路径上，跳到对应步骤
+							onExistingPath = true
+							this.currentStepIndex = stepIndex
+							this.currentStep = this.navigationSteps[this.currentStepIndex]
+							this.nextStep = this.currentStepIndex < this.navigationSteps.length - 1 
+								? this.navigationSteps[this.currentStepIndex + 1] 
+								: null
+							
+							console.log('✅ 扫码位置在当前路径上，跳到步骤:', {
+								步骤索引: stepIndex,
+								当前步骤: this.currentStep.instruction,
+								下一步: this.nextStep ? this.nextStep.instruction : '已到终点'
+							})
+							
+							// 重新生成剩余路径（从当前位置到终点）
+							const remainingSteps = this.navigationSteps.slice(this.currentStepIndex)
+							this.path = this.generatePathFromSteps(remainingSteps)
+							
+							// 重新绘制地图
+							this.$nextTick(() => {
+								this.drawMap()
+							})
+							
+							uni.showToast({
+								title: `已跳到：${nodeName}`,
+								icon: 'success',
+								duration: 2000
+							})
+						}
+					}
+					
+					// 如果扫码位置不在当前路径上，重新规划路径
+					if (!onExistingPath) {
+						console.log('⚠️ 扫码位置不在当前路径上，重新规划路径', {
+							起点: this.startNode,
+							终点: this.targetNode
 						})
 						
-					} else {
+						await this.calculatePath()
+						
+						uni.showToast({
+							title: `已重新规划路径：${nodeName}`,
+							icon: 'success',
+							duration: 2500
+						})
+					}
+					
+				} else {
 						throw new Error(scanResponse.data.message || '后端API返回错误')
 					}
 					
@@ -2767,6 +3759,44 @@ export default {
 					})
 				}
 			}
+		},
+		
+		/**
+		 * 切换楼栋
+		 */
+		switchBuilding(building) {
+			if (this.currentBuilding === building) {
+				// 如果点击的是当前楼栋，取消选择（显示所有楼栋）
+				this.currentBuilding = null
+				console.log('取消楼栋筛选，显示所有楼栋')
+			} else {
+				this.currentBuilding = building
+				console.log('切换到楼栋:', building)
+			}
+			// 重新绘制地图
+			this.$nextTick(() => {
+				this.drawMap()
+			})
+		},
+		
+		/**
+		 * 切换标签显示模式
+		 */
+		toggleLabels() {
+			this.showAllLabels = !this.showAllLabels
+			console.log('切换标签显示模式:', this.showAllLabels ? '显示所有' : '仅显示重要节点')
+			// 重新绘制地图
+			this.$nextTick(() => {
+				this.drawMap()
+			})
+		},
+		
+		/**
+		 * 切换完整路线显示
+		 */
+		toggleRouteDetail() {
+			this.showRouteDetail = !this.showRouteDetail
+			console.log('切换路线详情:', this.showRouteDetail ? '展开' : '折叠')
 		},
 		
 		/**
@@ -2868,7 +3898,14 @@ export default {
 				// 否则用A*生成细颗粒度路径
 				const segment = astar.findPath(fromNode.x, fromNode.y, toNode.x, toNode.y)
 				if (!segment || segment.length === 0) {
-					// A*失败，回退到直线
+					// A*失败（可能是坐标超出网格范围），回退到直线
+					console.warn('[路径生成] A*寻路失败，使用直线连接:', {
+						from: fromNode.name,
+						to: toNode.name,
+						fromCoord: [fromNode.x, fromNode.y],
+						toCoord: [toNode.x, toNode.y],
+						gridSize: [this.gridWidth, this.gridHeight]
+					})
 					if (path.length === 0) {
 						path.push({ x: fromNode.x, y: fromNode.y })
 					}
@@ -3138,6 +4175,36 @@ export default {
 	font-size: 30rpx;
 	color: #333;
 	font-weight: 600;
+}
+
+.building-selector {
+	margin-bottom: 10px;
+	padding: 10px;
+	background: #f5f5f5;
+	border-radius: 8px;
+}
+
+.building-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.building-btn {
+	padding: 6px 12px;
+	background: #fff;
+	border: 1px solid #d9d9d9;
+	border-radius: 4px;
+	font-size: 12px;
+	color: #666;
+	transition: all 0.3s;
+}
+
+.building-btn.active {
+	background: #1890FF;
+	color: #fff;
+	border-color: #1890FF;
 }
 
 .floor-selector {
@@ -3488,6 +4555,92 @@ export default {
 	font-size: 26rpx;
 	color: #AD6800;
 	line-height: 1.5;
+}
+
+/* 完整路线样式 */
+.route-overview {
+	margin-top: 16rpx;
+	background: #F0F9FF;
+	border-radius: 8rpx;
+	overflow: hidden;
+}
+
+.route-header {
+	padding: 16rpx 20rpx;
+	display: flex;
+	align-items: center;
+	background: linear-gradient(135deg, #E6F7FF 0%, #BAE7FF 100%);
+	cursor: pointer;
+}
+
+.route-icon {
+	font-size: 32rpx;
+	margin-right: 12rpx;
+}
+
+.route-title {
+	flex: 1;
+	font-size: 28rpx;
+	color: #0050B3;
+	font-weight: 600;
+}
+
+.route-toggle {
+	font-size: 24rpx;
+	color: #0050B3;
+	margin-left: 12rpx;
+}
+
+.route-steps {
+	padding: 12rpx 20rpx;
+	max-height: 400rpx;
+	overflow-y: auto;
+}
+
+.route-step {
+	display: flex;
+	align-items: center;
+	padding: 12rpx 0;
+	border-bottom: 1rpx solid #E6F7FF;
+}
+
+.route-step:last-child {
+	border-bottom: none;
+}
+
+.route-step.current-step {
+	background: #E6F7FF;
+	margin: 0 -20rpx;
+	padding: 12rpx 20rpx;
+	border-radius: 6rpx;
+}
+
+.route-step.completed-step {
+	opacity: 0.6;
+}
+
+.step-number {
+	font-size: 22rpx;
+	color: #8C8C8C;
+	margin-right: 8rpx;
+	min-width: 40rpx;
+}
+
+.step-icon {
+	font-size: 28rpx;
+	margin-right: 8rpx;
+}
+
+.step-text {
+	flex: 1;
+	font-size: 26rpx;
+	color: #262626;
+	line-height: 1.5;
+}
+
+.route-step.current-step .step-text {
+	color: #0050B3;
+	font-weight: 600;
 }
 </style>
 

@@ -108,14 +108,54 @@ public class MapService {
                 int gridX = mapNode.getCoordinatesX() != null ? mapNode.getCoordinatesX().intValue() : 0;
                 int gridY = mapNode.getCoordinatesY() != null ? mapNode.getCoordinatesY().intValue() : 0;
                 
-                // 使用数据库中的真实节点名称
+                // 获取节点类型和楼层
+                String nodeTypeStr = mapNode.getNodeType() != null ? mapNode.getNodeType().name().toLowerCase() : null;
+                Integer floorLevel = mapNode.getFloorLevel();
+                
+                // 提取楼栋信息
+                String building = null;
+                // 优先从关联的location获取楼栋信息
+                if (linkedLocation != null && linkedLocation.getBuilding() != null) {
+                    building = linkedLocation.getBuilding();
+                } else {
+                    // 从节点名称中提取楼栋（如"内科楼大门" -> "内科楼"）
+                    String nodeName = mapNode.getNodeName();
+                    if (nodeName != null) {
+                        if (nodeName.contains("内科楼")) {
+                            building = "内科楼";
+                        } else if (nodeName.contains("外科楼")) {
+                            building = "外科楼";
+                        } else if (nodeName.contains("儿科楼")) {
+                            building = "儿科楼";
+                        } else if (nodeName.contains("妇产科楼")) {
+                            building = "妇产科楼";
+                        } else if (nodeName.contains("医院正门") || nodeName.contains("中心广场")) {
+                            building = "中心区域";
+                        }
+                    }
+                }
+                
+                // 使用数据库中的真实节点名称，包含节点类型和楼层信息
                 MapNodeDTO node = new MapNodeDTO(
                     mapNode.getNodeId(),
                     mapNode.getNodeName(),  // 真实的节点名称
                     gridX,
                     gridY,
-                    locationId
+                    locationId,
+                    nodeTypeStr,
+                    floorLevel
                 );
+                
+                // 设置楼栋信息
+                node.setBuilding(building);
+                
+                // 如果有二维码信息，也设置
+                if (mapNode.getQrcodeContent() != null) {
+                    node.setQrcodeContent(mapNode.getQrcodeContent());
+                    node.setQrcodeImagePath(mapNode.getQrcodeImagePath());
+                    node.setQrcodeStatus(mapNode.getQrcodeStatus() != null ? mapNode.getQrcodeStatus().name().toLowerCase() : null);
+                }
+                
                 nodes.add(node);
                 
                 System.out.println("[MapService] 添加节点: " + mapNode.getNodeName() + 
@@ -381,8 +421,11 @@ public class MapService {
                 })
                 .collect(Collectors.toList());
         
+        // 获取所有可用楼层（从数据库查询）
+        List<Integer> availableFloors = getAvailableFloors();
+        
         MapGridDTO grid = new MapGridDTO(GRID_WIDTH, GRID_HEIGHT, gridMatrix);
-        MapConfigResponse response = new MapConfigResponse(grid, floorNodes);
+        MapConfigResponse response = new MapConfigResponse(grid, floorNodes, availableFloors);
         
         System.out.println("[MapService] 返回配置，楼层: " + floorLevel + ", grid宽度: " + grid.getWidth() + ", 高度: " + grid.getHeight());
         System.out.println("[MapService] 返回该楼层节点数量: " + response.getNodes().size());
@@ -422,6 +465,36 @@ public class MapService {
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException(
                     "未找到nodeId为" + nodeId + "的地图节点"));
+    }
+    
+    /**
+     * 获取所有可用楼层列表（从数据库动态查询）
+     * @return 可用楼层列表，按升序排列
+     */
+    public List<Integer> getAvailableFloors() {
+        try {
+            // 从数据库查询所有不重复的楼层号
+            List<Integer> floors = mapNodeRepository.findAll().stream()
+                    .map(MapNode::getFloorLevel)
+                    .filter(floor -> floor != null && floor > 0) // 过滤掉null和无效楼层
+                    .distinct() // 去重
+                    .sorted() // 排序
+                    .collect(Collectors.toList());
+            
+            // 如果数据库中没有楼层数据，返回默认楼层
+            if (floors.isEmpty()) {
+                System.out.println("[MapService] 警告：数据库中没有楼层数据，返回默认楼层 [1, 2, 3]");
+                return List.of(1, 2, 3);
+            }
+            
+            System.out.println("[MapService] 从数据库获取到 " + floors.size() + " 个楼层: " + floors);
+            return floors;
+        } catch (Exception e) {
+            System.err.println("[MapService] 获取可用楼层失败: " + e.getMessage());
+            e.printStackTrace();
+            // 出错时返回默认楼层
+            return List.of(1, 2, 3);
+        }
     }
 }
 

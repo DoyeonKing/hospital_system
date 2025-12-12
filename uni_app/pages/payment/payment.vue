@@ -8,7 +8,25 @@
 			<!-- 费用详情卡片 -->
 			<view class="amount-card">
 				<text class="amount-label">挂号费用</text>
-				<text class="amount-value">¥{{ fee }}</text>
+				<!-- 显示实际应付费用 -->
+				<text class="amount-value">¥{{ actualFee }}</text>
+				
+				<!-- 费用明细（如果存在费用详情） -->
+				<view class="fee-detail" v-if="feeDetail && feeDetail.reimbursementRate > 0">
+					<view class="fee-row">
+						<text class="fee-label">原价：</text>
+						<text class="fee-value">¥{{ feeDetail.originalFee.toFixed(2) }}</text>
+					</view>
+					<view class="fee-row">
+						<text class="fee-label">{{ feeDetail.patientType }}报销（{{ (feeDetail.reimbursementRate * 100).toFixed(0) }}%）：</text>
+						<text class="fee-value reimbursement">-¥{{ feeDetail.reimbursementAmount.toFixed(2) }}</text>
+					</view>
+					<view class="fee-divider"></view>
+					<view class="fee-row total-row">
+						<text class="fee-label">实付：</text>
+						<text class="fee-value total">¥{{ actualFee.toFixed(2) }}</text>
+					</view>
+				</view>
 			</view>
 			
 			<!-- 预约信息 -->
@@ -54,7 +72,7 @@
 			<view class="payment-section">
 				<view class="total-info">
 					<text class="total-label">实付：</text>
-					<text class="total-value">¥{{ fee }}</text>
+					<text class="total-value">¥{{ actualFee.toFixed(2) }}</text>
 				</view>
 				<button class="pay-btn" @click="handlePayment">立即支付</button>
 			</view>
@@ -70,7 +88,9 @@
 			return {
 				scheduleId: null,
 				waitlistId: null, // 候补ID
-				fee: 0,
+				fee: 0, // 原价
+				actualFee: 0, // 实际应付费用
+				feeDetail: null, // 费用详情
 				departmentName: '',
 				doctorName: '',
 				doctorTitle: '',
@@ -135,6 +155,50 @@
 						duration: 2000
 					})
 				}
+				
+				// 如果没有费用详情，根据患者类型计算（从URL参数传入的fee是原价）
+				if (!this.feeDetail && this.fee > 0) {
+					this.calculateFeeFromPatientType()
+				}
+			},
+			
+			// 从患者类型计算费用（临时方案，用于从URL参数传入的情况）
+			calculateFeeFromPatientType() {
+				const patientInfo = this.patientInfo || uni.getStorageSync('patientInfo') || {}
+				const patientType = patientInfo.patientType || 'student' // 默认为学生
+				
+				const originalFee = parseFloat(this.fee) || 0
+				if (originalFee <= 0) {
+					this.actualFee = 0
+					return
+				}
+				
+				let reimbursementRate = 0
+				let patientTypeName = '学生'
+				
+				if (patientType === 'student') {
+					reimbursementRate = 0.95 // 学生95%
+					patientTypeName = '学生'
+				} else if (patientType === 'teacher') {
+					reimbursementRate = 0.90 // 教师90%
+					patientTypeName = '教师'
+				} else {
+					reimbursementRate = 0 // 其他0%
+					patientTypeName = '职工'
+				}
+				
+				const reimbursementAmount = originalFee * reimbursementRate
+				this.actualFee = parseFloat((originalFee * (1 - reimbursementRate)).toFixed(2))
+				
+				this.feeDetail = {
+					originalFee: originalFee,
+					reimbursementRate: reimbursementRate,
+					reimbursementAmount: parseFloat(reimbursementAmount.toFixed(2)),
+					actualFee: this.actualFee,
+					patientType: patientTypeName
+				}
+				
+				console.log('计算费用详情:', this.feeDetail)
 			},
 			
 			selectMethod(method) {
@@ -193,6 +257,44 @@
 						if (appointmentData) {
 							this.appointmentId = appointmentData.appointmentId || appointmentData.id
 							this.appointmentCreated = true
+							
+							console.log('======== 费用详情调试开始 ========')
+							console.log('URL传入的原始fee:', this.fee)
+							console.log('后端返回的完整appointmentData:', JSON.stringify(appointmentData, null, 2))
+							console.log('后端返回的feeDetail:', appointmentData.feeDetail)
+							
+							// 提取费用详情
+							if (appointmentData.feeDetail) {
+								this.feeDetail = appointmentData.feeDetail
+								this.actualFee = parseFloat(appointmentData.feeDetail.actualFee || this.fee)
+								// 保持原始fee不变，不要被后端覆盖（如果后端有误）
+								console.log('后端feeDetail.originalFee:', appointmentData.feeDetail.originalFee)
+								console.log('当前this.fee:', this.fee)
+								
+								// 检查后端返回的originalFee是否与URL传入的fee一致
+								const backendOriginalFee = parseFloat(appointmentData.feeDetail.originalFee)
+								if (Math.abs(backendOriginalFee - this.fee) > 0.01) {
+									console.warn('警告：后端返回的originalFee与URL传入的fee不一致！')
+									console.warn('URL传入的fee:', this.fee)
+									console.warn('后端返回的originalFee:', backendOriginalFee)
+									// 使用URL传入的fee作为原价（保持数据库原值）
+									this.feeDetail.originalFee = this.fee
+									// 重新计算
+									this.calculateFeeFromPatientType()
+								} else {
+									this.fee = backendOriginalFee
+								}
+							} else {
+								console.log('后端未返回feeDetail，使用前端计算')
+								// 如果没有费用详情，使用患者类型计算（临时方案）
+								this.calculateFeeFromPatientType()
+							}
+							
+							console.log('最终的费用详情:', this.feeDetail)
+							console.log('最终的actualFee:', this.actualFee)
+							console.log('最终的fee:', this.fee)
+							console.log('======== 费用详情调试结束 ========')
+							
 							console.log('预约创建成功，appointmentId:', this.appointmentId)
 						} else {
 							console.error('创建预约响应格式异常:', response)
@@ -397,9 +499,27 @@
 						
 						console.log('候补支付完整响应:', JSON.stringify(response, null, 2))
 						
+						let appointmentData = null
 						if (response && response.code === '200' && response.data) {
-							this.appointmentId = response.data.appointmentId || response.data.id
+							appointmentData = response.data
+						} else if (response && response.appointmentId) {
+							appointmentData = response
+						} else if (response && response.data && response.data.appointmentId) {
+							appointmentData = response.data
+						}
+						
+						if (appointmentData) {
+							this.appointmentId = appointmentData.appointmentId || appointmentData.id
+							
+							// 提取费用详情（候补支付的响应应该包含费用详情）
+							if (appointmentData.feeDetail) {
+								this.feeDetail = appointmentData.feeDetail
+								this.actualFee = parseFloat(appointmentData.feeDetail.actualFee || this.fee)
+								this.fee = parseFloat(appointmentData.feeDetail.originalFee || this.fee)
+							}
+							
 							console.log('候补支付成功，新的appointmentId:', this.appointmentId)
+							console.log('费用详情:', this.feeDetail)
 						} else {
 							throw new Error(response?.msg || response?.message || '支付失败')
 						}
@@ -498,6 +618,53 @@
 		font-size: 72rpx;
 		font-weight: 700;
 		color: #ffffff;
+	}
+	
+	.fee-detail {
+		margin-top: 30rpx;
+		padding-top: 30rpx;
+		border-top: 1rpx solid rgba(255, 255, 255, 0.3);
+	}
+	
+	.fee-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 16rpx;
+		font-size: 24rpx;
+	}
+	
+	.fee-label {
+		color: rgba(255, 255, 255, 0.8);
+	}
+	
+	.fee-value {
+		color: rgba(255, 255, 255, 0.9);
+		font-weight: 500;
+	}
+	
+	.fee-value.reimbursement {
+		color: #4FD9C3;
+	}
+	
+	.fee-divider {
+		height: 1rpx;
+		background: rgba(255, 255, 255, 0.3);
+		margin: 20rpx 0;
+	}
+	
+	.total-row {
+		margin-top: 16rpx;
+		
+		.fee-label,
+		.fee-value {
+			font-size: 28rpx;
+			font-weight: 600;
+		}
+		
+		.fee-value.total {
+			font-size: 32rpx;
+		}
 	}
 
 	.info-card {

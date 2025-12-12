@@ -13,7 +13,7 @@ from mysql.connector import Error
 # 数据库配置（从application.yml获取）
 DB_CONFIG = {
     'host': 'localhost',
-    'database': 'hospital_05',
+    'database': 'hospital_07',  # 请根据实际数据库名称修改
     'user': 'root',
     'password': '123456',
     'charset': 'utf8mb4'

@@ -12,48 +12,77 @@
  * 常见IP格式：192.168.x.x 或 10.x.x.x
  */
 
-// ⚠️ 真机调试：请修改为你的电脑局域网IP地址
-// 检测到的IP地址：
+// ==================== IP配置区域 ====================
+// 请根据你的网络环境修改以下IP地址
+
+// 电脑端（开发者工具）使用的IP - 保持不变
+const DEVICE_IP = 'localhost' // 👈 开发者工具调试用这个（电脑端）
+
+// 真机调试使用的局域网IP - 请修改为你的电脑IP
+// 检测到的可用IP：
 //   - 192.168.137.1 (可能是手机热点)
-//   - 172.20.10.3 (可能是WiFi连接) ← 试试这个！
-//   - 26.206.1.21 (可能是虚拟网卡)
+//   - 172.20.10.3 (可能是WiFi连接) ← 推荐使用这个！
+//   - 172.22.48.1 (可能是其他网络)
+//   - 26.206.1.21 (可能是虚拟网卡，不推荐)
+const MOBILE_IP = '172.20.10.3' // 👈 真机调试时用这个（请修改为你的电脑IP）
 
-// ⚠️ 重要：根据你的网络环境选择正确的IP
-// 
-// 检测到的IP地址：
-//   1. 192.168.137.1 - 手机热点（如果电脑连接手机热点用这个）
-//   2. 172.20.10.3 - WiFi连接（如果手机和电脑在同一WiFi用这个）
-//   3. 26.206.1.21 - 虚拟网卡（通常不用）
+// ==================== 运行模式切换 ====================
+// 手动切换模式：
+//   - 'auto': 自动检测（推荐）- 开发者工具用 localhost，真机用 MOBILE_IP
+//   - 'device': 强制使用 DEVICE_IP（电脑端）
+//   - 'mobile': 强制使用 MOBILE_IP（真机调试）
+const RUN_MODE = 'auto' // 👈 修改这里来切换模式
 
-// ⚠️ 重要：根据调试方式选择IP
-// 
-// 1. 微信开发者工具调试（推荐）：使用 localhost
-//    - 优点：不需要配置域名，直接可用
-//    - 缺点：只能在开发者工具中使用，真机无法访问
-// 
-// 2. 真机调试：使用局域网IP（如 172.20.10.3）
-//    - 优点：可以在真机上测试
-//    - 缺点：需要在开发者工具中关闭域名校验
-//    - 设置：微信开发者工具 → 详情 → 本地设置 → 勾选"不校验合法域名"
-//
-// 3. 如何获取局域网IP：
-//    - Windows: 打开 cmd，运行 ipconfig，查看"IPv4 地址"
-//    - 通常是 192.168.x.x 或 172.20.x.x
+// 获取当前使用的IP
+function getCurrentIP() {
+	if (RUN_MODE === 'device') {
+		return DEVICE_IP
+	} else if (RUN_MODE === 'mobile') {
+		return MOBILE_IP
+	} else {
+		// auto 模式：自动检测环境
+		// #ifdef MP-WEIXIN
+		try {
+			const systemInfo = uni.getSystemInfoSync()
+			// 在开发者工具中，platform 通常是 'devtools'
+			// 在真机上，platform 是 'ios' 或 'android'
+			if (systemInfo.platform === 'devtools') {
+				return DEVICE_IP
+			} else {
+				return MOBILE_IP
+			}
+		} catch (e) {
+			// 如果获取失败，默认使用真机IP
+			return MOBILE_IP
+		}
+		// #endif
+		
+		// #ifndef MP-WEIXIN
+		// 非微信小程序环境（H5等），使用 localhost
+		return DEVICE_IP
+		// #endif
+	}
+}
 
-// 当前使用：开发者工具调试（使用 localhost）
-const LOCAL_IP = 'localhost' // 👈 开发者工具调试用这个
+// 当前使用的IP
+const CURRENT_IP = getCurrentIP()
 
-// 如果需要真机调试，改为局域网IP，例如：
-// const LOCAL_IP = '172.20.10.3' // 👈 真机调试时用这个
+// 打印当前配置（方便调试）
+console.log('🔧 API配置:', {
+	模式: RUN_MODE,
+	当前IP: CURRENT_IP,
+	电脑端IP: DEVICE_IP,
+	真机IP: MOBILE_IP,
+	baseURL: `http://${CURRENT_IP}:8080`
+})
 
-// 开发环境配置
+// ==================== 开发环境配置 ====================
 const development = {
-	// 真机调试使用局域网IP
-	//baseURL: `http://${LOCAL_IP}:8080`, // 主后端服务（Spring Boot）
+	// 主后端服务（Spring Boot）- 自动根据环境切换IP
+	baseURL: `http://${CURRENT_IP}:8080`,
 	
-	// 如果要在浏览器测试，可以临时改为：
-	baseURL: 'http://localhost:8080',
-	aiBaseURL: 'http://localhost:5000' // AI 预问诊后端服务（Node.js）- 端口5000
+	// AI 预问诊后端服务（Node.js）- 端口5000
+	aiBaseURL: `http://${CURRENT_IP}:5000`
 }
 
 // 生产环境配置

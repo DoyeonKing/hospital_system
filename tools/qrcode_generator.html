@@ -269,11 +269,25 @@
         // 从后端API获取所有节点数据（包括location和途径点）
         async function loadLocationsFromAPI() {
             try {
+                console.log('开始从API加载节点数据...');
+                
                 // 1. 获取所有location（目的地）
-                const locationResponse = await fetch('http://localhost:8080/api/locations');
+                console.log('正在请求: http://localhost:8080/api/locations');
+                const locationResponse = await fetch('http://localhost:8080/api/locations', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    mode: 'cors' // 明确指定CORS模式
+                });
+                
+                console.log('Location API响应状态:', locationResponse.status, locationResponse.statusText);
+                
                 let locationNodes = [];
                 if (locationResponse.ok) {
                     const locations = await locationResponse.json();
+                    console.log('获取到locations数量:', locations.length);
                     locationNodes = locations
                         .filter(loc => loc.mapNodeId != null && loc.mapNodeId > 0)
                         .map(loc => ({
@@ -286,13 +300,29 @@
                             nodeType: 'ROOM',
                             typeName: '诊室'
                         }));
+                } else {
+                    console.warn('Location API返回错误状态:', locationResponse.status);
+                    const errorText = await locationResponse.text();
+                    console.warn('错误详情:', errorText);
                 }
                 
                 // 2. 获取所有途径点（走廊、电梯、楼梯等）
-                const waypointResponse = await fetch('http://localhost:8080/api/map/nodes/waypoints');
+                console.log('正在请求: http://localhost:8080/api/map/nodes/waypoints');
+                const waypointResponse = await fetch('http://localhost:8080/api/map/nodes/waypoints', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    mode: 'cors' // 明确指定CORS模式
+                });
+                
+                console.log('Waypoint API响应状态:', waypointResponse.status, waypointResponse.statusText);
+                
                 let waypointNodes = [];
                 if (waypointResponse.ok) {
                     const result = await waypointResponse.json();
+                    console.log('Waypoint API返回:', result);
                     if (result.code === '200' && result.data) {
                         waypointNodes = result.data.map(node => ({
                             nodeId: node.nodeId,
@@ -304,6 +334,10 @@
                             coordinatesY: node.coordinatesY
                         }));
                     }
+                } else {
+                    console.warn('Waypoint API返回错误状态:', waypointResponse.status);
+                    const errorText = await waypointResponse.text();
+                    console.warn('错误详情:', errorText);
                 }
                 
                 // 3. 合并所有节点
@@ -313,6 +347,20 @@
                 return true;
             } catch (error) {
                 console.error('从API加载节点数据失败:', error);
+                console.error('错误类型:', error.name);
+                console.error('错误消息:', error.message);
+                console.error('错误堆栈:', error.stack);
+                
+                // 显示更详细的错误信息
+                let errorMsg = '无法连接到后端服务';
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    errorMsg = '❌ 后端服务未运行或无法连接\n\n请检查：\n1. Spring Boot服务是否在8080端口运行\n2. 防火墙是否阻止了连接\n3. 浏览器控制台是否有CORS错误';
+                } else if (error.message.includes('CORS')) {
+                    errorMsg = '❌ CORS跨域错误\n\n请检查后端CORS配置';
+                } else {
+                    errorMsg = `❌ 错误: ${error.message}`;
+                }
+                
                 // 如果API失败，使用默认示例数据
                 nodes = [
                     {nodeId: 1, name: "医院大门", nodeType: 'ENTRANCE', typeName: '入口'},
@@ -321,6 +369,9 @@
                     {nodeId: 4, name: "内科诊室", nodeType: 'ROOM', typeName: '诊室'},
                     {nodeId: 5, name: "外科诊室", nodeType: 'ROOM', typeName: '诊室'},
                 ];
+                
+                // 显示错误提示
+                alert(errorMsg);
                 return false;
             }
         }

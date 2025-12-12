@@ -16,4 +16,5 @@ public class PatientResponse {
     private PatientStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private PatientProfileResponse patientProfile;
 }

@@ -38,7 +38,8 @@ function request(options) {
 			data: options.data || {},
 			timeout: options.timeout || 30000, // 默认30秒超时（真机调试网络可能较慢）
 			header: {
-				'Content-Type': 'application/json',
+				'Content-Type': 'application/json;charset=UTF-8',
+				'Accept': 'application/json;charset=UTF-8',
 				// 如果有token，自动添加到请求头
 				...(options.header || {}),
 				...getAuthHeader()
