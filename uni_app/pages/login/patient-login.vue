@@ -170,7 +170,9 @@
 				const adaptedInfo = {
 					id: userInfo.patientId,
 					name: userInfo.fullName,
-					identifier: userInfo.identifier
+					identifier: userInfo.identifier,
+					phoneNumber: userInfo.phoneNumber,
+					patientType: userInfo.patientType  // 保存患者类型（student/teacher/staff）用于报销比例计算
 				};
 				uni.setStorageSync('patientInfo', adaptedInfo);
 				
