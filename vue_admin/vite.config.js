@@ -35,7 +35,10 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        // ✅ 已配置为使用云服务器后端，本地后端不需要运行
+        target: 'http://123.249.30.241:8080',
+        // 旧配置（已注释，如需切换回本地后端可取消注释）：
+        // target: 'http://localhost:8080',
         changeOrigin: true,
         // 保留 /api 前缀，因为后端接口路径包含 /api
         // rewrite: (path) => path.replace(/^\/api/, '')

@@ -3,9 +3,14 @@ import {ElMessage} from "element-plus";
 import { getToken, removeToken } from './auth.js'
 import router from '@/router'
 
+// 云服务器IP地址（与数据库同一台服务器）
+const CLOUD_SERVER_IP = '123.249.30.241'
+
 const request = axios.create({
-  //baseURL: 'http://localhost:8080',
-  baseURL: 'http://123.249.30.241:8080',
+  // ✅ 已配置为使用云服务器后端，本地后端不需要运行
+  baseURL: `http://${CLOUD_SERVER_IP}:8080`,
+  // 旧配置（已注释，如需切换回本地后端可取消注释）：
+  // baseURL: 'http://localhost:8080',
   timeout: 30000  // 后台接口超时时间
 })
 
