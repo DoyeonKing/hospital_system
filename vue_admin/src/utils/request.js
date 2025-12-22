@@ -4,7 +4,7 @@ import {ElMessage} from "element-plus";
 const request = axios.create({
   // 开发环境使用相对路径，让 Vite 代理处理请求
   // 生产环境使用完整的 baseURL
-  baseURL: import.meta.env.DEV ? '' : 'http://localhost:8080',
+  baseURL: import.meta.env.DEV ? '' : 'http://123.249.30.241:8080',
   timeout: 30000  // 后台接口超时时间
 })
 

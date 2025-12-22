@@ -2,7 +2,7 @@ import axios from "axios";
 import {ElMessage} from "element-plus";
 
 const request = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: 'http://123.249.30.241:8080',
   timeout: 30000  // 后台接口超时时间
 })
 

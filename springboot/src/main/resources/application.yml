@@ -20,13 +20,13 @@ spring:
     upload-dir: images/doctors/
 
   datasource:
-    #url: jdbc:mysql://localhost:3306/hospital2?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
-    #username: root
-    #password: 123456 # 使用引号包裹密码，避免特殊字符解析问题
+    url: jdbc:mysql://123.249.30.241:3306/hospital_db?useSSL=true&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
+    username: root
+    password: "123456" # 使用引号包裹密码，避免特殊字符解析问题
    
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3307/hospital_07?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000}
-    username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:123456} # 使用引号包裹密码，避免特殊字符解析问题
+    #url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3307/hospital_07?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000}
+    #username: ${SPRING_DATASOURCE_USERNAME:root}
+    #password: ${SPRING_DATASOURCE_PASSWORD:123456} # 使用引号包裹密码，避免特殊字符解析问题
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       # 连接池配置
