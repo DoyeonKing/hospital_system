@@ -1530,4 +1530,42 @@ public class AppointmentService {
         }
         return sb.toString();
     }
+
+    /**
+     * 自动标记爽约
+     * 查找所有已过期但未签到的预约，自动设置为 NO_SHOW 状态
+     * 这会触发黑名单检查逻辑（爽约3次自动加入黑名单）
+     * 
+     * @return 标记为爽约的预约数量
+     */
+    @Transactional
+    public int autoMarkNoShowAppointments() {
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+        
+        // 查询需要标记为爽约的预约
+        List<Appointment> appointments = appointmentRepository.findAppointmentsToMarkAsNoShow(
+            AppointmentStatus.scheduled, today, now
+        );
+        
+        int count = 0;
+        for (Appointment appointment : appointments) {
+            try {
+                // 使用 updateAppointment 方法，会自动处理黑名单逻辑
+                AppointmentUpdateRequest request = new AppointmentUpdateRequest();
+                request.setStatus(AppointmentStatus.NO_SHOW);
+                updateAppointment(appointment.getAppointmentId(), request);
+                count++;
+                logger.info("自动标记爽约成功 - 预约ID: {}, 患者: {}", 
+                    appointment.getAppointmentId(), 
+                    appointment.getPatient().getFullName());
+            } catch (Exception e) {
+                logger.error("自动标记爽约失败 - 预约ID: {}, 错误: {}", 
+                    appointment.getAppointmentId(), e.getMessage(), e);
+            }
+        }
+        
+        logger.info("自动标记爽约任务完成，共处理 {} 条记录", count);
+        return count;
+    }
 }

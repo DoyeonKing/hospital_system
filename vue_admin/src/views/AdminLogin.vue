@@ -80,6 +80,7 @@ import { ElMessage } from 'element-plus'
 import { User, Lock, InfoFilled } from '@element-plus/icons-vue'
 import { useAdminStore } from '@/stores/adminStore'
 import request from '@/utils/request'
+import { saveToken } from '@/utils/auth.js'
 
 const router = useRouter()
 const adminStore = useAdminStore()
@@ -129,6 +130,14 @@ const handleLogin = async () => {
       // 保存登录信息到store
       const loginData = response.data
       console.log('登录响应数据:', loginData)
+      
+      // 保存Token
+      if (loginData.token) {
+        saveToken(loginData.token)
+        console.log('[LOGIN] Token已保存')
+      } else {
+        console.warn('[LOGIN] 登录响应未返回Token')
+      }
       
       // 从 userInfo 中提取管理员信息
       const adminInfo = loginData.userInfo || {}

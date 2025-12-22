@@ -84,6 +84,7 @@
 
 <script>
 	import { post } from '../../utils/request.js'
+	import { saveToken } from '../../utils/auth.js'
 	
 	export default {
 		data() {
@@ -163,7 +164,13 @@
 			
 			if (isSuccess && response.data) {
 				// 保存token和用户信息
-				uni.setStorageSync('patientToken', response.data.token);
+				const token = response.data.token
+				if (token) {
+					saveToken(token, 'patient')
+					console.log('[LOGIN] Token已保存')
+				} else {
+					console.warn('[LOGIN] 登录响应未返回Token')
+				}
 				
 				// 适配后端返回的数据格式：data.userInfo 包含患者信息
 				const userInfo = response.data.userInfo || {};

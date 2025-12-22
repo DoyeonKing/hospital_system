@@ -46,5 +46,12 @@ public class Admin {
     )
     private Set<Role> roles = new HashSet<>();
 
+    @Column(name = "failed_login_count", nullable = false)
+    private Integer failedLoginCount = 0; // 登录失败次数
 
+    @Column(name = "last_failed_login_time")
+    private LocalDateTime lastFailedLoginTime; // 最后一次失败登录时间
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil; // 锁定到期时间（为null表示永久锁定，需管理员解锁）
 }
