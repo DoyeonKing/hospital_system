@@ -646,6 +646,8 @@ onUnload() {
 				
 				// 如果都没有，返回空字符串（不显示）
 				return ''
+			},
+			
 			// 处理支付
 			async handlePayment() {
 				if (!this.appointmentId) {
