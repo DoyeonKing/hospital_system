@@ -289,4 +289,25 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     List<Appointment> findByPatientNameAndDepartment(
             @Param("patientName") String patientName,
             @Param("departmentId") Integer departmentId);
+
+    /**
+     * 查询需要标记为爽约的预约
+     * 条件：
+     * 1. 状态为 scheduled（已预约但未签到）
+     * 2. 就诊时段已结束（当前时间 > 排班结束时间）
+     * 3. 未签到（checkInTime 为空）
+     */
+    @Query("SELECT a FROM Appointment a " +
+           "JOIN FETCH a.schedule s " +
+           "JOIN FETCH s.slot slot " +
+           "JOIN FETCH a.patient p " +
+           "LEFT JOIN FETCH p.patientProfile " +
+           "WHERE a.status = :status " +
+           "AND a.checkInTime IS NULL " +
+           "AND (s.scheduleDate < :today " +
+           "     OR (s.scheduleDate = :today AND slot.endTime < :now))")
+    List<Appointment> findAppointmentsToMarkAsNoShow(
+            @Param("status") AppointmentStatus status,
+            @Param("today") LocalDate today,
+            @Param("now") LocalTime now);
 }

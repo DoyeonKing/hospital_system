@@ -1336,23 +1336,14 @@ public class AppointmentService {
             throw new BadRequestException("该预约还未被叫号，无法标记过号");
         }
 
-        // 增加过号次数
+        // 仅增加过号次数，保留签到/叫号状态
         appointment.setMissedCallCount(
                 (appointment.getMissedCallCount() == null ? 0 : appointment.getMissedCallCount()) + 1);
 
-        // 清除签到记录，状态改回scheduled
-        appointment.setStatus(AppointmentStatus.scheduled);
-        appointment.setCheckInTime(null);
-        appointment.setCalledAt(null);
-        appointment.setRecheckInTime(null);
-        appointment.setRealTimeQueueNumber(null);
-        appointment.setIsOnTime(false);
-        appointment.setIsLate(false);
-
         appointmentRepository.save(appointment);
 
-        logger.info("标记过号成功 - 预约ID: {}, 患者: {}, 过号次数: {}, 状态已改回scheduled",
-                appointmentId, appointment.getPatient().getFullName(), appointment.getMissedCallCount());
+        logger.info("标记过号成功 - 预约ID: {}, 患者: {}, 过号次数: {}, 状态保持为 {}",
+                appointmentId, appointment.getPatient().getFullName(), appointment.getMissedCallCount(), appointment.getStatus());
 
         return convertToResponseDto(appointment);
     }
@@ -1538,5 +1529,43 @@ public class AppointmentService {
             sb.append(chars.charAt(random.nextInt(chars.length())));
         }
         return sb.toString();
+    }
+
+    /**
+     * 自动标记爽约
+     * 查找所有已过期但未签到的预约，自动设置为 NO_SHOW 状态
+     * 这会触发黑名单检查逻辑（爽约3次自动加入黑名单）
+     * 
+     * @return 标记为爽约的预约数量
+     */
+    @Transactional
+    public int autoMarkNoShowAppointments() {
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+        
+        // 查询需要标记为爽约的预约
+        List<Appointment> appointments = appointmentRepository.findAppointmentsToMarkAsNoShow(
+            AppointmentStatus.scheduled, today, now
+        );
+        
+        int count = 0;
+        for (Appointment appointment : appointments) {
+            try {
+                // 使用 updateAppointment 方法，会自动处理黑名单逻辑
+                AppointmentUpdateRequest request = new AppointmentUpdateRequest();
+                request.setStatus(AppointmentStatus.NO_SHOW);
+                updateAppointment(appointment.getAppointmentId(), request);
+                count++;
+                logger.info("自动标记爽约成功 - 预约ID: {}, 患者: {}", 
+                    appointment.getAppointmentId(), 
+                    appointment.getPatient().getFullName());
+            } catch (Exception e) {
+                logger.error("自动标记爽约失败 - 预约ID: {}, 错误: {}", 
+                    appointment.getAppointmentId(), e.getMessage(), e);
+            }
+        }
+        
+        logger.info("自动标记爽约任务完成，共处理 {} 条记录", count);
+        return count;
     }
 }

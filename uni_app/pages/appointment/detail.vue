@@ -4,23 +4,17 @@
 			<text class="page-title">预约详情</text>
 		</view>
 		
-		<view class="content" :class="{ 'content-loaded': !loading }">
-			<!-- 加载指示器 -->
-			<view class="loading-container" v-if="loading">
-				<view class="loading-spinner"></view>
-				<text class="loading-text">加载中...</text>
-			</view>
-			
+		<view class="content">
 			<!-- 状态卡片 -->
-			<view class="status-card" v-if="!loading">
+			<view class="status-card">
 				<view class="status-icon" :class="isExpiredStatus(appointment) ? 'expired' : appointment.status">
 					<text>{{ getStatusIcon(appointment) }}</text>
 				</view>
 				<text class="status-text">{{ getStatusText(appointment) }}</text>
 			</view>
-
+			
 			<!-- 患者信息 -->
-			<view class="info-card" v-if="!loading">
+			<view class="info-card">
 				<view class="card-title">患者信息</view>
 				<view class="info-row">
 					<text class="label">姓名：</text>
@@ -31,9 +25,9 @@
 					<text class="value">{{ patientInfo.identifier }}</text>
 				</view>
 			</view>
-
+			
 			<!-- 预约信息 -->
-			<view class="info-card" v-if="!loading">
+			<view class="info-card">
 				<view class="card-title">预约信息</view>
 				<view class="info-row">
 					<text class="label">科室：</text>
@@ -65,18 +59,18 @@
 					<text class="value">{{ formatDateTime(appointment.appointmentTime) }}</text>
 				</view>
 			</view>
-
+			
 			<!-- 过号提示卡片（已叫号但状态已改回scheduled） -->
-			<view class="missed-call-card" v-if="!loading && appointment.calledAt && appointment.status !== 'checked_in'">
+			<view class="missed-call-card" v-if="appointment.calledAt && appointment.status !== 'checked_in'">
 				<view class="missed-call-icon">⚠️</view>
 				<view class="missed-call-content">
 					<text class="missed-call-title">您已过号</text>
 					<text class="missed-call-desc">请重新扫码签到</text>
 				</view>
 			</view>
-
+			
 			<!-- 待支付提示卡片 -->
-			<view class="payment-pending-card" v-if="!loading && isPendingPaymentStatus(appointment.status)">
+			<view class="payment-pending-card" v-if="isPendingPaymentStatus(appointment.status)">
 				<view class="payment-icon">💰</view>
 				<view class="payment-content">
 					<text class="payment-title">待支付</text>
@@ -87,9 +81,9 @@
 					</text>
 				</view>
 			</view>
-
+			
 			<!-- 签到二维码（已支付且未过期状态显示，排除待支付状态） -->
-			<view class="qr-code-card" v-if="!loading && isConfirmedStatus(appointment.status) && !isPendingPaymentStatus(appointment.status) && !isExpiredStatus(appointment)">
+			<view class="qr-code-card" v-if="isConfirmedStatus(appointment.status) && !isPendingPaymentStatus(appointment.status) && !isExpiredStatus(appointment)">
 				<view class="qr-title">
 					<text class="qr-icon">📱</text>
 					<text class="qr-text">签到二维码</text>
@@ -109,17 +103,17 @@
 					<text>手动刷新</text>
 				</view>
 			</view>
-
+			
 			<!-- 导航按钮（仅已确认且未过期状态显示） -->
-			<view class="navigation-section" v-if="!loading && isConfirmedStatus(appointment.status) && !isExpiredStatus(appointment)">
+			<view class="navigation-section" v-if="isConfirmedStatus(appointment.status) && !isExpiredStatus(appointment)">
 				<button class="navigation-btn" @click="handleNavigation">
 					<text class="nav-icon">🧭</text>
 					<text>导航到诊室</text>
 				</button>
 			</view>
-
+			
 			<!-- 操作按钮 -->
-			<view class="action-section" v-if="!isCancelledStatus(appointment.status) && !loading">
+			<view class="action-section" v-if="!isCancelledStatus(appointment.status)">
 				<!-- 待支付状态：显示支付和取消按钮 -->
 				<view class="button-row" v-if="isPendingPaymentStatus(appointment.status)">
 					<button class="pay-btn-half" @click="handlePayment">立即支付</button>
@@ -139,7 +133,7 @@
 <script>
 	import { getAppointmentDetail, cancelAppointment, getAppointmentQrCode, payForAppointment } from '../../api/appointment.js'
 	import { mockPatientInfo } from '../../api/mockData.js'
-
+	
 	export default {
 	data() {
 		return {
@@ -221,17 +215,17 @@ onUnload() {
 			}
 			return
 		}
-
+		
 		console.log('[前端] ========== 开始加载预约详情 ==========')
 		console.log('[前端] 预约ID:', this.appointmentId)
 		const loadStartTime = new Date().toISOString()
 		console.log('[前端] 加载开始时间:', loadStartTime)
-
+		
 		this.loading = true
 		try {
 			const response = await getAppointmentDetail(this.appointmentId)
 			console.log('[前端] 预约详情API响应:', JSON.stringify(response, null, 2))
-
+			
 			if (response && response.code === '200' && response.data) {
 				this.appointment = response.data
 				console.log('[前端] 预约详情数据加载成功:', {
@@ -249,7 +243,7 @@ onUnload() {
 					isCancelledStatus: this.isCancelledStatus(this.appointment.status),
 					isExpiredStatus: this.isExpiredStatus(this.appointment)
 				})
-
+				
 				// 只有已支付状态才生成二维码（排除待支付状态）
 				if (this.isConfirmedStatus(this.appointment.status) && !this.isPendingPaymentStatus(this.appointment.status)) {
 					console.log('[前端] 准备生成二维码并启动自动刷新')
@@ -284,24 +278,24 @@ onUnload() {
 			console.log('[前端] ========== 预约详情加载结束 ==========')
 		}
 	},
-
+			
 			// 生成二维码
 			async generateQRCode() {
 				console.log('========== [前端] 开始生成二维码 ==========')
 				const requestTime = new Date().toISOString()
 				console.log('[前端] 请求时间:', requestTime)
 				console.log('[前端] 预约ID:', this.appointmentId)
-
+				
 				if (!this.appointmentId) {
 					console.warn('[前端] 预约ID为空，无法生成二维码')
 					return
 				}
-
+				
 				// 检查预约状态，已确认或已签到的预约都可以生成二维码
 				const statusLower = (this.appointment.status || '').toLowerCase()
 				const canGenerate = this.isConfirmedStatus(this.appointment.status) || statusLower === 'checked_in'
 				const isExpired = this.isExpiredStatus(this.appointment)
-
+				
 				console.log('[前端] 预约状态检查:', {
 					status: this.appointment.status,
 					statusLower: statusLower,
@@ -312,23 +306,23 @@ onUnload() {
 					scheduleTime: this.appointment.scheduleTime,
 					scheduleEndTime: this.appointment.scheduleEndTime
 				})
-
+				
 				if (!canGenerate || isExpired) {
 					console.warn('[前端] 无法生成二维码 - canGenerate:', canGenerate, ', isExpired:', isExpired)
 					return
 				}
-
+				
 				try {
 					console.log('[前端] 调用API生成二维码 - 预约ID:', this.appointmentId)
 					const response = await getAppointmentQrCode(this.appointmentId)
 					console.log('[前端] API响应:', JSON.stringify(response, null, 2))
-
+					
 					if (response && response.code === '200' && response.data) {
 						this.qrToken = response.data.qrToken
 						this.refreshInterval = response.data.refreshInterval || 60
 						const expiresIn = response.data.expiresIn || 0
 						const expiresInMinutes = Math.floor(expiresIn / 60)
-
+						
 						console.log('[前端] 二维码Token获取成功:', {
 							qrToken: this.qrToken,
 							refreshInterval: this.refreshInterval,
@@ -336,12 +330,12 @@ onUnload() {
 							expiresInMinutes: expiresInMinutes,
 							expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString()
 						})
-
+						
 						// 使用在线API生成二维码图片（Token作为内容）
 						// 注意：这里使用在线API生成图片，Token是从后端获取的
 						this.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(this.qrToken)}`
 						console.log('[前端] 二维码图片URL已生成')
-
+						
 						// 重置倒计时
 						this.refreshCountdown = this.refreshInterval
 						console.log('[前端] 倒计时已重置:', this.refreshCountdown, '秒')
@@ -369,7 +363,7 @@ onUnload() {
 					// 不提供降级方案，要求用户重试
 				}
 			},
-
+			
 			// 手动刷新二维码
 			refreshQRCode() {
 				console.log('[前端] 手动刷新二维码 - 当前Token:', this.qrToken, ', 刷新间隔:', this.refreshInterval)
@@ -378,23 +372,23 @@ onUnload() {
 				console.log('[前端] 旧二维码已清空，旧Token:', oldToken)
 				this.generateQRCode()
 			},
-
+			
 			// 启动自动刷新
 			startAutoRefresh() {
 				console.log('[前端] ========== 启动自动刷新 ==========')
 				const isConfirmed = this.isConfirmedStatus(this.appointment.status)
 				const isExpired = this.isExpiredStatus(this.appointment)
 				console.log('[前端] 自动刷新检查 - 预约状态:', this.appointment.status, ', isConfirmed:', isConfirmed, ', isExpired:', isExpired)
-
+				
 				// 只有已确认且未过期的预约才启动刷新
 				if (!isConfirmed || isExpired) {
 					console.warn('[前端] 不满足自动刷新条件，取消启动')
 					return
 				}
-
+				
 				this.stopAutoRefresh()  // 先清除旧的定时器
 				console.log('[前端] 旧定时器已清除')
-
+				
 				// 倒计时定时器（每秒更新）
 				this.countdownTimer = setInterval(() => {
 					if (this.refreshCountdown > 0) {
@@ -404,7 +398,7 @@ onUnload() {
 					}
 				}, 1000)
 				console.log('[前端] 倒计时定时器已启动 - 间隔: 1秒')
-
+				
 				// 刷新定时器（每refreshInterval秒刷新一次）
 				this.refreshTimer = setInterval(() => {
 					console.log('[前端] ========== 自动刷新二维码 ==========')
@@ -414,12 +408,12 @@ onUnload() {
 				console.log('[前端] 刷新定时器已启动 - 间隔:', this.refreshInterval, '秒 (', this.refreshInterval * 1000, '毫秒)')
 				console.log('[前端] ========== 自动刷新已启动 ==========')
 			},
-
+			
 			// 停止自动刷新
 			stopAutoRefresh() {
 				console.log('[前端] ========== 停止自动刷新 ==========')
 				console.log('[前端] 当前定时器状态 - refreshTimer:', this.refreshTimer, ', countdownTimer:', this.countdownTimer)
-
+				
 				if (this.refreshTimer) {
 					clearInterval(this.refreshTimer)
 					this.refreshTimer = null
@@ -430,36 +424,36 @@ onUnload() {
 					this.countdownTimer = null
 					console.log('[前端] 倒计时定时器已清除')
 				}
-
+				
 				console.log('[前端] ========== 自动刷新已停止 ==========')
 			},
-
+			
 			loadPatientInfo() {
 				const stored = uni.getStorageSync('patientInfo')
 				this.patientInfo = stored || mockPatientInfo
 			},
-
+			
 			// 判断预约时间是否已过去（检查排班结束时间，而不是开始时间）
 			isAppointmentTimePassed(appointment) {
 				if (!appointment) return false
-
+				
 				// 优先使用排班结束时间，如果没有则使用开始时间
 				const timeToCheck = appointment.scheduleEndTime || appointment.scheduleTime
 				if (!timeToCheck) return false
-
+				
 				const endTime = new Date(timeToCheck)
 				const now = new Date()
-
+				
 				// 检查日期是否有效
 				if (isNaN(endTime.getTime())) {
 					console.warn('[detail isAppointmentTimePassed] 无效的时间格式:', timeToCheck)
 					return false
 				}
-
+				
 				// 如果排班结束时间已经过去（至少1分钟），则认为已过去
 				return endTime.getTime() < (now.getTime() - 60 * 1000)
 			},
-
+			
 			// 判断是否为已过期状态（时间已过去但不是已完成状态）
 			isExpiredStatus(appointment) {
 				if (!appointment) return false
@@ -480,9 +474,9 @@ onUnload() {
 					const appointmentDate = new Date(appointment.appointmentTime)
 					const scheduleDate = appointment.scheduleTime ? new Date(appointment.scheduleTime) : null
 					const now = new Date()
-
+					
 					// 如果预约是今天创建的，且就诊时间也是今天，不显示为过期
-					if (scheduleDate &&
+					if (scheduleDate && 
 						appointmentDate.toDateString() === now.toDateString() &&
 						scheduleDate.toDateString() === now.toDateString()) {
 						// 检查预约创建时间和就诊时间的间隔
@@ -495,15 +489,15 @@ onUnload() {
 				}
 				return true
 			},
-
+			
 			getStatusText(appointment) {
 				if (!appointment || !appointment.status) return '未知'
-
+				
 				// 如果已过期，返回"已过期"
 				if (this.isExpiredStatus(appointment)) {
 					return '已过期'
 				}
-
+				
 				const status = appointment.status
 				const statusLower = status.toLowerCase()
 				const statusMap = {
@@ -520,15 +514,15 @@ onUnload() {
 				}
 				return statusMap[statusLower] || statusMap[status] || '未知'
 			},
-
+			
 			getStatusIcon(appointment) {
 				if (!appointment) return '❓'
-
+				
 				// 如果已过期，返回过期图标
 				if (this.isExpiredStatus(appointment)) {
 					return '⏰'
 				}
-
+				
 				const status = appointment.status
 				if (!status) return '❓'
 				const statusLower = status.toLowerCase()
@@ -546,7 +540,7 @@ onUnload() {
 				}
 				return iconMap[statusLower] || iconMap[status] || '❓'
 			},
-
+			
 			// 判断是否为已确认状态（兼容大小写）
 			// 包括：confirmed, scheduled, checked_in（已支付的状态）
 			// 注意：不包括 pending_payment（待支付状态不显示二维码）
@@ -556,45 +550,45 @@ onUnload() {
 					return false
 				}
 				const statusLower = status.toLowerCase()
-				const result = statusLower === 'confirmed' ||
-					   statusLower === 'scheduled' ||
+				const result = statusLower === 'confirmed' || 
+					   statusLower === 'scheduled' || 
 					   statusLower === 'checked_in'
 				console.log('[detail isConfirmedStatus] 状态:', status, '转换为:', statusLower, '结果:', result)
 				return result
 			},
-
+			
 			// 判断是否为已完成状态
 			isCompletedStatus(status) {
 				if (!status) return false
 				return status.toLowerCase() === 'completed'
 			},
-
+			
 			// 判断是否为已取消状态
 			isCancelledStatus(status) {
 				if (!status) return false
 				return status.toLowerCase() === 'cancelled'
 			},
-
+			
 			// 判断是否为待支付状态
 			isPendingStatus(status) {
 				if (!status) return false
 				const statusLower = status.toLowerCase()
 				return statusLower === 'pending' || statusLower === 'pending_payment'
 			},
-
+			
 			// 判断是否为待支付状态（用于显示支付按钮）
 			isPendingPaymentStatus(status) {
 				if (!status) return false
 				const statusLower = status.toLowerCase()
 				return statusLower === 'pending_payment'
 			},
-
+			
 			// 判断是否可以取消预约（已取消状态、已签到状态和已过期的预约不能取消）
 			canCancelAppointment(status) {
 				if (!status || !this.appointment) return false
-
+				
 				const statusLower = (status || '').toLowerCase()
-
+				
 				// 已签到状态不能取消
 				if (statusLower === 'checked_in') {
 					return false
@@ -618,14 +612,14 @@ onUnload() {
 					}
 				}
 				// 只有已预约或待支付状态可以取消
-				const canCancel = statusLower === 'confirmed' ||
-								  statusLower === 'scheduled' ||
+				const canCancel = statusLower === 'confirmed' || 
+								  statusLower === 'scheduled' || 
 								  statusLower === 'pending_payment' ||
 								  statusLower === 'pending'
 				console.log('[detail canCancelAppointment] 状态:', status, '可以取消:', canCancel)
 				return canCancel
 			},
-
+			
 			formatDateTime(dateString) {
 				if (!dateString) return ''
 				const date = new Date(dateString)
@@ -635,21 +629,21 @@ onUnload() {
 				const minutes = date.getMinutes().toString().padStart(2, '0')
 				return `${month}月${day}日 ${hours}:${minutes}`
 			},
-
+			
 			// 获取地点名称
 			getLocationName(appointment) {
 				if (!appointment) return ''
-
+				
 				// 优先从schedule.location获取
 				if (appointment.schedule && appointment.schedule.location) {
 					return appointment.schedule.location
 				}
-
+				
 				// 如果没有，尝试从其他字段获取
 				if (appointment.location) {
 					return appointment.location
 				}
-
+				
 				// 如果都没有，返回空字符串（不显示）
 				return ''
 			},
@@ -663,14 +657,14 @@ onUnload() {
 					})
 					return
 				}
-
+				
 				// 显示支付方式选择
 				uni.showActionSheet({
 					itemList: this.paymentMethods.map(m => m.icon + ' ' + m.name),
 					success: async (res) => {
 						const selectedMethod = this.paymentMethods[res.tapIndex]
 						this.selectedPaymentMethod = selectedMethod.value
-
+						
 						// 确认支付
 						uni.showModal({
 							title: '确认支付',
@@ -684,32 +678,32 @@ onUnload() {
 					}
 				})
 			},
-
+			
 			// 处理支付流程
 			async processPayment() {
 				uni.showLoading({ title: '支付中...' })
-
+				
 				try {
 					console.log('开始支付，appointmentId:', this.appointmentId)
-
+					
 					const response = await payForAppointment(this.appointmentId, {
 						paymentMethod: this.selectedPaymentMethod,
 						transactionId: 'TXN' + Date.now()
 					})
-
+					
 					console.log('支付完整响应:', JSON.stringify(response, null, 2))
-
+					
 					// 检查响应
 					if (response && (response.code === '200' || response.appointmentId)) {
 						uni.hideLoading()
-
+						
 						// 显示支付成功
 						uni.showToast({
 							title: '支付成功',
 							icon: 'success',
 							duration: 2000
 						})
-
+						
 						// 延迟刷新页面，显示二维码
 						setTimeout(() => {
 							this.loadAppointmentDetail()
@@ -727,7 +721,7 @@ onUnload() {
 					})
 				}
 			},
-
+			
 			async handleCancel() {
 				// 检查是否可以取消
 				if (!this.canCancelAppointment(this.appointment.status)) {
@@ -751,7 +745,7 @@ onUnload() {
 					})
 					return
 				}
-
+				
 				uni.showModal({
 					title: '确认取消',
 					content: '确定要取消这个预约吗？',
@@ -761,13 +755,13 @@ onUnload() {
 							uni.showLoading({ title: '取消中...' })
 								const response = await cancelAppointment(this.appointmentId)
 								console.log('取消预约响应:', response)
-
+							
 								if (response && response.code === '200') {
 								uni.showToast({
 									title: '预约已取消',
 									icon: 'success'
 								})
-
+								
 								setTimeout(() => {
 									uni.navigateBack()
 								}, 1500)
@@ -790,7 +784,7 @@ onUnload() {
 					}
 				})
 			},
-
+			
 			// 导航到诊室
 			handleNavigation() {
 				if (!this.appointmentId) {
@@ -800,13 +794,13 @@ onUnload() {
 					})
 					return
 				}
-
+				
 				// 优先使用schedule中的locationId
 				let locationId = null
 				if (this.appointment && this.appointment.schedule && this.appointment.schedule.locationId) {
 					locationId = this.appointment.schedule.locationId
 				}
-
+				
 				// 如果有locationId，直接传递；否则传递appointmentId让导航页自己获取
 				if (locationId) {
 				uni.navigateTo({
@@ -819,7 +813,7 @@ onUnload() {
 				})
 				}
 			},
-
+			
 			handleBackToHome() {
 				// 返回主页，并触发列表页刷新
 				uni.switchTab({
@@ -854,42 +848,6 @@ onUnload() {
 
 	.content {
 		padding: 30rpx;
-		opacity: 0;
-		transition: opacity 0.3s ease-in;
-	}
-	
-	.content-loaded {
-		opacity: 1;
-	}
-	
-	.loading-container {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 120rpx 0;
-		min-height: 400rpx;
-	}
-	
-	.loading-spinner {
-		width: 80rpx;
-		height: 80rpx;
-		border: 6rpx solid #E6F7FF;
-		border-top-color: #4FD9C3;
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
-	}
-	
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-	
-	.loading-text {
-		margin-top: 30rpx;
-		font-size: 28rpx;
-		color: #718096;
 	}
 
 	.status-card {
@@ -900,7 +858,7 @@ onUnload() {
 		text-align: center;
 		box-shadow: 0 4rpx 20rpx rgba(79, 209, 197, 0.3);
 	}
-
+	
 	.status-card .status-icon.expired {
 		color: #C2410C;
 	}
@@ -972,7 +930,7 @@ onUnload() {
 		justify-content: space-between;
 		margin-bottom: 20rpx;
 	}
-
+	
 	.qr-refresh-tip {
 		font-size: 24rpx;
 		color: #FFA500;
@@ -1010,7 +968,7 @@ onUnload() {
 		color: #718096;
 		text-align: center;
 	}
-
+	
 	.qr-desc {
 		display: block;
 		text-align: center;
@@ -1018,7 +976,7 @@ onUnload() {
 		color: #718096;
 		margin-top: 20rpx;
 	}
-
+	
 	.qr-tip {
 		display: block;
 		text-align: center;
@@ -1027,7 +985,7 @@ onUnload() {
 		font-weight: 600;
 		margin-top: 12rpx;
 	}
-
+	
 	.qr-refresh-btn {
 		display: flex;
 		justify-content: center;
@@ -1045,7 +1003,7 @@ onUnload() {
 		margin: 20rpx 0;
 		padding: 0 30rpx;
 	}
-
+	
 	.navigation-btn {
 		width: 100%;
 		height: 96rpx;
@@ -1060,11 +1018,11 @@ onUnload() {
 		justify-content: center;
 		gap: 12rpx;
 	}
-
+	
 	.nav-icon {
 		font-size: 36rpx;
 	}
-
+	
 	.action-section {
 		position: fixed;
 		bottom: 0;
@@ -1073,18 +1031,6 @@ onUnload() {
 		padding: 30rpx;
 		background: #ffffff;
 		box-shadow: 0 -2rpx 12rpx rgba(0, 0, 0, 0.08);
-		animation: slideUp 0.3s ease-out;
-	}
-	
-	@keyframes slideUp {
-		from {
-			opacity: 0;
-			transform: translateY(100rpx);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
 	}
 
 	.button-row {

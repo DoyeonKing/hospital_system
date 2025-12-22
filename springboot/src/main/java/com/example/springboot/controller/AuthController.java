@@ -12,6 +12,9 @@ import com.example.springboot.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth") // 认证相关的公共路由
@@ -20,6 +23,9 @@ public class AuthController {
 
     private final PatientService patientService;
     private final AdminService adminService;
+    
+    @Autowired
+    private com.example.springboot.security.JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     public AuthController(PatientService patientService, AdminService adminService) {
@@ -105,5 +111,29 @@ public class AuthController {
             e.printStackTrace(); // 打印堆栈跟踪以便调试
             return ResponseEntity.internalServerError().body("{\"error\": \"服务器内部错误，激活失败\"}");
         }
+    }
+
+    /**
+     * 验证Token有效性（测试接口）
+     * URL: GET /api/auth/verify-token
+     */
+    @GetMapping("/verify-token")
+    public ResponseEntity<Result> verifyToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.ok(Result.error("401", "Token缺失"));
+        }
+        
+        String token = authHeader.substring(7);
+        if (!jwtTokenProvider.validateToken(token) || jwtTokenProvider.isTokenExpired(token)) {
+            return ResponseEntity.ok(Result.error("401", "Token无效或已过期"));
+        }
+        
+        Map<String, Object> data = new HashMap<>();
+        data.put("userType", jwtTokenProvider.getUserTypeFromToken(token));
+        data.put("userId", jwtTokenProvider.getUserIdFromToken(token));
+        data.put("identifier", jwtTokenProvider.getIdentifierFromToken(token));
+        
+        return ResponseEntity.ok(Result.success(data));
     }
 }

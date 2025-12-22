@@ -3,11 +3,13 @@ package com.example.springboot.service;
 import com.example.springboot.dto.notification.NotificationCreateRequest;
 import com.example.springboot.dto.notification.NotificationResponse;
 import com.example.springboot.entity.Notification;
+import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.enums.NotificationPriority;
 import com.example.springboot.entity.enums.NotificationStatus;
 import com.example.springboot.entity.enums.NotificationType;
 import com.example.springboot.entity.enums.UserType;
 import com.example.springboot.repository.NotificationRepository;
+import com.example.springboot.repository.PatientRepository;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,16 +17,23 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final PatientRepository patientRepository;
+    private final SmsService smsService;
 
     @Autowired
-    public NotificationService(NotificationRepository notificationRepository) {
+    public NotificationService(NotificationRepository notificationRepository,
+                              PatientRepository patientRepository,
+                              SmsService smsService) {
         this.notificationRepository = notificationRepository;
+        this.patientRepository = patientRepository;
+        this.smsService = smsService;
     }
 
     /**
@@ -71,7 +80,18 @@ public class NotificationService {
         request.setRelatedId(appointmentId);
         request.setPriority(NotificationPriority.high);
 
-        return createNotification(request);
+        NotificationResponse response = createNotification(request);
+        
+        // 发送短信通知
+        String smsContent = String.format("【校医院】您的预约已成功创建！科室：%s，医生：%s，就诊时间：%s %s，就诊序号：%d。", 
+                departmentName, doctorName, scheduleDate, slotName, appointmentNumber);
+        if (locationName != null && !locationName.trim().isEmpty()) {
+            smsContent += String.format("就诊地点：%s。", locationName);
+        }
+        smsContent += "请及时完成支付，祝您早日康复！";
+        sendSmsIfNeeded(patientId, smsContent);
+        
+        return response;
     }
 
     /**
@@ -93,7 +113,14 @@ public class NotificationService {
         request.setRelatedId(appointmentId);
         request.setPriority(NotificationPriority.high);
 
-        return createNotification(request);
+        NotificationResponse response = createNotification(request);
+        
+        // 发送短信通知
+        String smsContent = String.format("您的挂号费用已支付成功！科室：%s，医生：%s，就诊时间：%s %s，费用：¥%.2f。请按时就诊，祝您早日康复！", 
+                departmentName, doctorName, scheduleDate, slotName, fee);
+        sendSmsIfNeeded(patientId, smsContent);
+        
+        return response;
     }
 
     /**
@@ -114,7 +141,14 @@ public class NotificationService {
         request.setRelatedId(waitlistId);
         request.setPriority(NotificationPriority.urgent);
 
-        return createNotification(request);
+        NotificationResponse response = createNotification(request);
+        
+        // 发送短信通知（候补通知很重要，必须发送短信）
+        String smsContent = String.format("【校医院】您候补的号源现在可以预约了！科室：%s，医生：%s，就诊时间：%s %s。请在15分钟内完成支付，超时将自动取消。", 
+                departmentName, doctorName, scheduleDate, slotName);
+        sendSmsIfNeeded(patientId, smsContent);
+        
+        return response;
     }
 
     /**
@@ -363,5 +397,44 @@ public class NotificationService {
         BeanUtils.copyProperties(notification, response);
         return response;
     }
+
+    /**
+     * 发送短信通知（如果需要）
+     * @param patientId 患者ID
+     * @param message 短信内容
+     */
+    private void sendSmsIfNeeded(Integer patientId, String message) {
+        try {
+            // 查询患者信息获取手机号
+            Optional<Patient> patientOpt = patientRepository.findById(patientId.longValue());
+            if (!patientOpt.isPresent()) {
+                return;
+            }
+            
+            Patient patient = patientOpt.get();
+            String phoneNumber = patient.getPhoneNumber();
+            
+            if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
+                logger.warn("患者 {} 未绑定手机号，无法发送短信", patientId);
+                return;
+            }
+            
+            // 移除可能的前缀（如+86）
+            phoneNumber = phoneNumber.replace("+86", "").trim();
+            
+            // 发送短信
+            boolean success = smsService.sendSms(phoneNumber, message);
+            if (success) {
+                logger.info("短信发送成功 - 患者ID：{}，手机号：{}", patientId, phoneNumber);
+            } else {
+                logger.warn("短信发送失败 - 患者ID：{}，手机号：{}", patientId, phoneNumber);
+            }
+        } catch (Exception e) {
+            // 短信发送失败不影响主流程，只记录日志
+            logger.error("发送短信异常 - 患者ID：{}，错误：{}", patientId, e.getMessage(), e);
+        }
+    }
+    
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(NotificationService.class);
 }
 
