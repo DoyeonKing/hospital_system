@@ -16,7 +16,8 @@
 // 请根据你的网络环境修改以下IP地址
 
 // 电脑端（开发者工具）使用的IP - 保持不变
-const DEVICE_IP = 'localhost' // 👈 开发者工具调试用这个（电脑端）
+//const DEVICE_IP = 'localhost' // 👈 开发者工具调试用这个（电脑端）
+const DEVICE_IP = '123.249.30.241'
 
 // 真机调试使用的局域网IP - 请修改为你的电脑IP
 // 检测到的可用IP：

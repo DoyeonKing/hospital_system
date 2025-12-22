@@ -632,20 +632,22 @@ onUnload() {
 			
 			// 获取地点名称
 			getLocationName(appointment) {
-				if (!appointment) return ''
-				
-				// 优先从schedule.location获取
-				if (appointment.schedule && appointment.schedule.location) {
-					return appointment.schedule.location
-				}
-				
-				// 如果没有，尝试从其他字段获取
-				if (appointment.location) {
-					return appointment.location
-				}
-				
-				// 如果都没有，返回空字符串（不显示）
-				return ''
+        if (!appointment) return ''
+
+        // 优先从schedule.location获取
+        if (appointment.schedule && appointment.schedule.location) {
+          return appointment.schedule.location
+        }
+
+        // 如果没有，尝试从其他字段获取
+        if (appointment.location) {
+          return appointment.location
+        }
+
+        // 如果都没有，返回空字符串（不显示）
+        return ''
+      },
+
 			// 处理支付
 			async handlePayment() {
 				if (!this.appointmentId) {
