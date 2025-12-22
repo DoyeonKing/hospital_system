@@ -82,3 +82,31 @@ file:
 ai:
   model:
     path: models/medical_word2vec.bin # Word2Vec 模型文件路径（需要下载标准模型文件）
+
+# 短信服务配置
+sms:
+  enabled: false  # 是否启用短信服务（false时只记录日志，不发送真实短信，不会产生费用）
+  provider: twilio  # 平台类型：twilio（推荐个人用户）、custom（自定义HTTP API）、juhe（聚合数据，仅企业用户）
+  
+  # ⚠️ 重要提示：
+  # 1. 聚合数据、阿里云、腾讯云、华为云等主流平台仅支持企业用户
+  # 2. 个人用户推荐使用 Twilio（支持个人，稳定可靠）
+  # 3. 或使用支持个人的第三方短信平台，通过 custom 方式接入
+  
+  # Twilio平台配置（推荐个人用户使用）
+  twilio:
+    account-sid: AC824e3c3378e8abf2db7523db6e68be58  # 从Twilio控制台获取
+    auth-token: 722adcd055351a640fcce5df9213ced4  # 从Twilio控制台获取
+    from-number: +13369103119  # Twilio提供的发送方号码（格式：+国家代码+号码）
+  
+  # 自定义HTTP API平台配置（如果使用其他平台）
+  # api-url: https://api.example.com/sendSms  # 替换为你的短信平台API地址
+  # api-key: 你的API密钥  # 从短信平台获取
+  # api-secret: 你的API密钥2  # 如果平台需要（可选）
+  # sign: 校医院  # 短信签名（根据平台要求填写）
+  # template-id: 你的模板ID  # 如果使用模板发送（可选）
+  
+  # 聚合数据平台配置（仅企业用户可用，个人用户请忽略）
+  # juhe:
+  #   app-key: 你的聚合数据API_Key
+  #   template-id: 你的模板ID

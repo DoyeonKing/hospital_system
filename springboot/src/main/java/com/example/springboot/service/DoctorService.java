@@ -9,6 +9,7 @@ import com.example.springboot.dto.doctor.DoctorUpdateInfoRequest;
 import com.example.springboot.entity.Doctor;
 import com.example.springboot.entity.LeaveRequest;
 import com.example.springboot.entity.Schedule;
+import com.example.springboot.common.Constants;
 import com.example.springboot.entity.enums.DoctorStatus;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 
 import com.example.springboot.entity.Department;
@@ -60,31 +62,76 @@ public class DoctorService {
      * @param password 密码
      * @return 登录响应
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(String identifier, String password) {
+        LocalDateTime now = LocalDateTime.now();
+        
         // 1. 查找医生
         Doctor doctor = doctorRepository.findByIdentifier(identifier)
                 .orElseThrow(() -> new IllegalArgumentException("工号或密码错误"));
 
-        // 2. 验证密码
-        if (!passwordEncoderUtil.matches(password, doctor.getPasswordHash())) {
-            throw new IllegalArgumentException("工号或密码错误");
-        }
-
-        // 3. 检查账户状态
+        // 2. 检查账户状态（在验证密码之前）
         if (doctor.getStatus() == DoctorStatus.inactive) {
             throw new IllegalArgumentException("账户未激活，请先激活账户");
-        }
-        
-        if (doctor.getStatus() == DoctorStatus.locked) {
-            throw new IllegalArgumentException("账户已被锁定，请联系管理员");
         }
         
         if (doctor.getStatus() == DoctorStatus.deleted) {
             throw new IllegalArgumentException("账户已删除，无法登录");
         }
 
-        // 4. 构建用户信息
+        // 3. 检查账户锁定状态
+        // 如果账户状态是locked，检查是否已到解锁时间
+        if (doctor.getStatus() == DoctorStatus.locked) {
+            if (doctor.getLockedUntil() != null && now.isAfter(doctor.getLockedUntil())) {
+                // 自动解锁：重置状态和失败次数
+                doctor.setStatus(DoctorStatus.active);
+                doctor.setFailedLoginCount(0);
+                doctor.setLastFailedLoginTime(null);
+                doctor.setLockedUntil(null);
+                doctorRepository.save(doctor);
+            } else {
+                // 仍在锁定期内
+                throw new IllegalArgumentException("账户已被锁定，请联系管理员");
+            }
+        }
+
+        // 4. 初始化失败登录计数（如果为null）
+        if (doctor.getFailedLoginCount() == null) {
+            doctor.setFailedLoginCount(0);
+        }
+
+        // 5. 验证密码
+        boolean passwordMatches = passwordEncoderUtil.matches(password, doctor.getPasswordHash());
+        
+        if (!passwordMatches) {
+            // 登录失败：增加失败次数
+            int newFailureCount = doctor.getFailedLoginCount() + 1;
+            doctor.setFailedLoginCount(newFailureCount);
+            doctor.setLastFailedLoginTime(now);
+            
+            // 检查是否达到锁定阈值
+            if (newFailureCount >= Constants.MAX_LOGIN_FAILURE_COUNT) {
+                // 自动锁定账户
+                doctor.setStatus(DoctorStatus.locked);
+                doctor.setLockedUntil(now.plusMinutes(Constants.ACCOUNT_LOCK_DURATION_MINUTES));
+                doctorRepository.save(doctor);
+                throw new IllegalArgumentException("登录失败次数过多，账户已被锁定，请" + Constants.ACCOUNT_LOCK_DURATION_MINUTES + "分钟后再试或联系管理员");
+            } else {
+                // 未达到阈值，只保存失败次数
+                doctorRepository.save(doctor);
+                int remainingAttempts = Constants.MAX_LOGIN_FAILURE_COUNT - newFailureCount;
+                throw new IllegalArgumentException("工号或密码错误，还可尝试" + remainingAttempts + "次");
+            }
+        }
+
+        // 6. 密码正确，登录成功：重置失败次数
+        if (doctor.getFailedLoginCount() > 0) {
+            doctor.setFailedLoginCount(0);
+            doctor.setLastFailedLoginTime(null);
+            doctorRepository.save(doctor);
+        }
+
+        // 7. 构建用户信息
         Map<String, Object> doctorInfo = new HashMap<>();
         doctorInfo.put("doctorId", doctor.getDoctorId());
         doctorInfo.put("identifier", doctor.getIdentifier());
@@ -94,7 +141,7 @@ public class DoctorService {
         doctorInfo.put("departmentName", doctor.getDepartment() != null ? doctor.getDepartment().getName() : null);
         doctorInfo.put("status", doctor.getStatus().name());
 
-        // 5. 返回登录响应
+        // 8. 返回登录响应
         return LoginResponse.builder()
                 .token(null) // 暂不使用token
                 .userType("doctor")

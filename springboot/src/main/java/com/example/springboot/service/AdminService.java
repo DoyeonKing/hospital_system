@@ -9,6 +9,7 @@ import com.example.springboot.dto.auth.LoginResponse;
 import com.example.springboot.entity.Admin;
 import com.example.springboot.entity.Permission;
 import com.example.springboot.entity.Role;
+import com.example.springboot.common.Constants;
 import com.example.springboot.entity.enums.AdminStatus;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.AdminRepository;
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -52,32 +54,77 @@ public class AdminService {
      * @param password 密码
      * @return 登录响应
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(String username, String password) {
+        LocalDateTime now = LocalDateTime.now();
+        
         // 1. 查找管理员
         Admin admin = adminRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("用户名或密码错误"));
 
-        // 2. 验证密码
-        if (!passwordEncoderUtil.matches(password, admin.getPasswordHash())) {
-            throw new IllegalArgumentException("用户名或密码错误");
-        }
-
-        // 3. 检查账户状态
+        // 2. 检查账户状态（在验证密码之前）
         if (admin.getStatus() == AdminStatus.inactive) {
             throw new IllegalArgumentException("账户未激活，请联系系统管理员");
         }
-        
+
+        // 3. 检查账户锁定状态
+        // 如果账户状态是locked，检查是否已到解锁时间
         if (admin.getStatus() == AdminStatus.locked) {
-            throw new IllegalArgumentException("账户已被锁定，请联系系统管理员");
+            if (admin.getLockedUntil() != null && now.isAfter(admin.getLockedUntil())) {
+                // 自动解锁：重置状态和失败次数
+                admin.setStatus(AdminStatus.active);
+                admin.setFailedLoginCount(0);
+                admin.setLastFailedLoginTime(null);
+                admin.setLockedUntil(null);
+                adminRepository.save(admin);
+            } else {
+                // 仍在锁定期内
+                throw new IllegalArgumentException("账户已被锁定，请联系系统管理员");
+            }
         }
 
-        // 4. 获取角色列表
+        // 4. 初始化失败登录计数（如果为null）
+        if (admin.getFailedLoginCount() == null) {
+            admin.setFailedLoginCount(0);
+        }
+
+        // 5. 验证密码
+        boolean passwordMatches = passwordEncoderUtil.matches(password, admin.getPasswordHash());
+        
+        if (!passwordMatches) {
+            // 登录失败：增加失败次数
+            int newFailureCount = admin.getFailedLoginCount() + 1;
+            admin.setFailedLoginCount(newFailureCount);
+            admin.setLastFailedLoginTime(now);
+            
+            // 检查是否达到锁定阈值
+            if (newFailureCount >= Constants.MAX_LOGIN_FAILURE_COUNT) {
+                // 自动锁定账户
+                admin.setStatus(AdminStatus.locked);
+                admin.setLockedUntil(now.plusMinutes(Constants.ACCOUNT_LOCK_DURATION_MINUTES));
+                adminRepository.save(admin);
+                throw new IllegalArgumentException("登录失败次数过多，账户已被锁定，请" + Constants.ACCOUNT_LOCK_DURATION_MINUTES + "分钟后再试或联系系统管理员");
+            } else {
+                // 未达到阈值，只保存失败次数
+                adminRepository.save(admin);
+                int remainingAttempts = Constants.MAX_LOGIN_FAILURE_COUNT - newFailureCount;
+                throw new IllegalArgumentException("用户名或密码错误，还可尝试" + remainingAttempts + "次");
+            }
+        }
+
+        // 6. 密码正确，登录成功：重置失败次数
+        if (admin.getFailedLoginCount() > 0) {
+            admin.setFailedLoginCount(0);
+            admin.setLastFailedLoginTime(null);
+            adminRepository.save(admin);
+        }
+
+        // 7. 获取角色列表
         List<String> roles = admin.getRoles().stream()
                 .map(Role::getRoleName)
                 .collect(Collectors.toList());
 
-        // 5. 构建用户信息
+        // 8. 构建用户信息
         Map<String, Object> adminInfo = new HashMap<>();
         adminInfo.put("adminId", admin.getAdminId());
         adminInfo.put("username", admin.getUsername());
@@ -85,7 +132,7 @@ public class AdminService {
         adminInfo.put("status", admin.getStatus().name());
         adminInfo.put("roles", roles);
 
-        // 6. 返回登录响应
+        // 9. 返回登录响应
         return LoginResponse.builder()
                 .token(null) // 暂不使用token
                 .userType("admin")

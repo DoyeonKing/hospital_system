@@ -195,6 +195,7 @@ import com.example.springboot.dto.patient.PatientProfileResponse;
 import com.example.springboot.dto.patient.PatientSimpleResponse;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.PatientProfile;
+import com.example.springboot.common.Constants;
 import com.example.springboot.entity.enums.BlacklistStatus;
 import com.example.springboot.entity.enums.PatientStatus; // <<<<<< 确保导入您的 PatientStatus 枚举
 import com.example.springboot.exception.ResourceNotFoundException;
@@ -212,6 +213,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -244,31 +246,76 @@ public class PatientService {
      * @param password 密码
      * @return 登录响应
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(String identifier, String password) {
+        LocalDateTime now = LocalDateTime.now();
+        
         // 1. 查找患者
         Patient patient = patientRepository.findByIdentifier(identifier)
                 .orElseThrow(() -> new IllegalArgumentException("学号/工号或密码错误"));
 
-        // 2. 验证密码
-        if (!passwordEncoderUtil.matches(password, patient.getPasswordHash())) {
-            throw new IllegalArgumentException("学号/工号或密码错误");
-        }
-
-        // 3. 检查账户状态
+        // 2. 检查账户状态（在验证密码之前）
         if (patient.getStatus() == PatientStatus.inactive) {
             throw new IllegalArgumentException("账户未激活，请先激活账户");
-        }
-        
-        if (patient.getStatus() == PatientStatus.locked) {
-            throw new IllegalArgumentException("账户已被锁定，请联系管理员");
         }
         
         if (patient.getStatus() == PatientStatus.deleted) {
             throw new IllegalArgumentException("账户已删除，无法登录");
         }
 
-        // 4. 构建用户信息
+        // 3. 检查账户锁定状态
+        // 如果账户状态是locked，检查是否已到解锁时间
+        if (patient.getStatus() == PatientStatus.locked) {
+            if (patient.getLockedUntil() != null && now.isAfter(patient.getLockedUntil())) {
+                // 自动解锁：重置状态和失败次数
+                patient.setStatus(PatientStatus.active);
+                patient.setFailedLoginCount(0);
+                patient.setLastFailedLoginTime(null);
+                patient.setLockedUntil(null);
+                patientRepository.save(patient);
+            } else {
+                // 仍在锁定期内
+                throw new IllegalArgumentException("账户已被锁定，请联系管理员");
+            }
+        }
+
+        // 4. 初始化失败登录计数（如果为null）
+        if (patient.getFailedLoginCount() == null) {
+            patient.setFailedLoginCount(0);
+        }
+
+        // 5. 验证密码
+        boolean passwordMatches = passwordEncoderUtil.matches(password, patient.getPasswordHash());
+        
+        if (!passwordMatches) {
+            // 登录失败：增加失败次数
+            int newFailureCount = patient.getFailedLoginCount() + 1;
+            patient.setFailedLoginCount(newFailureCount);
+            patient.setLastFailedLoginTime(now);
+            
+            // 检查是否达到锁定阈值
+            if (newFailureCount >= Constants.MAX_LOGIN_FAILURE_COUNT) {
+                // 自动锁定账户
+                patient.setStatus(PatientStatus.locked);
+                patient.setLockedUntil(now.plusMinutes(Constants.ACCOUNT_LOCK_DURATION_MINUTES));
+                patientRepository.save(patient);
+                throw new IllegalArgumentException("登录失败次数过多，账户已被锁定，请" + Constants.ACCOUNT_LOCK_DURATION_MINUTES + "分钟后再试或联系管理员");
+            } else {
+                // 未达到阈值，只保存失败次数
+                patientRepository.save(patient);
+                int remainingAttempts = Constants.MAX_LOGIN_FAILURE_COUNT - newFailureCount;
+                throw new IllegalArgumentException("学号/工号或密码错误，还可尝试" + remainingAttempts + "次");
+            }
+        }
+
+        // 6. 密码正确，登录成功：重置失败次数
+        if (patient.getFailedLoginCount() > 0) {
+            patient.setFailedLoginCount(0);
+            patient.setLastFailedLoginTime(null);
+            patientRepository.save(patient);
+        }
+
+        // 7. 构建用户信息
         Map<String, Object> patientInfo = new HashMap<>();
         patientInfo.put("patientId", patient.getPatientId());
         patientInfo.put("identifier", patient.getIdentifier());
@@ -277,7 +324,7 @@ public class PatientService {
         patientInfo.put("patientType", patient.getPatientType().name());
         patientInfo.put("status", patient.getStatus().name());
 
-        // 5. 返回登录响应
+        // 8. 返回登录响应
         return LoginResponse.builder()
                 .token(null) // 暂不使用token
                 .userType("patient")
