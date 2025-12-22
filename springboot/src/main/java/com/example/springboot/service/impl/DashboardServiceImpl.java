@@ -237,7 +237,15 @@ public class DashboardServiceImpl implements DashboardService {
         long totalNoShows = patientProfileRepository.sumNoShowCount();
         response.setTotalNoShows(totalNoShows);
 
-        // 4. 近30天用户增长趋势
+        // 4. 历史挂号/退号/退款统计
+        long totalAppointments = appointmentRepository.count();
+        long totalCancelledAppointments = appointmentRepository.countByStatus(AppointmentStatus.cancelled);
+        long totalRefundedAppointments = appointmentRepository.countByPaymentStatus(PaymentStatus.refunded);
+        response.setTotalAppointments(totalAppointments);
+        response.setTotalCancelledAppointments(totalCancelledAppointments);
+        response.setTotalRefundedAppointments(totalRefundedAppointments);
+
+        // 5. 近30天用户增长趋势
         LocalDate thirtyDaysAgo = today.minusDays(29);
         List<Map<String, Object>> trendData = patientRepository.countByDateRangeGroupByDate(
             thirtyDaysAgo.atStartOfDay(), todayEnd
@@ -265,7 +273,7 @@ public class DashboardServiceImpl implements DashboardService {
         response.setLast30DaysDates(dates);
         response.setLast30DaysCounts(counts);
 
-        // 5. 患者类型构成
+        // 6. 患者类型构成
         List<SimpleNameValue> patientType = new ArrayList<>();
         SimpleNameValue teacher = new SimpleNameValue();
         teacher.setName("教师");
@@ -283,7 +291,7 @@ public class DashboardServiceImpl implements DashboardService {
         patientType.add(student);
         response.setPatientType(patientType);
 
-        // 6. 就诊时段热力图（按日期范围统计，如果未指定则统计所有数据）
+        // 7. 就诊时段热力图（按日期范围统计，如果未指定则统计所有数据）
         List<Map<String, Object>> timeSlotStats;
         if (startDate != null && endDate != null) {
             System.out.println("就诊时段热力图 - 日期范围: " + startDate + " 至 " + endDate);

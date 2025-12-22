@@ -184,6 +184,16 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     long countByStatusIn(List<AppointmentStatus> statuses);
 
     /**
+     * 统计单一状态的预约数量
+     */
+    long countByStatus(AppointmentStatus status);
+
+    /**
+     * 统计指定支付状态的预约数量
+     */
+    long countByPaymentStatus(com.example.springboot.entity.enums.PaymentStatus paymentStatus);
+
+    /**
      * 统计今天或未来的候诊人数（已签到但未就诊，或已预约但未就诊）
      */
     @Query("SELECT COUNT(a) FROM Appointment a " +

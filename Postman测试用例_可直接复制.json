@@ -1,0 +1,53 @@
+{
+  "测试用例说明": "以下是可以直接在Postman Body中使用的JSON测试用例",
+  
+  "用例1_空值测试": {
+    "patientId": null,
+    "scheduleId": null,
+    "appointmentNumber": null
+  },
+  
+  "用例2_类型错误_数字": {
+    "patientId": "abc",
+    "scheduleId": 1,
+    "appointmentNumber": 1
+  },
+  
+  "用例3_类型错误_数组": {
+    "patientId": [1, 2, 3],
+    "scheduleId": {"test": "value"},
+    "appointmentNumber": true
+  },
+  
+  "用例4_超长字符串_100字符": {
+    "patientId": 1,
+    "scheduleId": 1,
+    "appointmentNumber": "4343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343"
+  },
+  
+  "用例5_SQL注入尝试": {
+    "patientId": 1,
+    "scheduleId": 1,
+    "appointmentNumber": "1'; DROP TABLE appointments; --"
+  },
+  
+  "用例6_XSS脚本尝试": {
+    "patientId": 1,
+    "scheduleId": 1,
+    "appointmentNumber": "<script>alert('xss')</script>"
+  },
+  
+  "用例7_特殊字符": {
+    "patientId": 1,
+    "scheduleId": 1,
+    "appointmentNumber": "!@#$%^&*()_+-=[]{}|;':\",./<>?"
+  },
+  
+  "用例8_正常数据": {
+    "patientId": 1,
+    "scheduleId": 1,
+    "appointmentNumber": "001"
+  }
+}
+
+
