@@ -43,11 +43,11 @@ public class JwtTokenProvider {
         claims.put("userId", userId);
         
         return Jwts.builder()
-                .setSubject(identifier)
-                .setClaims(claims)
-                .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(secretKey, SignatureAlgorithm.HS256)
+                .subject(identifier)
+                .claims(claims)
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(secretKey)
                 .compact();
     }
     
@@ -108,11 +108,11 @@ public class JwtTokenProvider {
      * 从Token中解析Claims
      */
     private Claims getClaimsFromToken(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(secretKey)
+        return Jwts.parser()
+                .verifyWith(secretKey)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 }
 
