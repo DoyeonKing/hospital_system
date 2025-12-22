@@ -7,7 +7,9 @@ import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
 import com.example.springboot.dto.appointment.CheckInRequest;
 import com.example.springboot.dto.appointment.CheckInResponse;
 import com.example.springboot.dto.appointment.QrCodeResponse;
+import com.example.springboot.dto.fee.FeeDetailDTO;
 import com.example.springboot.dto.schedule.ScheduleResponse;
+import com.example.springboot.util.FeeCalculator;
 import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.Schedule;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -140,7 +143,7 @@ public class AppointmentService {
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
         appointment.setAppointmentNumber(getNextAppointmentNumberForRebooking(schedule, patient)); // 自动分配就诊序号
-        appointment.setStatus(AppointmentStatus.scheduled); // 初始状态为待支付
+        appointment.setStatus(AppointmentStatus.PENDING_PAYMENT); // 初始状态为待支付
         appointment.setPaymentStatus(PaymentStatus.unpaid);
         appointment.setCreatedAt(LocalDateTime.now());
 
@@ -383,6 +386,31 @@ public class AppointmentService {
 
         // ScheduleResponse 包含 Doctor, TimeSlot, Clinic, Department 信息
         response.setSchedule(ScheduleResponse.fromEntity(appointment.getSchedule()));
+
+        // 计算费用详情（根据患者类型计算报销比例和实际应付费用）
+        if (appointment.getSchedule() != null && 
+            appointment.getSchedule().getFee() != null &&
+            appointment.getPatient() != null &&
+            appointment.getPatient().getPatientType() != null) {
+            
+            BigDecimal originalFee = appointment.getSchedule().getFee();
+            PatientType patientType = appointment.getPatient().getPatientType();
+            
+            BigDecimal reimbursementRate = FeeCalculator.getReimbursementRate(patientType);
+            BigDecimal reimbursementAmount = FeeCalculator.calculateReimbursementAmount(originalFee, patientType);
+            BigDecimal actualFee = FeeCalculator.calculateActualFee(originalFee, patientType);
+            String patientTypeName = FeeCalculator.getPatientTypeName(patientType);
+            
+            FeeDetailDTO feeDetail = new FeeDetailDTO(
+                originalFee, 
+                reimbursementRate, 
+                reimbursementAmount, 
+                actualFee, 
+                patientTypeName
+            );
+            
+            response.setFeeDetail(feeDetail);
+        }
 
         return response;
     }
@@ -1501,5 +1529,43 @@ public class AppointmentService {
             sb.append(chars.charAt(random.nextInt(chars.length())));
         }
         return sb.toString();
+    }
+
+    /**
+     * 自动标记爽约
+     * 查找所有已过期但未签到的预约，自动设置为 NO_SHOW 状态
+     * 这会触发黑名单检查逻辑（爽约3次自动加入黑名单）
+     * 
+     * @return 标记为爽约的预约数量
+     */
+    @Transactional
+    public int autoMarkNoShowAppointments() {
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+        
+        // 查询需要标记为爽约的预约
+        List<Appointment> appointments = appointmentRepository.findAppointmentsToMarkAsNoShow(
+            AppointmentStatus.scheduled, today, now
+        );
+        
+        int count = 0;
+        for (Appointment appointment : appointments) {
+            try {
+                // 使用 updateAppointment 方法，会自动处理黑名单逻辑
+                AppointmentUpdateRequest request = new AppointmentUpdateRequest();
+                request.setStatus(AppointmentStatus.NO_SHOW);
+                updateAppointment(appointment.getAppointmentId(), request);
+                count++;
+                logger.info("自动标记爽约成功 - 预约ID: {}, 患者: {}", 
+                    appointment.getAppointmentId(), 
+                    appointment.getPatient().getFullName());
+            } catch (Exception e) {
+                logger.error("自动标记爽约失败 - 预约ID: {}, 错误: {}", 
+                    appointment.getAppointmentId(), e.getMessage(), e);
+            }
+        }
+        
+        logger.info("自动标记爽约任务完成，共处理 {} 条记录", count);
+        return count;
     }
 }

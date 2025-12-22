@@ -216,6 +216,7 @@ import { ElMessage } from 'element-plus'
 import { User, Lock, Check, CreditCard } from '@element-plus/icons-vue'
 import { useDoctorStore } from '@/stores/doctorStore'
 import request from '@/utils/request'
+import { saveToken } from '@/utils/auth.js'
 import defaultAvatar from '@/assets/doctor.jpg';
 
 const router = useRouter()
@@ -347,19 +348,22 @@ const handleLogin = async () => {
     if (loginRes.code === '200' || loginRes.code === 200) {
       const loginData = loginRes.data || {}
       const loginDoctorInfo = loginData.userInfo || {}
-      const token = loginData.token || `temp-token-${loginDoctorInfo.identifier || loginForm.identifier}`
+      const token = loginData.token
 
-      if (!loginData.token) {
-        console.warn('登录响应未返回 token，已使用临时 token 占位，后端启用鉴权后请返回实际 token。')
+      if (!token) {
+        console.warn('[LOGIN] 登录响应未返回Token')
+        ElMessage.error('登录失败：未返回Token')
+        return
       }
 
-      // 2. 第二步：使用 Token 调取医生详细信息
+      // 保存Token
+      saveToken(token)
+      console.log('[LOGIN] Token已保存')
+
+      // 2. 第二步：使用 Token 调取医生详细信息（Token会自动添加到请求头）
       const detailRes = await request({
         url: `/api/doctors/identifier/${loginForm.identifier}`,
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}` // 【修改】加上 Bearer 前缀
-        }
+        method: 'GET'
       });
 
       // 【新增】打印返回数据，方便调试

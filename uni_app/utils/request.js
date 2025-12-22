@@ -3,6 +3,7 @@
  * 统一处理请求和响应
  */
 import config from '../config/index.js'
+import { getToken, clearAllTokens } from './auth.js'
 
 /**
  * 获取API基础URL
@@ -38,10 +39,11 @@ function request(options) {
 			data: options.data || {},
 			timeout: options.timeout || 30000, // 默认30秒超时（真机调试网络可能较慢）
 			header: {
-				'Content-Type': 'application/json',
+				'Content-Type': 'application/json;charset=UTF-8',
+				'Accept': 'application/json;charset=UTF-8',
 				// 如果有token，自动添加到请求头
-				...(options.header || {}),
-				...getAuthHeader()
+				...getAuthHeader(options.userType || 'patient'),
+				...(options.header || {})
 			},
 			success: (res) => {
 				const duration = Date.now() - startTime
@@ -58,6 +60,35 @@ function request(options) {
 				// 如果请求时间超过3秒，记录警告
 				if (duration > 3000) {
 					console.warn(`[PERFORMANCE] 请求耗时较长: ${duration}ms, URL: ${fullUrl}`)
+				}
+				
+				// 处理401响应（Token无效或过期）
+				if (res.statusCode === 401 || (res.data && res.data.code === '401')) {
+					console.warn('[AUTH] Token无效或已过期，清除Token并跳转登录页')
+					
+					// 清除Token
+					clearAllTokens()
+					
+					// 清除用户信息
+					uni.removeStorageSync('patientInfo')
+					uni.removeStorageSync('doctorInfo')
+					uni.removeStorageSync('adminInfo')
+					
+					// 提示用户
+					uni.showModal({
+						title: '登录已过期',
+						content: '您的登录已过期，请重新登录',
+						showCancel: false,
+						success: () => {
+							// 跳转到登录页
+							uni.reLaunch({
+								url: '/pages/login/patient-login'
+							})
+						}
+					})
+					
+					reject(new Error('Token已过期'))
+					return
 				}
 				
 				// 统一处理响应
@@ -145,9 +176,10 @@ function request(options) {
 
 /**
  * 获取认证header
+ * @param {String} userType 用户类型：patient/doctor/admin
  */
-function getAuthHeader() {
-	const token = uni.getStorageSync('patientToken')
+function getAuthHeader(userType = 'patient') {
+	const token = getToken(userType)
 	if (token) {
 		return {
 			'Authorization': 'Bearer ' + token

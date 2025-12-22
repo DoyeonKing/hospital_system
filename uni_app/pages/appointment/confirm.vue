@@ -46,7 +46,12 @@
 					</view>
 					<view class="info-row">
 						<text class="label">挂号费用：</text>
-						<text class="value price">¥{{ scheduleInfo.fee }}</text>
+						<view class="fee-info">
+							<text class="value price">¥{{ scheduleInfo.fee ? scheduleInfo.fee.toFixed(2) : '0.00' }}</text>
+							<text class="original-price-hint">
+								（支付时将按报销比例计算实付金额）
+							</text>
+						</view>
 					</view>
 				</view>
 			</view>
@@ -65,7 +70,7 @@
 	import { adaptSchedule } from '../../utils/dataAdapter.js'
 	
 	export default {
-		data() {
+			data() {
 			return {
 				scheduleId: null,
 				scheduleInfo: {
@@ -79,7 +84,8 @@
 				},
 				patientInfo: {
 					name: '',
-					identifier: ''
+					identifier: '',
+					patientType: ''
 				}
 			}
 		},
@@ -126,6 +132,10 @@
 							location: scheduleData.location || '',
 							fee: scheduleData.fee || 0
 						}
+						
+						// 预约确认页不计算费用详情，只显示原价
+						// 费用计算留到支付页面
+						
 						console.log('设置后的scheduleInfo:', this.scheduleInfo)
 					} else {
 						throw new Error('返回数据格式异常')
@@ -164,11 +174,13 @@
 					if (stored) {
 						this.patientInfo = stored
 					} else {
-						this.patientInfo = mockPatientInfo || { name: '', identifier: '' }
+						this.patientInfo = mockPatientInfo || { name: '', identifier: '', patientType: '' }
 					}
+					
+					// 预约确认页不计算费用详情，只显示原价
 				} catch (error) {
 					console.error('加载患者信息失败:', error)
-					this.patientInfo = mockPatientInfo || { name: '', identifier: '' }
+					this.patientInfo = mockPatientInfo || { name: '', identifier: '', patientType: '' }
 				}
 			},
 			
@@ -182,7 +194,7 @@
 					return
 				}
 				
-		// 跳转到支付页面
+		// 跳转到支付页面（传递原价）
 		uni.navigateTo({
 			url: `/pages/payment/payment?scheduleId=${this.scheduleId}&fee=${this.scheduleInfo.fee}&departmentName=${encodeURIComponent(this.scheduleInfo.departmentName)}&doctorName=${encodeURIComponent(this.scheduleInfo.doctorName)}&doctorTitle=${encodeURIComponent(this.scheduleInfo.doctorTitle)}&scheduleDate=${encodeURIComponent(this.scheduleInfo.scheduleDate)}&slotName=${encodeURIComponent(this.scheduleInfo.slotName)}&location=${encodeURIComponent(this.scheduleInfo.location || '')}`
 		})
@@ -254,10 +266,24 @@
 		flex: 1;
 	}
 
+	.fee-info {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+	}
+	
 	.value.price {
 		color: #FF6B6B;
 		font-size: 32rpx;
 		font-weight: 700;
+	}
+	
+	.original-price,
+	.original-price-hint {
+		font-size: 22rpx;
+		color: #718096;
+		margin-top: 8rpx;
+		font-weight: normal;
 	}
 
 	.confirm-section {

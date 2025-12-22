@@ -48,6 +48,21 @@ public class MapNodeDTO {
      */
     private String qrcodeStatus;
     
+    /**
+     * 节点类型（entrance, hallway, elevator, stairs, room）
+     */
+    private String nodeType;
+    
+    /**
+     * 楼层号
+     */
+    private Integer floorLevel;
+    
+    /**
+     * 楼栋名称（从节点名称提取，如"内科楼"、"外科楼"）
+     */
+    private String building;
+    
     public MapNodeDTO() {
     }
     
@@ -69,6 +84,32 @@ public class MapNodeDTO {
         this.qrcodeContent = qrcodeContent;
         this.qrcodeImagePath = qrcodeImagePath;
         this.qrcodeStatus = qrcodeStatus;
+    }
+    
+    public MapNodeDTO(Integer nodeId, String name, int x, int y, Integer locationId, 
+                     String nodeType, Integer floorLevel) {
+        this.nodeId = nodeId;
+        this.name = name;
+        this.x = x;
+        this.y = y;
+        this.locationId = locationId;
+        this.nodeType = nodeType;
+        this.floorLevel = floorLevel;
+    }
+    
+    public MapNodeDTO(Integer nodeId, String name, int x, int y, Integer locationId, 
+                     String qrcodeContent, String qrcodeImagePath, String qrcodeStatus,
+                     String nodeType, Integer floorLevel) {
+        this.nodeId = nodeId;
+        this.name = name;
+        this.x = x;
+        this.y = y;
+        this.locationId = locationId;
+        this.qrcodeContent = qrcodeContent;
+        this.qrcodeImagePath = qrcodeImagePath;
+        this.qrcodeStatus = qrcodeStatus;
+        this.nodeType = nodeType;
+        this.floorLevel = floorLevel;
     }
 }
 
