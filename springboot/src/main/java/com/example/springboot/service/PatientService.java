@@ -227,6 +227,9 @@ public class PatientService {
     private final PatientRepository patientRepository;
     private final PatientProfileRepository patientProfileRepository;
     private final PasswordEncoderUtil passwordEncoderUtil;
+    
+    @Autowired
+    private com.example.springboot.security.JwtTokenProvider jwtTokenProvider;
 
     // 构造函数注入
     @Autowired
@@ -324,9 +327,16 @@ public class PatientService {
         patientInfo.put("patientType", patient.getPatientType().name());
         patientInfo.put("status", patient.getStatus().name());
 
-        // 8. 返回登录响应
+        // 8. 生成Token
+        String token = jwtTokenProvider.generateToken(
+            patient.getIdentifier(), 
+            "patient", 
+            patient.getPatientId()
+        );
+
+        // 9. 返回登录响应
         return LoginResponse.builder()
-                .token(null) // 暂不使用token
+                .token(token)  // 返回实际Token
                 .userType("patient")
                 .userInfo(patientInfo)
                 .build();

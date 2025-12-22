@@ -40,6 +40,9 @@ public class DoctorService {
     private final DepartmentRepository departmentRepository;
     private final ScheduleRepository scheduleRepository;
     private final LeaveRequestRepository leaveRequestRepository;
+    
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.example.springboot.security.JwtTokenProvider jwtTokenProvider;
 
     public DoctorService(DoctorRepository doctorRepository, PasswordEncoderUtil passwordEncoderUtil,
             DepartmentRepository departmentRepository, ScheduleRepository scheduleRepository,
@@ -141,9 +144,16 @@ public class DoctorService {
         doctorInfo.put("departmentName", doctor.getDepartment() != null ? doctor.getDepartment().getName() : null);
         doctorInfo.put("status", doctor.getStatus().name());
 
-        // 8. 返回登录响应
+        // 8. 生成Token
+        String token = jwtTokenProvider.generateToken(
+            doctor.getIdentifier(), 
+            "doctor", 
+            (long) doctor.getDoctorId()
+        );
+
+        // 9. 返回登录响应
         return LoginResponse.builder()
-                .token(null) // 暂不使用token
+                .token(token)  // 返回实际Token
                 .userType("doctor")
                 .userInfo(doctorInfo)
                 .build();

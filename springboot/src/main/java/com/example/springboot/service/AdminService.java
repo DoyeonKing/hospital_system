@@ -36,6 +36,9 @@ public class AdminService {
     private final AdminRepository adminRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoderUtil passwordEncoderUtil;
+    
+    @Autowired
+    private com.example.springboot.security.JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     public AdminService(AdminRepository adminRepository, RoleRepository roleRepository, PasswordEncoderUtil passwordEncoderUtil) {
@@ -132,9 +135,16 @@ public class AdminService {
         adminInfo.put("status", admin.getStatus().name());
         adminInfo.put("roles", roles);
 
-        // 9. 返回登录响应
+        // 9. 生成Token
+        String token = jwtTokenProvider.generateToken(
+            admin.getUsername(), 
+            "admin", 
+            (long) admin.getAdminId()
+        );
+
+        // 10. 返回登录响应
         return LoginResponse.builder()
-                .token(null) // 暂不使用token
+                .token(token)  // 返回实际Token
                 .userType("admin")
                 .userInfo(adminInfo)
                 .build();
