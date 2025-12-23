@@ -63,7 +63,7 @@
             <el-icon :size="32" color="#4299E1"><UserFilled /></el-icon>
           </div>
           <h3>用户账户管理</h3>
-          <p>创建、搜索、编辑用户信息</p>
+          <p>创建、搜索、编辑用户信息，审核新注册用户</p>
         </div>
       </router-link>
 

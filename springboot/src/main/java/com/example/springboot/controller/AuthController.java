@@ -6,8 +6,11 @@ import com.example.springboot.dto.auth.LoginRequest;
 import com.example.springboot.dto.auth.LoginResponse;
 import com.example.springboot.dto.patient.VerifyRequest;
 import com.example.springboot.dto.patient.ActivateRequest;
+import com.example.springboot.dto.patient.PatientSelfRegisterRequest;
+import com.example.springboot.dto.patient.PatientRegistrationResponse;
 import com.example.springboot.service.AdminService;
 import com.example.springboot.service.PatientService;
+import jakarta.validation.Valid;
 import com.example.springboot.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -109,6 +112,22 @@ public class AuthController {
             // 捕获未预期的错误
             e.printStackTrace(); // 打印堆栈跟踪以便调试
             return ResponseEntity.internalServerError().body("{\"error\": \"服务器内部错误，激活失败\"}");
+        }
+    }
+
+    /**
+     * 学生/教师自主注册
+     * URL: POST /api/auth/patient/register
+     */
+    @PostMapping("/patient/register")
+    public ResponseEntity<Result> patientRegister(@Valid @RequestBody PatientSelfRegisterRequest request) {
+        try {
+            PatientRegistrationResponse response = patientService.selfRegister(request);
+            return ResponseEntity.ok(Result.success(response));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(Result.error("400", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Result.error("500", "注册失败：" + e.getMessage()));
         }
     }
 

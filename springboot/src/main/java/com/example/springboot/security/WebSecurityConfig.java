@@ -46,10 +46,13 @@ public class WebSecurityConfig {
 
                         // 公开接口（不需要Token）
                         .requestMatchers("/api/auth/patient/login").permitAll()
+                        .requestMatchers("/api/auth/patient/register").permitAll()  // 患者自主注册接口
                         .requestMatchers("/api/auth/admin/login").permitAll()
                         .requestMatchers("/api/doctor/auth/login").permitAll()
                         .requestMatchers("/api/auth/verify-patient").permitAll()
                         .requestMatchers("/api/auth/activate-patient").permitAll()
+                        .requestMatchers("/api/files/upload-identity-proof").permitAll()  // 身份证明材料上传接口
+                        .requestMatchers("/api/files/identity-proofs/**").permitAll()  // 身份证明材料访问接口
 
                         // 允许 Swagger 访问
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()

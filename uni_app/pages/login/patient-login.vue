@@ -21,8 +21,9 @@
 					<input class="input-field" v-model="loginForm.password" type="password" placeholder="请输入密码" />
 				</view>
 				<button class="submit-btn" @click="handleLogin">登 录</button>
-				<view class="footer-text" @click="switchToActivation">
-					<text>首次使用？点击激活账户</text>
+				<view class="footer-links">
+					<text class="footer-text" @click="switchToActivation">首次使用？点击激活账户</text>
+					<text class="footer-text" @click="goToRegister" style="margin-top: 20rpx;">没有账户？去注册</text>
 				</view>
 			</view>
 
@@ -127,6 +128,12 @@
 					identifier: '',
 					password: ''
 				};
+			},
+			
+			goToRegister() {
+				uni.navigateTo({
+					url: '/pages/register/patient-register'
+				});
 			},
 			
 		// 患者正常登录

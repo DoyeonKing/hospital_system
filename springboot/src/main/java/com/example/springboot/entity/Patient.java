@@ -2,6 +2,7 @@ package com.example.springboot.entity; // 包名调整
 
 import com.example.springboot.entity.enums.PatientStatus; // 导入路径调整
 import com.example.springboot.entity.enums.PatientType;   // 导入路径调整
+import com.example.springboot.entity.enums.RegistrationSource; // 导入注册来源枚举
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -58,6 +59,10 @@ public class Patient {
 
     @Column(name = "locked_until")
     private LocalDateTime lockedUntil; // 锁定到期时间（为null表示永久锁定，需管理员解锁）
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "registration_source")
+    private RegistrationSource registrationSource = RegistrationSource.admin_created; // 注册来源
 
     @OneToOne(mappedBy = "patient", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore

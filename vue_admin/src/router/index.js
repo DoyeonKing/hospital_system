@@ -54,6 +54,8 @@ import SlotApproval from '@/views/SlotApproval.vue';
 
 // ===== 新增：导入管理员管理页面组件 =====
 import AdminManagement from '@/views/AdminManagement.vue';
+// ===== 新增：导入身份验证审核管理页面组件 =====
+import IdentityVerification from '@/views/admin/IdentityVerification.vue';
 
 // 通用视图组件导入
 const NotFoundView = () => import('../views/404.vue');
@@ -160,6 +162,12 @@ const routes = [
         name: 'AdminManagement',
         meta: { title: '管理员管理', requiresAuth: true },
         component: AdminManagement
+    },
+    {
+        path: '/admin/identity-verification',
+        name: 'IdentityVerification',
+        meta: { title: '身份验证审核', requiresAuth: true },
+        component: IdentityVerification
     },
     // =======================================================
 

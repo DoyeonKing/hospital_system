@@ -1,38 +1,53 @@
 /**
  * 应用配置文件
  * 
- * ✅ 已配置为使用云服务器后端，本地后端不需要运行
+ * ✅ 本地开发模式：使用本地后端进行开发测试
+ * 如需切换回云服务器，请注释本地配置，取消注释云服务器配置
  * 云服务器IP: 123.249.30.241
  */
 
-// ==================== 云服务器配置 ====================
+// ==================== 云服务器配置（已注释，如需切换回云服务器可取消注释） ====================
 // 云服务器IP地址（与数据库同一台服务器）
-const CLOUD_SERVER_IP = '123.249.30.241'
+// const CLOUD_SERVER_IP = '123.249.30.241'
+
+// ==================== 本地开发配置 ====================
+// 本地后端地址（开发环境使用）
+const LOCAL_BACKEND = 'http://localhost:8080'
+// 真机调试时，需要将 localhost 改为电脑的局域网IP（如：192.168.1.100）
+// 获取IP方法：Windows运行 ipconfig，Mac/Linux运行 ifconfig
+// const LOCAL_BACKEND = 'http://192.168.1.100:8080'  // 👈 真机调试时使用这个
 
 // ==================== 开发环境配置 ====================
 const development = {
-	// 主后端服务（Spring Boot）- 指向云服务器
-	baseURL: `http://${CLOUD_SERVER_IP}:8080`,
+	// 主后端服务（Spring Boot）- 指向本地后端
+	baseURL: LOCAL_BACKEND,
+	// 云服务器配置（已注释，如需切换回云服务器可取消注释）：
+	// baseURL: `http://${CLOUD_SERVER_IP}:8080`,
 	
-	// AI 预问诊后端服务（Node.js）- 端口5000（如果AI后端也在云服务器上）
-	aiBaseURL: `http://${CLOUD_SERVER_IP}:5000`
+	// AI 预问诊后端服务（Node.js）- 端口5000（本地开发）
+	aiBaseURL: `http://localhost:5000`
+	// 云服务器配置（已注释，如需切换回云服务器可取消注释）：
+	// aiBaseURL: `http://${CLOUD_SERVER_IP}:5000`
 }
 
 // 生产环境配置
 const production = {
-	baseURL: `http://${CLOUD_SERVER_IP}:8080`,
-	aiBaseURL: `http://${CLOUD_SERVER_IP}:5000`
+	// 生产环境可以使用云服务器或本地服务器
+	baseURL: LOCAL_BACKEND,  // 👈 生产环境如需使用云服务器，改为：`http://${CLOUD_SERVER_IP}:8080`
+	// baseURL: `http://${CLOUD_SERVER_IP}:8080`,  // 👈 云服务器配置（已注释）
+	aiBaseURL: `http://localhost:5000`
+	// aiBaseURL: `http://${CLOUD_SERVER_IP}:5000`  // 👈 云服务器配置（已注释）
 }
 
-// 当前使用的配置（统一使用云服务器）
+// 当前使用的配置（本地开发模式）
 const config = development
 
 // 打印当前配置（方便调试）
 console.log('🔧 API配置:', {
-	模式: '云服务器模式',
+	模式: '本地开发模式',
 	后端地址: config.baseURL,
 	AI后端地址: config.aiBaseURL,
-	提示: '本地后端不需要运行'
+	提示: '使用本地后端进行开发测试'
 })
 
 // ==================== 以下为旧的本地配置（已注释，如需切换回本地后端可取消注释） ====================
@@ -51,9 +66,10 @@ console.log('🔧 API配置:', {
 // // ==================== IP配置区域 ====================
 // // 请根据你的网络环境修改以下IP地址
 
-// 电脑端（开发者工具）使用的IP - 保持不变
-//const DEVICE_IP = 'localhost' // 👈 开发者工具调试用这个（电脑端）
-const DEVICE_IP = '123.249.30.241'
+// 电脑端（开发者工具）使用的IP - 本地开发模式
+const DEVICE_IP = 'localhost' // 👈 开发者工具调试用这个（电脑端）
+// 云服务器配置（已注释，如需切换回云服务器可取消注释）：
+// const DEVICE_IP = '123.249.30.241'
 
 // // 真机调试使用的局域网IP - 请修改为你的电脑IP
 // // 检测到的可用IP：

@@ -198,10 +198,19 @@ import com.example.springboot.entity.PatientProfile;
 import com.example.springboot.common.Constants;
 import com.example.springboot.entity.enums.BlacklistStatus;
 import com.example.springboot.entity.enums.PatientStatus; // <<<<<< 确保导入您的 PatientStatus 枚举
+import com.example.springboot.entity.enums.RegistrationSource;
+import com.example.springboot.entity.enums.VerificationStatus;
+import com.example.springboot.entity.PatientIdentityVerification;
+import com.example.springboot.entity.Admin;
 import com.example.springboot.exception.ResourceNotFoundException;
 import com.example.springboot.repository.PatientRepository;
 import com.example.springboot.repository.PatientProfileRepository;
+import com.example.springboot.repository.PatientIdentityVerificationRepository;
+import com.example.springboot.repository.AdminRepository;
 import com.example.springboot.util.PasswordEncoderUtil; // 导入您的密码工具类
+import com.example.springboot.dto.patient.PatientSelfRegisterRequest;
+import com.example.springboot.dto.patient.PatientRegistrationResponse;
+import com.example.springboot.dto.verification.VerificationResponse;
 import jakarta.persistence.criteria.JoinType;
 import org.hibernate.Hibernate;
 import org.springframework.beans.BeanUtils;
@@ -226,6 +235,8 @@ public class PatientService {
 
     private final PatientRepository patientRepository;
     private final PatientProfileRepository patientProfileRepository;
+    private final PatientIdentityVerificationRepository verificationRepository;
+    private final AdminRepository adminRepository;
     private final PasswordEncoderUtil passwordEncoderUtil;
     
     @Autowired
@@ -233,9 +244,15 @@ public class PatientService {
 
     // 构造函数注入
     @Autowired
-    public PatientService(PatientRepository patientRepository, PatientProfileRepository patientProfileRepository, PasswordEncoderUtil passwordEncoderUtil) {
+    public PatientService(PatientRepository patientRepository, 
+                         PatientProfileRepository patientProfileRepository,
+                         PatientIdentityVerificationRepository verificationRepository,
+                         AdminRepository adminRepository,
+                         PasswordEncoderUtil passwordEncoderUtil) {
         this.patientRepository = patientRepository;
         this.patientProfileRepository = patientProfileRepository;
+        this.verificationRepository = verificationRepository;
+        this.adminRepository = adminRepository;
         this.passwordEncoderUtil = passwordEncoderUtil;
     }
 
@@ -249,16 +266,37 @@ public class PatientService {
      * @param password 密码
      * @return 登录响应
      */
-    @Transactional
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public LoginResponse login(String identifier, String password) {
         LocalDateTime now = LocalDateTime.now();
         
         // 1. 查找患者
         Patient patient = patientRepository.findByIdentifier(identifier)
                 .orElseThrow(() -> new IllegalArgumentException("学号/工号或密码错误"));
+        
+        // 调试日志：记录查询到的失败次数
+        System.out.println("[PatientService] 查询到的失败次数: " + patient.getFailedLoginCount() + 
+                          ", 最后失败时间: " + patient.getLastFailedLoginTime());
 
         // 2. 检查账户状态（在验证密码之前）
         if (patient.getStatus() == PatientStatus.inactive) {
+            // 如果是自主注册的用户，检查身份验证审核状态
+            if (patient.getRegistrationSource() == RegistrationSource.self_registered) {
+                PatientIdentityVerification verification = verificationRepository
+                    .findByPatient_PatientId(patient.getPatientId())
+                    .orElse(null);
+                
+                if (verification != null) {
+                    if (verification.getStatus() == VerificationStatus.pending) {
+                        throw new IllegalArgumentException("身份验证审核中，请耐心等待管理员审核");
+                    } else if (verification.getStatus() == VerificationStatus.rejected) {
+                        String reason = verification.getRejectionReason() != null 
+                            ? "，拒绝原因：" + verification.getRejectionReason()
+                            : "";
+                        throw new IllegalArgumentException("身份验证未通过" + reason + "，请联系管理员");
+                    }
+                }
+            }
             throw new IllegalArgumentException("账户未激活，请先激活账户");
         }
         
@@ -286,33 +324,65 @@ public class PatientService {
         if (patient.getFailedLoginCount() == null) {
             patient.setFailedLoginCount(0);
         }
+        
+        // 5. 检查失败登录时间窗口：如果距离最后一次失败登录超过30分钟，重置失败次数
+        // 这样可以避免失败次数无限累积，给用户重新尝试的机会
+        if (patient.getLastFailedLoginTime() != null && patient.getFailedLoginCount() > 0) {
+            long minutesSinceLastFailure = java.time.Duration.between(patient.getLastFailedLoginTime(), now).toMinutes();
+            if (minutesSinceLastFailure >= Constants.ACCOUNT_LOCK_DURATION_MINUTES) {
+                // 超过时间窗口，重置失败次数
+                patient.setFailedLoginCount(0);
+                patient.setLastFailedLoginTime(null);
+                patientRepository.save(patient);
+            }
+        }
 
-        // 5. 验证密码
+        // 6. 验证密码
         boolean passwordMatches = passwordEncoderUtil.matches(password, patient.getPasswordHash());
         
         if (!passwordMatches) {
             // 登录失败：增加失败次数
-            int newFailureCount = patient.getFailedLoginCount() + 1;
-            patient.setFailedLoginCount(newFailureCount);
-            patient.setLastFailedLoginTime(now);
+            // 重新从数据库查询，确保获取最新的失败次数（避免缓存问题）
+            Patient freshPatient = patientRepository.findByIdentifier(identifier)
+                    .orElseThrow(() -> new IllegalArgumentException("学号/工号或密码错误"));
+            
+            int currentFailureCount = freshPatient.getFailedLoginCount() != null ? freshPatient.getFailedLoginCount() : 0;
+            int newFailureCount = currentFailureCount + 1;
+            
+            System.out.println("[PatientService] 登录失败 - 当前失败次数: " + currentFailureCount + 
+                              ", 新失败次数: " + newFailureCount);
+            
+            freshPatient.setFailedLoginCount(newFailureCount);
+            freshPatient.setLastFailedLoginTime(now);
+            
+            // 保存失败次数到数据库（确保事务提交）
+            patientRepository.save(freshPatient);
+            // 强制刷新到数据库，确保数据已保存
+            patientRepository.flush();
+            
+            // 验证保存是否成功
+            Patient verifyPatient = patientRepository.findByIdentifier(identifier).orElse(null);
+            if (verifyPatient != null) {
+                System.out.println("[PatientService] 保存后验证 - 失败次数: " + verifyPatient.getFailedLoginCount());
+            }
             
             // 检查是否达到锁定阈值
             if (newFailureCount >= Constants.MAX_LOGIN_FAILURE_COUNT) {
                 // 自动锁定账户
-                patient.setStatus(PatientStatus.locked);
-                patient.setLockedUntil(now.plusMinutes(Constants.ACCOUNT_LOCK_DURATION_MINUTES));
-                patientRepository.save(patient);
+                freshPatient.setStatus(PatientStatus.locked);
+                freshPatient.setLockedUntil(now.plusMinutes(Constants.ACCOUNT_LOCK_DURATION_MINUTES));
+                patientRepository.save(freshPatient);
+                patientRepository.flush();
                 throw new IllegalArgumentException("登录失败次数过多，账户已被锁定，请" + Constants.ACCOUNT_LOCK_DURATION_MINUTES + "分钟后再试或联系管理员");
             } else {
-                // 未达到阈值，只保存失败次数
-                patientRepository.save(patient);
+                // 未达到阈值，计算剩余次数
                 int remainingAttempts = Constants.MAX_LOGIN_FAILURE_COUNT - newFailureCount;
                 throw new IllegalArgumentException("学号/工号或密码错误，还可尝试" + remainingAttempts + "次");
             }
         }
 
-        // 6. 密码正确，登录成功：重置失败次数
-        if (patient.getFailedLoginCount() > 0) {
+        // 7. 密码正确，登录成功：重置失败次数
+        if (patient.getFailedLoginCount() != null && patient.getFailedLoginCount() > 0) {
             patient.setFailedLoginCount(0);
             patient.setLastFailedLoginTime(null);
             patientRepository.save(patient);
@@ -614,5 +684,186 @@ public class PatientService {
         response.setName(patient.getFullName());
         response.setPhone(patient.getPhoneNumber());
         return response;
+    }
+
+    // =========================================================================
+    // 【新增】患者自主注册功能
+    // =========================================================================
+
+    /**
+     * 学生/教师自主注册
+     * @param request 注册请求（包含身份证明材料）
+     * @return 注册结果
+     */
+    @Transactional
+    public PatientRegistrationResponse selfRegister(PatientSelfRegisterRequest request) {
+        // 1. 检查学号/工号是否已存在
+        if (patientRepository.findByIdentifier(request.getIdentifier()).isPresent()) {
+            throw new IllegalArgumentException("该学号/工号已被注册");
+        }
+
+        // 2. 检查手机号是否已存在
+        if (request.getPhoneNumber() != null && 
+            patientRepository.findByPhoneNumber(request.getPhoneNumber()).isPresent()) {
+            throw new IllegalArgumentException("该手机号已被注册");
+        }
+
+        // 3. 创建患者账户（状态为inactive，等待审核）
+        Patient patient = new Patient();
+        patient.setIdentifier(request.getIdentifier());
+        patient.setPasswordHash(passwordEncoderUtil.encodePassword(request.getPassword()));
+        patient.setFullName(request.getFullName());
+        patient.setPhoneNumber(request.getPhoneNumber());
+        patient.setPatientType(request.getPatientType());
+        patient.setStatus(PatientStatus.inactive); // 初始状态为未激活
+        patient.setRegistrationSource(RegistrationSource.self_registered);
+        
+        Patient savedPatient = patientRepository.save(patient);
+
+        // 4. 创建身份验证申请记录
+        PatientIdentityVerification verification = new PatientIdentityVerification();
+        verification.setPatient(savedPatient);
+        verification.setIdentifier(request.getIdentifier());
+        verification.setFullName(request.getFullName());
+        verification.setIdCardNumber(request.getIdCardNumber());
+        verification.setPhoneNumber(request.getPhoneNumber());
+        verification.setPatientType(request.getPatientType());
+        verification.setIdCardFrontUrl(request.getIdCardFrontUrl()); // 身份证正面照片URL
+        verification.setIdCardBackUrl(request.getIdCardBackUrl()); // 身份证背面照片URL
+        verification.setStatus(VerificationStatus.pending);
+        
+        verificationRepository.save(verification);
+
+        return PatientRegistrationResponse.builder()
+            .patientId(savedPatient.getPatientId())
+            .identifier(savedPatient.getIdentifier())
+            .message("注册成功，请等待管理员审核身份信息")
+            .status("pending")
+            .build();
+    }
+
+    /**
+     * 管理员审核身份验证申请
+     * @param verificationId 验证申请ID
+     * @param adminId 审核管理员ID
+     * @param approved 是否通过
+     * @param rejectionReason 拒绝原因（如果拒绝）
+     */
+    @Transactional
+    public void reviewIdentityVerification(Long verificationId, Integer adminId, 
+                                           boolean approved, String rejectionReason) {
+        PatientIdentityVerification verification = 
+            verificationRepository.findById(verificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("验证申请不存在"));
+
+        if (verification.getStatus() != VerificationStatus.pending) {
+            throw new IllegalArgumentException("该申请已审核，无法重复审核");
+        }
+
+        Admin admin = adminRepository.findById(adminId)
+            .orElseThrow(() -> new ResourceNotFoundException("管理员不存在"));
+
+        Patient patient = verification.getPatient();
+
+        if (approved) {
+            // 审核通过：激活账户，创建患者档案
+            verification.setStatus(VerificationStatus.approved);
+            patient.setStatus(PatientStatus.active);
+
+            // 创建患者档案
+            if (patientProfileRepository.findById(patient.getPatientId()).isEmpty()) {
+                PatientProfile profile = new PatientProfile();
+                profile.setPatient(patient);
+                profile.setIdCardNumber(verification.getIdCardNumber());
+                profile.setBlacklistStatus(com.example.springboot.entity.enums.BlacklistStatus.normal);
+                patientProfileRepository.save(profile);
+            }
+        } else {
+            // 审核拒绝
+            if (rejectionReason == null || rejectionReason.trim().isEmpty()) {
+                throw new IllegalArgumentException("拒绝审核时必须提供拒绝原因");
+            }
+            verification.setStatus(VerificationStatus.rejected);
+            verification.setRejectionReason(rejectionReason);
+            // 账户保持inactive状态
+        }
+
+        verification.setReviewedBy(admin);
+        verification.setReviewedAt(LocalDateTime.now());
+        verificationRepository.save(verification);
+        patientRepository.save(patient);
+    }
+
+    /**
+     * 获取待审核的身份验证申请列表
+     */
+    @Transactional(readOnly = true)
+    public List<VerificationResponse> getPendingVerifications() {
+        List<PatientIdentityVerification> verifications = 
+            verificationRepository.findPendingVerifications(VerificationStatus.pending);
+        
+        return verifications.stream()
+            .map(v -> {
+                VerificationResponse response = VerificationResponse.builder()
+                    .verificationId(v.getVerificationId())
+                    .patientId(v.getPatient().getPatientId())
+                    .identifier(v.getIdentifier())
+                    .fullName(v.getFullName())
+                    .idCardNumber(v.getIdCardNumber())
+                    .phoneNumber(v.getPhoneNumber())
+                    .patientType(v.getPatientType())
+                    .idCardFrontUrl(v.getIdCardFrontUrl())
+                    .idCardBackUrl(v.getIdCardBackUrl())
+                    .status(v.getStatus())
+                    .rejectionReason(v.getRejectionReason())
+                    .createdAt(v.getCreatedAt())
+                    .updatedAt(v.getUpdatedAt())
+                    .build();
+                
+                if (v.getReviewedBy() != null) {
+                    response.setReviewedBy(v.getReviewedBy().getAdminId());
+                    response.setReviewedByName(v.getReviewedBy().getFullName());
+                    response.setReviewedAt(v.getReviewedAt());
+                }
+                
+                return response;
+            })
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取所有身份验证申请（包括已审核的）
+     */
+    @Transactional(readOnly = true)
+    public List<VerificationResponse> getAllVerifications() {
+        List<PatientIdentityVerification> verifications = verificationRepository.findAll();
+        
+        return verifications.stream()
+            .map(v -> {
+                VerificationResponse response = VerificationResponse.builder()
+                    .verificationId(v.getVerificationId())
+                    .patientId(v.getPatient().getPatientId())
+                    .identifier(v.getIdentifier())
+                    .fullName(v.getFullName())
+                    .idCardNumber(v.getIdCardNumber())
+                    .phoneNumber(v.getPhoneNumber())
+                    .patientType(v.getPatientType())
+                    .idCardFrontUrl(v.getIdCardFrontUrl())
+                    .idCardBackUrl(v.getIdCardBackUrl())
+                    .status(v.getStatus())
+                    .rejectionReason(v.getRejectionReason())
+                    .createdAt(v.getCreatedAt())
+                    .updatedAt(v.getUpdatedAt())
+                    .build();
+                
+                if (v.getReviewedBy() != null) {
+                    response.setReviewedBy(v.getReviewedBy().getAdminId());
+                    response.setReviewedByName(v.getReviewedBy().getFullName());
+                    response.setReviewedAt(v.getReviewedAt());
+                }
+                
+                return response;
+            })
+            .collect(Collectors.toList());
     }
 }
