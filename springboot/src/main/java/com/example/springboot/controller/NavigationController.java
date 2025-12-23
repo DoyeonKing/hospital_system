@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/navigation")
-@CrossOrigin(origins = "*")
 public class NavigationController {
     
     @Autowired

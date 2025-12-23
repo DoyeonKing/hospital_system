@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/map")
-@CrossOrigin(origins = "*")
 public class MapController {
     
     private final MapService mapService;
