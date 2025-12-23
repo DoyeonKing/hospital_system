@@ -18,7 +18,6 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/slot-applications")
-@CrossOrigin(origins = "*")
 public class SlotApplicationController {
 
     private final SlotApplicationService slotApplicationService;

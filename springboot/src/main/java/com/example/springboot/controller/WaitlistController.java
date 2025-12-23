@@ -18,7 +18,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/waitlist")
-@CrossOrigin(origins = "*")
 public class WaitlistController {
 
     private final WaitlistService waitlistService;

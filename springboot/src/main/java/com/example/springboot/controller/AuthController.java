@@ -18,7 +18,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth") // 认证相关的公共路由
-@CrossOrigin(origins = "*")
 public class AuthController {
 
     private final PatientService patientService;
