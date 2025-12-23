@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/doctor/auth") // 专为医生身份认证设置的路径
-@CrossOrigin(origins = "*")
 public class DoctorAuthController {
 
     private final DoctorService doctorService;

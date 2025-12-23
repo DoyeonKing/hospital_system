@@ -22,7 +22,6 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/qrcode")
-@CrossOrigin(origins = "*")
 public class QRCodeController {
     
     private final QRCodeService qrCodeService;
