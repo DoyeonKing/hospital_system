@@ -1,5 +1,6 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.dto.department.DepartmentDTO;
 import com.example.springboot.dto.department.DepartmentQueryDTO;
 import com.example.springboot.dto.department.DepartmentResponseDTO;
@@ -36,6 +37,7 @@ public class DepartmentController {
      * @return 创建成功的科室信息
      */
     @PostMapping
+    @AuditLog(action = "创建科室", targetEntity = "departments")
     public ResponseEntity<?> createDepartment(@RequestBody DepartmentDTO departmentDTO) {
         try {
             if (departmentDTO.getName() == null || departmentDTO.getName().trim().isEmpty()) {
@@ -64,6 +66,7 @@ public class DepartmentController {
      * @return 更新成功的科室信息
      */
     @PutMapping("/description")
+    @AuditLog(action = "更新科室描述", targetEntity = "departments")
     public ResponseEntity<?> updateDepartmentDescription(@RequestBody DepartmentDTO departmentDTO) {
         try {
             if (departmentDTO.getName() == null || departmentDTO.getName().trim().isEmpty()) {
@@ -87,6 +90,7 @@ public class DepartmentController {
      * @return 删除结果
      */
     @DeleteMapping("/{departmentId}")
+    @AuditLog(action = "删除科室", targetEntity = "departments")
     public ResponseEntity<?> deleteDepartment(@PathVariable Integer departmentId) {
         try {
             DepartmentDeleteResult result = departmentService.deleteDepartment(departmentId);
@@ -242,6 +246,7 @@ public class DepartmentController {
      * @return 添加后的医生信息
      */
     @PostMapping("/{departmentId}/members")
+    @AuditLog(action = "添加医生到科室", targetEntity = "departments")
     public ResponseEntity<?> addDoctorToDepartment(@PathVariable Integer departmentId, @RequestBody DoctorDataDTO doctorData) {
         try {
             DoctorResponse doctor = departmentService.addDoctorToDepartment(departmentId, doctorData);
@@ -260,6 +265,7 @@ public class DepartmentController {
      * @return 操作结果
      */
     @DeleteMapping("/{departmentId}/members/{doctorIdentifier}")
+    @AuditLog(action = "从科室移除医生", targetEntity = "departments")
     public ResponseEntity<?> removeDoctorFromDepartment(@PathVariable Integer departmentId, @PathVariable String doctorIdentifier) {
         try {
             departmentService.removeDoctorFromDepartment(departmentId, doctorIdentifier);
@@ -278,6 +284,7 @@ public class DepartmentController {
      * @return 添加成功的医生列表
      */
     @PostMapping("/{departmentId}/batch-add-doctors")
+    @AuditLog(action = "批量添加医生到科室", targetEntity = "departments")
     public ResponseEntity<?> batchAddDoctorsToDepartment(@PathVariable Integer departmentId, @RequestBody List<String> doctorIdentifiers) {
         try {
             List<DoctorResponse> doctors = departmentService.batchAddDoctorsToDepartment(departmentId, doctorIdentifiers);

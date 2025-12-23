@@ -1,6 +1,7 @@
 // 路径：src/main/java/com/example/springboot/controller/LocationController.java
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.dto.location.LocationResponse;
 import com.example.springboot.entity.Location;
 import com.example.springboot.service.LocationService;
@@ -75,6 +76,7 @@ public class LocationController {
      * @return 创建成功的地点信息
      */
     @PostMapping("/department/{departmentId}")
+    @AuditLog(action = "添加地点到科室", targetEntity = "locations")
     public ResponseEntity<?> addLocationToDepartment(
             @PathVariable Integer departmentId,
             @RequestBody Map<String, Object> locationData) {
@@ -94,6 +96,7 @@ public class LocationController {
      * @return 操作结果
      */
     @DeleteMapping("/{locationId}")
+    @AuditLog(action = "删除地点", targetEntity = "locations")
     public ResponseEntity<?> deleteLocation(@PathVariable Integer locationId) {
         try {
             locationService.deleteLocation(locationId);
@@ -128,6 +131,7 @@ public class LocationController {
      * @return 分配成功的地点列表
      */
     @PostMapping("/department/{departmentId}/batch-assign")
+    @AuditLog(action = "批量分配地点到科室", targetEntity = "locations")
     public ResponseEntity<?> batchAssignLocationsToDepartment(
             @PathVariable Integer departmentId,
             @RequestBody List<Integer> locationIds) {
@@ -148,6 +152,7 @@ public class LocationController {
      * @return 操作结果
      */
     @DeleteMapping("/department/{departmentId}/location/{locationId}")
+    @AuditLog(action = "从科室移除地点", targetEntity = "locations")
     public ResponseEntity<?> removeLocationFromDepartment(
             @PathVariable Integer departmentId,
             @PathVariable Integer locationId) {

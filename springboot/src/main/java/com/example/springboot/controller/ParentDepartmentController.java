@@ -1,5 +1,6 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.entity.ParentDepartment;
 import com.example.springboot.service.ParentDepartmentService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,7 @@ public class ParentDepartmentController {
      * 接收: { name: "父科室名", description: "描述" }
      */
     @PostMapping
+    @AuditLog(action = "创建父科室", targetEntity = "parent_departments")
     public ResponseEntity<?> createParentDepartment(@RequestBody ParentDepartment parentDepartment) {
         try {
             if (parentDepartment.getName() == null || parentDepartment.getName().trim().isEmpty()) {
@@ -73,6 +75,7 @@ public class ParentDepartmentController {
      * 更新父科室
      */
     @PutMapping("/{id}")
+    @AuditLog(action = "更新父科室信息", targetEntity = "parent_departments")
     public ResponseEntity<?> updateParentDepartment(@PathVariable Integer id, @RequestBody ParentDepartment parentDepartment) {
         try {
             if (parentDepartment.getName() == null || parentDepartment.getName().trim().isEmpty()) {
@@ -96,6 +99,7 @@ public class ParentDepartmentController {
      * 删除父科室
      */
     @DeleteMapping("/{id}")
+    @AuditLog(action = "删除父科室", targetEntity = "parent_departments")
     public ResponseEntity<?> deleteParentDepartment(@PathVariable Integer id) {
         try {
             parentDepartmentService.deleteParentDepartment(id);

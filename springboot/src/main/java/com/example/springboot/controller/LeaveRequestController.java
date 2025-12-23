@@ -1,5 +1,6 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.dto.leaverequest.LeaveRequestCreateRequest;
 import com.example.springboot.dto.leaverequest.LeaveRequestResponse;
 import com.example.springboot.dto.leaverequest.LeaveRequestUpdateRequest;
@@ -67,6 +68,7 @@ public class LeaveRequestController {
      * 创建请假申请
      */
     @PostMapping
+    @AuditLog(action = "创建请假申请", targetEntity = "leave_requests")
     public ResponseEntity<LeaveRequestResponse> createLeaveRequest(@Valid @RequestBody LeaveRequestCreateRequest request) {
         LeaveRequestResponse createdRequest = leaveRequestService.createLeaveRequest(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdRequest);
@@ -76,6 +78,7 @@ public class LeaveRequestController {
      * 更新请假申请（主要用于审批）
      */
     @PutMapping("/{id}")
+    @AuditLog(action = "更新请假申请", targetEntity = "leave_requests")
     public ResponseEntity<LeaveRequestResponse> updateLeaveRequest(
             @PathVariable Integer id,
             @Valid @RequestBody LeaveRequestUpdateRequest request) {
@@ -87,6 +90,7 @@ public class LeaveRequestController {
      * 删除请假申请
      */
     @DeleteMapping("/{id}")
+    @AuditLog(action = "删除请假申请", targetEntity = "leave_requests")
     public ResponseEntity<Void> deleteLeaveRequest(@PathVariable Integer id) {
         leaveRequestService.deleteLeaveRequest(id);
         return ResponseEntity.noContent().build();
@@ -96,6 +100,7 @@ public class LeaveRequestController {
      * 审批请假申请
      */
     @PutMapping("/{id}/approve")
+    @AuditLog(action = "批准请假申请", targetEntity = "leave_requests")
     public ResponseEntity<LeaveRequestResponse> approveLeaveRequest(
             @PathVariable Integer id,
             @RequestParam Integer approverId,
@@ -120,6 +125,7 @@ public class LeaveRequestController {
      * 拒绝请假申请
      */
     @PutMapping("/{id}/reject")
+    @AuditLog(action = "拒绝请假申请", targetEntity = "leave_requests")
     public ResponseEntity<LeaveRequestResponse> rejectLeaveRequest(
             @PathVariable Integer id,
             @RequestParam Integer approverId,
@@ -155,6 +161,7 @@ public class LeaveRequestController {
      * 确认替班安排
      */
     @PostMapping("/confirm-substitution")
+    @AuditLog(action = "确认替班", targetEntity = "leave_requests")
     public ResponseEntity<com.example.springboot.dto.leaverequest.SubstituteConfirmResponse> confirmSubstitution(
             @Valid @RequestBody com.example.springboot.dto.leaverequest.SubstituteConfirmRequest request) {
         com.example.springboot.dto.leaverequest.SubstituteConfirmResponse response = 

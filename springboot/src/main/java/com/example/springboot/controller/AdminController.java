@@ -1,5 +1,6 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.dto.admin.AdminCreateRequest;
 import com.example.springboot.dto.admin.AdminResponse;
 import com.example.springboot.dto.admin.AdminUpdateRequest;
@@ -139,6 +140,7 @@ public class AdminController {
      * 创建管理员
      */
     @PostMapping
+    @AuditLog(action = "创建管理员", targetEntity = "admins")
     public ResponseEntity<?> createAdmin(@RequestBody AdminCreateRequest request) {
         try {
             AdminResponse admin = adminService.createAdmin(request);
@@ -153,6 +155,7 @@ public class AdminController {
      * 更新管理员
      */
     @PutMapping("/{id}")
+    @AuditLog(action = "更新管理员信息", targetEntity = "admins")
     public ResponseEntity<?> updateAdmin(
             @PathVariable Integer id,
             @RequestBody AdminUpdateRequest request) {
@@ -178,6 +181,7 @@ public class AdminController {
      * 删除管理员
      */
     @DeleteMapping("/{id}")
+    @AuditLog(action = "删除管理员", targetEntity = "admins")
     public ResponseEntity<?> deleteAdmin(@PathVariable Integer id) {
         try {
             adminService.deleteAdmin(id);

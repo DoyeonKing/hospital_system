@@ -1,5 +1,6 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.dto.symptom.SymptomMappingRequest;
 import com.example.springboot.dto.symptom.SymptomMappingResponse;
 import com.example.springboot.service.SymptomMappingService;
@@ -50,6 +51,7 @@ public class SymptomMappingController {
      * POST /api/symptom-mappings
      */
     @PostMapping
+    @AuditLog(action = "创建症状映射", targetEntity = "symptom_mappings")
     public ResponseEntity<?> createMapping(@RequestBody SymptomMappingRequest request) {
         try {
             SymptomMappingResponse response = symptomMappingService.createMapping(request);
@@ -64,6 +66,7 @@ public class SymptomMappingController {
      * PUT /api/symptom-mappings/{mappingId}
      */
     @PutMapping("/{mappingId}")
+    @AuditLog(action = "更新症状映射", targetEntity = "symptom_mappings")
     public ResponseEntity<?> updateMapping(
             @PathVariable Integer mappingId,
             @RequestBody SymptomMappingRequest request) {
@@ -80,6 +83,7 @@ public class SymptomMappingController {
      * DELETE /api/symptom-mappings/{mappingId}
      */
     @DeleteMapping("/{mappingId}")
+    @AuditLog(action = "删除症状映射", targetEntity = "symptom_mappings")
     public ResponseEntity<?> deleteMapping(@PathVariable Integer mappingId) {
         try {
             symptomMappingService.deleteMapping(mappingId);
