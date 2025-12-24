@@ -957,10 +957,10 @@ public class AppointmentService {
         }
         
         // 9. 分配实时候诊序号（先签到先就诊）- 在保存后重新计算
-        Integer realTimeQueueNumber = assignRealTimeQueueNumber(schedule, appointment, isLate);
-        appointment.setRealTimeQueueNumber(realTimeQueueNumber);
-        appointmentRepository.save(appointment);
-        logger.info("实时候诊序号已分配 - 预约ID: {}, 实时候诊序号: {}", appointmentId, realTimeQueueNumber);
+        // 注意：需要重新计算所有已签到患者的实时候诊序号，而不仅仅是当前患者
+        // 因为新患者签到可能会影响其他患者的排序位置
+        recalculateAllRealTimeQueueNumbers(schedule);
+        logger.info("所有患者的实时候诊序号已重新计算 - 排班ID: {}", schedule.getScheduleId());
 
         // 7. 立即删除Token（确保一次性使用）
         try {
@@ -1045,6 +1045,13 @@ public class AppointmentService {
         List<Appointment> addOnAppointments = new ArrayList<>();    // 加号
         
         for (Appointment appointment : appointments) {
+            // 过滤掉已标记过号但未重新签到的记录（这些记录应该从队列中移除）
+            // 条件：已标记过号（missedCallCount > 0）但未重新签到（recheckInTime == null）且已清除叫号时间（calledAt == null）
+            if (appointment.getMissedCallCount() != null && appointment.getMissedCallCount() > 0 
+                    && appointment.getRecheckInTime() == null && appointment.getCalledAt() == null) {
+                // 已标记过号但未重新扫码，从队列中移除
+                continue;
+            }
             AppointmentType type = appointment.getAppointmentType();
             if (type == null) {
                 // 兼容旧数据，根据isWalkIn判断
@@ -1320,8 +1327,8 @@ public class AppointmentService {
     }
 
     /**
-     * 标记过号（状态改回scheduled，允许重新扫码签到）
-     * 规则：管理员/医生标记患者过号，增加过号次数，并将预约状态改回scheduled，清除签到记录
+     * 标记过号（清除叫号时间，从队列中移除，等待患者重新扫码）
+     * 规则：管理员/医生标记患者过号，增加过号次数，清除叫号时间，患者需重新扫码才能重新进入队列
      */
     @Transactional
     public AppointmentResponse markMissedCall(Integer appointmentId) {
@@ -1336,14 +1343,18 @@ public class AppointmentService {
             throw new BadRequestException("该预约还未被叫号，无法标记过号");
         }
 
-        // 仅增加过号次数，保留签到/叫号状态
+        // 增加过号次数
         appointment.setMissedCallCount(
                 (appointment.getMissedCallCount() == null ? 0 : appointment.getMissedCallCount()) + 1);
+        
+        // 清除叫号时间，这样患者会从当前队列中移除
+        // 患者需要重新扫码（调用 recheckInAfterMissedCall）才能重新进入队列
+        appointment.setCalledAt(null);
 
         appointmentRepository.save(appointment);
 
-        logger.info("标记过号成功 - 预约ID: {}, 患者: {}, 过号次数: {}, 状态保持为 {}",
-                appointmentId, appointment.getPatient().getFullName(), appointment.getMissedCallCount(), appointment.getStatus());
+        logger.info("标记过号成功 - 预约ID: {}, 患者: {}, 过号次数: {}, 已清除叫号时间，患者需重新扫码才能重新进入队列",
+                appointmentId, appointment.getPatient().getFullName(), appointment.getMissedCallCount());
 
         return convertToResponseDto(appointment);
     }
@@ -1392,24 +1403,15 @@ public class AppointmentService {
         appointment.setIsOnTime(false);
         
         // 过号重排：放在当前时段最后一位
-        // 查询同一排班下已签到的预约，找到最大的实时候诊序号
-        List<Appointment> checkedInAppointments = appointmentRepository
-                .findByScheduleAndStatus(schedule, AppointmentStatus.CHECKED_IN);
-        
-        int maxRealTimeQueueNumber = checkedInAppointments.stream()
-                .filter(a -> a.getRealTimeQueueNumber() != null && !a.getAppointmentId().equals(appointmentId))
-                .mapToInt(Appointment::getRealTimeQueueNumber)
-                .max()
-                .orElse(0);
-        
-        // 设置为最大序号+1，确保排在最后
-        appointment.setRealTimeQueueNumber(maxRealTimeQueueNumber + 1);
-        
         // 增加过号次数
         appointment.setMissedCallCount(
                 (appointment.getMissedCallCount() == null ? 0 : appointment.getMissedCallCount()) + 1);
         
+        // 保存过号信息
         appointmentRepository.save(appointment);
+        
+        // 重新计算所有患者的实时候诊序号（过号患者会排在最后）
+        recalculateAllRealTimeQueueNumbers(schedule);
         
         logger.info("过号重新签到成功 - 预约ID: {}, 患者: {}, 就诊序号: {} (不变), 实时候诊序号: {} (最后一位), 重新签到时间: {}", 
                 appointmentId, appointment.getPatient().getFullName(), 
@@ -1449,12 +1451,82 @@ public class AppointmentService {
     }
     
     /**
-     * 分配实时候诊序号
+     * 重新计算所有已签到患者的实时候诊序号
+     * 当有新患者签到时，需要重新计算所有患者的序号，确保排序正确
+     */
+    private void recalculateAllRealTimeQueueNumbers(Schedule schedule) {
+        // 查询同一排班下所有已签到的预约
+        List<Appointment> checkedInAppointments = appointmentRepository
+                .findByScheduleAndStatus(schedule, AppointmentStatus.CHECKED_IN);
+        
+        if (checkedInAppointments.isEmpty()) {
+            return;
+        }
+        
+        // 计算时段开始时间
+        LocalDateTime scheduleStartTime = LocalDateTime.of(schedule.getScheduleDate(), schedule.getSlot().getStartTime());
+        
+        // 分离按时签到和迟到签到
+        List<Appointment> onTimeAppointments = checkedInAppointments.stream()
+                .filter(a -> Boolean.TRUE.equals(a.getIsOnTime()) && a.getCheckInTime() != null)
+                .collect(Collectors.toList());
+        
+        List<Appointment> lateAppointments = checkedInAppointments.stream()
+                .filter(a -> Boolean.TRUE.equals(a.getIsLate()) && a.getCheckInTime() != null)
+                .collect(Collectors.toList());
+        
+        // 分离提前签到和时段内签到（按时签到的）
+        List<Appointment> earlyCheckIns = onTimeAppointments.stream()
+                .filter(a -> a.getCheckInTime().isBefore(scheduleStartTime))
+                .sorted((a1, a2) -> Integer.compare(
+                        a1.getAppointmentNumber() != null ? a1.getAppointmentNumber() : 0,
+                        a2.getAppointmentNumber() != null ? a2.getAppointmentNumber() : 0
+                ))
+                .collect(Collectors.toList());
+        
+        List<Appointment> inTimeCheckIns = onTimeAppointments.stream()
+                .filter(a -> !a.getCheckInTime().isBefore(scheduleStartTime))
+                .sorted((a1, a2) -> a1.getCheckInTime().compareTo(a2.getCheckInTime()))
+                .collect(Collectors.toList());
+        
+        // 合并：提前签到的在前（按挂号序号），时段内签到的在后（按签到时间）
+        List<Appointment> sortedOnTimeAppointments = new ArrayList<>();
+        sortedOnTimeAppointments.addAll(earlyCheckIns);
+        sortedOnTimeAppointments.addAll(inTimeCheckIns);
+        
+        // 为按时签到的患者分配实时候诊序号（从1开始）
+        for (int i = 0; i < sortedOnTimeAppointments.size(); i++) {
+            Appointment appointment = sortedOnTimeAppointments.get(i);
+            appointment.setRealTimeQueueNumber(i + 1);
+        }
+        
+        // 为迟到签到的患者分配实时候诊序号（排在队尾）
+        int maxOnTimeNumber = sortedOnTimeAppointments.size();
+        // 迟到患者按签到时间排序
+        lateAppointments.sort((a1, a2) -> a1.getCheckInTime().compareTo(a2.getCheckInTime()));
+        for (int i = 0; i < lateAppointments.size(); i++) {
+            Appointment appointment = lateAppointments.get(i);
+            appointment.setRealTimeQueueNumber(maxOnTimeNumber + i + 1);
+        }
+        
+        // 批量保存所有更新后的预约
+        appointmentRepository.saveAll(checkedInAppointments);
+        
+        logger.info("实时候诊序号重新计算完成 - 排班ID: {}, 按时签到: {}人, 迟到签到: {}人", 
+                schedule.getScheduleId(), sortedOnTimeAppointments.size(), lateAppointments.size());
+    }
+
+    /**
+     * 分配实时候诊序号（已废弃，使用 recalculateAllRealTimeQueueNumbers 代替）
      * 规则：
      * 1. 提前签到（时段开始前）：按挂号序号排序
      * 2. 时段内签到：按签到时间排序（先签到先就诊）
      * 3. 迟到签到：排在队尾
+     * 
+     * @deprecated 此方法只计算单个患者的序号，可能导致其他患者序号不正确
+     *             请使用 recalculateAllRealTimeQueueNumbers 方法
      */
+    @Deprecated
     private Integer assignRealTimeQueueNumber(Schedule schedule, Appointment currentAppointment, boolean isLate) {
         // 重新查询当前预约（确保获取最新数据）
         Appointment refreshedAppointment = appointmentRepository.findById(currentAppointment.getAppointmentId())
@@ -1479,9 +1551,6 @@ public class AppointmentService {
                     .orElse(0);
             return maxNumber + 1;
         }
-        
-        // 判断当前预约是提前签到还是时段内签到
-        boolean isEarlyCheckIn = currentCheckInTime != null && currentCheckInTime.isBefore(scheduleStartTime);
         
         // 按时签到的预约（包括提前和时段内）
         List<Appointment> onTimeAppointments = checkedInAppointments.stream()

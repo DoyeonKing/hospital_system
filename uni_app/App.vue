@@ -55,6 +55,14 @@
 						return
 					}
 					
+					// 检查Token是否存在
+					const token = uni.getStorageSync('patientToken')
+					if (!token) {
+						// 没有Token，停止检查
+						this.stopWaitlistNotificationCheck()
+						return
+					}
+					
 					// 动态导入 API
 					const { getPatientWaitlist } = await import('./api/appointment.js')
 					
@@ -95,7 +103,23 @@
 						}
 					}
 				} catch (error) {
-					// 静默处理错误，只记录日志
+					// 处理403错误（权限不足，可能是Token过期或无效）
+					if (error.statusCode === 403 || (error.data && error.data.status === 403)) {
+						console.warn('候补通知检查失败：权限不足（403），可能Token已过期')
+						// 停止检查，避免重复请求
+						this.stopWaitlistNotificationCheck()
+						return
+					}
+					
+					// 处理401错误（未授权，Token无效）
+					if (error.statusCode === 401 || (error.data && error.data.status === 401)) {
+						console.warn('候补通知检查失败：未授权（401），Token无效')
+						// 停止检查，避免重复请求
+						this.stopWaitlistNotificationCheck()
+						return
+					}
+					
+					// 静默处理其他错误，只记录日志
 					this.waitlistCheckRetryCount++
 					
 					// 如果连续失败次数过多，延长检查间隔
