@@ -18,15 +18,16 @@
 				class="message-bubble" 
 				v-for="(notification, index) in conversation.messages" 
 				:key="getNotificationKey(notification, index)"
-				:class="{ 'unread': notification.status === 'unread', 'clickable': isClickableNotification(notification) }"
-				@click="handleNotificationClick(notification)"
+				v-if="notification"
+				:class="{ 'unread': notification && notification.status === 'unread', 'clickable': notification && isClickableNotification(notification) }"
+				@click="handleNotificationClick(notification, index)"
 			>
-				<view class="message-time">{{ formatTime(notification.sentAt || notification.createTime) }}</view>
-				<view class="message-content-wrapper">
-					<view class="message-title">{{ notification.title }}</view>
-					<text class="message-text">{{ notification.content }}</text>
+				<view class="message-time" v-if="notification">{{ formatTime(notification.sentAt || notification.createTime) }}</view>
+				<view class="message-content-wrapper" v-if="notification">
+					<view class="message-title" v-if="notification.title">{{ notification.title }}</view>
+					<text class="message-text" v-if="notification.content">{{ notification.content }}</text>
 					<!-- 候补通知显示操作提示 -->
-					<view class="action-hint" v-if="notification.type === 'waitlist_available'">
+					<view class="action-hint" v-if="notification && notification.type === 'waitlist_available'">
 						<text class="hint-text">点击查看详情并支付</text>
 					</view>
 				</view>
@@ -58,8 +59,28 @@
 			}
 		},
 		onLoad(options) {
+			console.log('[消息详情] onLoad 参数:', options)
+			console.log('[消息详情] options.senderId:', options.senderId)
+			
 			// 从路由参数获取通知类型（senderId实际上是通知类型）
-			const notificationType = decodeURIComponent(options.senderId || '')
+			const senderId = options.senderId || ''
+			console.log('[消息详情] senderId原始值:', senderId)
+			
+			const notificationType = decodeURIComponent(senderId)
+			console.log('[消息详情] notificationType解码后:', notificationType)
+			
+			if (!notificationType) {
+				console.error('[消息详情] notificationType为空')
+				uni.showToast({
+					title: '缺少消息类型参数',
+					icon: 'none'
+				})
+				setTimeout(() => {
+					uni.navigateBack()
+				}, 1500)
+				return
+			}
+			
 			this.notificationType = notificationType
 			// 加载对话内容
 			this.loadConversation(notificationType)
@@ -94,8 +115,15 @@
 						uni.setStorageSync('allNotifications', allNotifications)
 					}
 					
-					// 筛选出该类型的通知
-					const notifications = allNotifications.filter(notif => notif.type === notificationType)
+					// 筛选出该类型的通知，同时过滤掉无效的通知
+					const notifications = allNotifications.filter(notif => {
+						// 确保通知对象存在且有type属性
+						if (!notif || !notif.type) {
+							console.warn('[消息详情] 发现无效通知:', notif)
+							return false
+						}
+						return notif.type === notificationType
+					})
 					
 					if (notifications.length === 0) {
 						uni.showToast({
@@ -110,12 +138,14 @@
 						return
 					}
 					
-					// 按时间排序（最新的在前）
-					const sortedNotifications = notifications.sort((a, b) => {
-						const timeA = new Date(a.sentAt || a.createTime || 0)
-						const timeB = new Date(b.sentAt || b.createTime || 0)
-						return timeB - timeA // 降序，最新的在前
-					})
+					// 按时间排序（最新的在前），再次过滤无效项
+					const sortedNotifications = notifications
+						.filter(notif => notif != null) // 再次确保没有null或undefined
+						.sort((a, b) => {
+							const timeA = new Date(a.sentAt || a.createTime || 0)
+							const timeB = new Date(b.sentAt || b.createTime || 0)
+							return timeB - timeA // 降序，最新的在前
+						})
 					
 					this.conversation = {
 						senderId: notificationType,
@@ -137,6 +167,7 @@
 			getTypeName(type) {
 				const typeMap = {
 					'payment_success': '支付通知',
+					'appointment_success': '预约成功',
 					'appointment_reminder': '预约提醒',
 					'cancellation': '取消通知',
 					'waitlist_available': '候补通知',
@@ -148,31 +179,203 @@
 			
 			// 获取通知的唯一key（小程序不支持表达式，需要使用方法）
 			getNotificationKey(notification, index) {
+				// 如果通知对象无效，返回索引
+				if (!notification) {
+					return `notification-${index}`
+				}
 				// 优先使用 notificationId，其次使用 id，最后使用索引
 				return notification.notificationId || notification.id || `notification-${index}`
 			},
 			
 			// 判断通知是否可点击
 			isClickableNotification(notification) {
-				return notification.type === 'waitlist_available' && notification.waitlistId
+				if (!notification) {
+					console.log('[消息详情] isClickableNotification: notification为空')
+					return false
+				}
+				
+				// 候补通知可点击：type为waitlist_available，且有相关ID
+				const isWaitlistAvailable = notification.type === 'waitlist_available'
+				const hasWaitlistId = notification.waitlistId != null || 
+					(notification.relatedEntity === 'waitlist' && notification.relatedId != null)
+				
+				// 预约相关通知也可以点击（如果有appointmentId）
+				// 注意：relatedId 可能是 0，所以不能直接用 || 判断，需要明确检查是否为 null/undefined
+				const hasAppointmentId = notification.appointmentId != null || 
+					(notification.relatedEntity === 'appointment' && notification.relatedId != null)
+				const isAppointmentRelated = notification.type === 'payment_success' || 
+											notification.type === 'appointment_success' ||
+											notification.type === 'appointment_reminder' || 
+											notification.type === 'cancellation'
+				
+				const result = (isWaitlistAvailable && hasWaitlistId) || (isAppointmentRelated && hasAppointmentId)
+				
+				console.log('[消息详情] ========== 判断通知是否可点击 ==========')
+				console.log('[消息详情] 通知类型:', notification.type)
+				console.log('[消息详情] relatedEntity:', notification.relatedEntity)
+				console.log('[消息详情] relatedId:', notification.relatedId, ', 类型:', typeof notification.relatedId)
+				console.log('[消息详情] appointmentId:', notification.appointmentId)
+				console.log('[消息详情] waitlistId:', notification.waitlistId)
+				console.log('[消息详情] isWaitlistAvailable:', isWaitlistAvailable)
+				console.log('[消息详情] hasWaitlistId:', hasWaitlistId)
+				console.log('[消息详情] isAppointmentRelated:', isAppointmentRelated)
+				console.log('[消息详情] hasAppointmentId计算:', {
+					'appointmentId存在': !!notification.appointmentId,
+					'relatedEntity === appointment': notification.relatedEntity === 'appointment',
+					'relatedId存在': !!notification.relatedId,
+					'relatedId值': notification.relatedId,
+					'最终hasAppointmentId': hasAppointmentId
+				})
+				console.log('[消息详情] 最终结果:', result)
+				console.log('[消息详情] ==========================================')
+				
+				return result
 			},
 			
 			// 处理通知点击
-			handleNotificationClick(notification) {
+			handleNotificationClick(notification, index) {
+				console.log('[消息详情] 点击通知 - notification:', notification, ', index:', index)
+				
+				// 如果 notification 为空，尝试从数组中获取
+				if (!notification && index != null && this.conversation.messages) {
+					console.log('[消息详情] notification为空，尝试从数组获取，index:', index)
+					notification = this.conversation.messages[index]
+					console.log('[消息详情] 从数组获取的notification:', notification)
+				}
+				
+				if (!notification) {
+					console.warn('[消息详情] 通知对象为空，无法处理点击')
+					console.warn('[消息详情] conversation.messages:', this.conversation.messages)
+					console.warn('[消息详情] index:', index)
+					return
+				}
+				
+				console.log('[消息详情] 通知详情:', {
+					type: notification.type,
+					relatedEntity: notification.relatedEntity,
+					relatedId: notification.relatedId,
+					waitlistId: notification.waitlistId,
+					isClickable: this.isClickableNotification(notification),
+					fullNotification: JSON.stringify(notification, null, 2)
+				})
+				
 				if (!this.isClickableNotification(notification)) {
+					console.log('[消息详情] 通知不可点击，忽略')
+					console.log('[消息详情] 通知详情:', {
+						type: notification.type,
+						relatedEntity: notification.relatedEntity,
+						relatedId: notification.relatedId
+					})
 					return
 				}
 				
 				// 候补通知：跳转到候补详情页
-				if (notification.type === 'waitlist_available' && notification.waitlistId) {
-					const waitlistId = notification.waitlistId
-					uni.navigateTo({
-						url: `/pages/waitlist/waitlist-detail?waitlistId=${waitlistId}`,
-						success: () => {
-							// 标记该通知为已读
-							this.markNotificationAsRead(notification)
-						}
+				if (notification.type === 'waitlist_available') {
+					// 优先使用 waitlistId，如果没有则使用 relatedId（当 relatedEntity 为 'waitlist' 时）
+					const waitlistId = notification.waitlistId || (notification.relatedEntity === 'waitlist' ? notification.relatedId : null)
+					
+					if (waitlistId) {
+						console.log('[消息详情] 跳转到候补详情页，waitlistId:', waitlistId)
+						uni.navigateTo({
+							url: `/pages/waitlist/waitlist-detail?waitlistId=${waitlistId}`,
+							success: () => {
+								console.log('[消息详情] 跳转成功')
+								// 标记该通知为已读
+								this.markNotificationAsRead(notification)
+							},
+							fail: (err) => {
+								console.error('[消息详情] 跳转失败:', err)
+								uni.showToast({
+									title: '跳转失败',
+									icon: 'none'
+								})
+							}
+						})
+					} else {
+						console.warn('[消息详情] 候补通知缺少waitlistId')
+						uni.showToast({
+							title: '候补信息不完整',
+							icon: 'none'
+						})
+					}
+				}
+				// 预约相关通知：跳转到预约详情页
+				else if (notification.type === 'payment_success' || 
+						 notification.type === 'appointment_success' ||
+						 notification.type === 'appointment_reminder' || 
+						 notification.type === 'cancellation') {
+					// 优先使用 appointmentId，如果没有则使用 relatedId（当 relatedEntity 为 'appointment' 时）
+					const appointmentId = notification.appointmentId || (notification.relatedEntity === 'appointment' ? notification.relatedId : null)
+					
+					console.log('[消息详情] 处理预约相关通知:', {
+						type: notification.type,
+						appointmentId: notification.appointmentId,
+						relatedEntity: notification.relatedEntity,
+						relatedId: notification.relatedId,
+						finalAppointmentId: appointmentId
 					})
+					
+					if (appointmentId) {
+						console.log('[消息详情] 跳转到预约详情页，appointmentId:', appointmentId)
+						const url = `/pages/appointment/detail?appointmentId=${appointmentId}`
+						console.log('[消息详情] 跳转URL:', url)
+						
+						// 先标记为已读，避免跳转失败时通知状态不对
+						this.markNotificationAsRead(notification)
+						
+						// 使用 setTimeout 延迟跳转，避免页面加载冲突
+						setTimeout(() => {
+							uni.navigateTo({
+								url: url,
+								success: () => {
+									console.log('[消息详情] 跳转成功')
+								},
+								fail: (err) => {
+									console.error('[消息详情] 跳转失败:', err)
+									console.error('[消息详情] 错误详情:', JSON.stringify(err, null, 2))
+									
+									// 如果是超时错误，尝试使用 redirectTo
+									if (err.errMsg && err.errMsg.includes('timeout')) {
+										console.log('[消息详情] navigateTo超时，尝试使用redirectTo')
+										uni.redirectTo({
+											url: url,
+											success: () => {
+												console.log('[消息详情] redirectTo成功')
+											},
+											fail: (redirectErr) => {
+												console.error('[消息详情] redirectTo也失败:', redirectErr)
+												uni.showToast({
+													title: '页面加载失败，请稍后重试',
+													icon: 'none',
+													duration: 3000
+												})
+											}
+										})
+									} else {
+										uni.showToast({
+											title: '跳转失败: ' + (err.errMsg || '未知错误'),
+											icon: 'none',
+											duration: 3000
+										})
+									}
+								}
+							})
+						}, 100) // 延迟100ms，确保当前页面状态稳定
+					} else {
+						console.warn('[消息详情] 预约通知缺少appointmentId')
+						console.warn('[消息详情] 通知详情:', {
+							type: notification.type,
+							appointmentId: notification.appointmentId,
+							relatedEntity: notification.relatedEntity,
+							relatedId: notification.relatedId
+						})
+						uni.showToast({
+							title: '预约信息不完整',
+							icon: 'none'
+						})
+					}
+				} else {
+					console.warn('[消息详情] 未知的通知类型，无法处理:', notification.type)
 				}
 			},
 			

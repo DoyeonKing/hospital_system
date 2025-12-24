@@ -82,11 +82,34 @@
               </div>
             </div>
 
+            <!-- 历史统计卡片 -->
+            <div class="top-cards" style="margin-top: 20px;">
+              <div class="stat-card stat-card-cyan">
+                <div class="stat-icon">
+                  <el-icon :size="30"><Calendar /></el-icon>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-label">历史挂号总数</div>
+                  <div class="stat-value">{{ mockData.overview.totalHistoricalAppointments }}</div>
+                </div>
+              </div>
+
+              <div class="stat-card stat-card-orange">
+                <div class="stat-icon">
+                  <el-icon :size="30"><Close /></el-icon>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-label">历史退号总数</div>
+                  <div class="stat-value">{{ mockData.overview.totalHistoricalCancellations }}</div>
+                </div>
+              </div>
+            </div>
+
             <!-- 图表区域 -->
             <div class="charts-grid">
               <el-card class="chart-card">
                 <template #header>
-                  <div class="card-header">全院挂号趋势</div>
+                  <div class="card-header">全院挂号趋势（近7天）</div>
                 </template>
                 <div id="appointmentTrendChart" class="chart"></div>
               </el-card>
@@ -96,6 +119,20 @@
                   <div class="card-header">支付状态分布</div>
                 </template>
                 <div id="paymentStatusChart" class="chart"></div>
+              </el-card>
+
+              <el-card class="chart-card chart-full-width">
+                <template #header>
+                  <div class="card-header">历史挂号趋势（近30天）</div>
+                </template>
+                <div id="historicalAppointmentChart" class="chart"></div>
+              </el-card>
+
+              <el-card class="chart-card chart-full-width">
+                <template #header>
+                  <div class="card-header">历史退号趋势（近30天）</div>
+                </template>
+                <div id="historicalCancellationChart" class="chart"></div>
               </el-card>
             </div>
           </div>
@@ -256,17 +293,19 @@ const exporting = ref(false)
 // Mock 数据
 const mockData = reactive({
   overview: {
-    todayAppointments: 128,
-    activeDoctorsToday: 24,
-    pendingPatients: 15,
-    totalPatients: 3450,
-    last7DaysDates: ['11-16', '11-17', '11-18', '11-19', '11-20', '11-21', '11-22'],
-    last7DaysCounts: [120, 132, 101, 134, 90, 230, 210],
-    paymentStatus: [
-      { name: '已支付', value: 245 },
-      { name: '待支付', value: 38 },
-      { name: '退款', value: 12 }
-    ]
+    todayAppointments: 0,
+    activeDoctorsToday: 0,
+    pendingPatients: 0,
+    totalPatients: 0,
+    last7DaysDates: [],
+    last7DaysCounts: [],
+    paymentStatus: [],
+    totalHistoricalAppointments: 0,
+    totalHistoricalCancellations: 0,
+    last30DaysAppointmentDates: [],
+    last30DaysAppointmentCounts: [],
+    last30DaysCancellationDates: [],
+    last30DaysCancellationCounts: []
   },
   doctors: {
     totalDoctors: 156,
@@ -438,6 +477,96 @@ const initOverviewCharts = () => {
             ][index]
           }
         }))
+      }
+    ]
+  })
+
+  // 历史挂号趋势图（近30天）
+  initChart('historicalAppointmentChart', {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '10%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: mockData.overview.last30DaysAppointmentDates,
+      axisLine: { lineStyle: { color: '#4a5568' } },
+      axisLabel: { color: '#718096', rotate: 45 }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { lineStyle: { color: '#4a5568' } },
+      axisLabel: { color: '#718096' },
+      splitLine: { lineStyle: { color: '#e2e8f0', type: 'dashed' } }
+    },
+    series: [
+      {
+        name: '挂号量',
+        type: 'line',
+        smooth: true,
+        data: mockData.overview.last30DaysAppointmentCounts,
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(99, 102, 241, 0.3)' },
+            { offset: 1, color: 'rgba(99, 102, 241, 0.1)' }
+          ])
+        },
+        lineStyle: { color: '#6366f1', width: 3 },
+        itemStyle: { color: '#6366f1', borderWidth: 2, borderColor: '#fff' }
+      }
+    ]
+  })
+
+  // 历史退号趋势图（近30天）
+  initChart('historicalCancellationChart', {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '10%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: mockData.overview.last30DaysCancellationDates,
+      axisLine: { lineStyle: { color: '#4a5568' } },
+      axisLabel: { color: '#718096', rotate: 45 }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { lineStyle: { color: '#4a5568' } },
+      axisLabel: { color: '#718096' },
+      splitLine: { lineStyle: { color: '#e2e8f0', type: 'dashed' } }
+    },
+    series: [
+      {
+        name: '退号量',
+        type: 'line',
+        smooth: true,
+        data: mockData.overview.last30DaysCancellationCounts,
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(251, 146, 60, 0.3)' },
+            { offset: 1, color: 'rgba(251, 146, 60, 0.1)' }
+          ])
+        },
+        lineStyle: { color: '#fb923c', width: 3 },
+        itemStyle: { color: '#fb923c', borderWidth: 2, borderColor: '#fff' }
       }
     ]
   })
@@ -790,7 +919,132 @@ const handleExit = () => {
   router.push('/')
 }
 
-// 导出PDF
+// 计算百分比的辅助函数
+const getPercentage = (value, dataArray) => {
+  const total = dataArray.reduce((sum, item) => sum + item.value, 0)
+  return total > 0 ? ((value / total) * 100).toFixed(1) : '0.0'
+}
+
+// 生成结论与建议
+const generateSummaryAndRecommendations = () => {
+  const findings = []
+  const recommendations = []
+  
+  // 综合分析所有数据
+  // 运营总览分析
+  if (mockData.overview.todayAppointments > 50) {
+    findings.push('今日挂号量较高，医疗服务需求旺盛')
+    recommendations.push('建议优化挂号流程，减少患者等待时间')
+  } else if (mockData.overview.todayAppointments < 20) {
+    findings.push('今日挂号量偏低，可能存在服务推广不足')
+    recommendations.push('建议加强医疗服务宣传，提升患者就诊意愿')
+  }
+  
+  if (mockData.overview.pendingPatients > 30) {
+    findings.push('当前候诊人数较多，可能存在就诊高峰')
+    recommendations.push('建议增加医生排班，优化候诊流程')
+  }
+  
+  // 分析支付状态
+  const unpaidCount = mockData.overview.paymentStatus.find(s => s.name === '待支付')?.value || 0
+  if (unpaidCount > 10) {
+    findings.push('待支付订单较多，可能影响医院收入')
+    recommendations.push('建议优化支付流程，增加支付提醒功能')
+  }
+  
+  // 医生资源分析
+  if (mockData.doctors.todayLeaveCount > 5) {
+    findings.push(`今日请假医生数量较多（${mockData.doctors.todayLeaveCount}人），可能影响正常接诊`)
+    recommendations.push('建议建立医生排班备份机制，确保医疗服务连续性')
+  }
+  
+  // 分析医生工作量
+  if (mockData.doctors.doctorWorkload.length > 0) {
+    const maxWorkload = Math.max(...mockData.doctors.doctorWorkload.map(d => d.value))
+    const topDoctor = mockData.doctors.doctorWorkload[0]
+    if (maxWorkload > 50) {
+      findings.push(`${topDoctor.name}医生工作量已达到饱和状态（${maxWorkload}人次）`)
+      recommendations.push('建议合理分配医生工作量，避免过度疲劳')
+    }
+  }
+  
+  // 分析科室繁忙度
+  if (mockData.doctors.departmentBusy.length > 0) {
+    const busiestDept = mockData.doctors.departmentBusy[0]
+    findings.push(`${busiestDept.name}科室就诊量最高（${busiestDept.value}人次），为重点科室`)
+    recommendations.push(`建议在${busiestDept.name}科室增加医生配置，提升服务能力`)
+  }
+  
+  // 患者群体分析
+  if (mockData.patients.monthlyNewRegistrations > 100) {
+    findings.push('本月新增注册用户增长强劲，医疗服务影响力提升')
+    recommendations.push('建议继续优化用户体验，提高用户留存率')
+  }
+  
+  if (mockData.patients.totalNoShows > 20) {
+    findings.push(`累计爽约次数较高（${mockData.patients.totalNoShows}次），影响医疗资源利用率`)
+    recommendations.push('建议引入预约提醒机制，降低爽约率')
+  }
+  
+  // 分析患者类型
+  const studentType = mockData.patients.patientType.find(t => t.name === '学生')
+  if (studentType && studentType.value > 50) {
+    const percentage = ((studentType.value / mockData.patients.patientType.reduce((sum, t) => sum + t.value, 0)) * 100).toFixed(1)
+    findings.push(`学生群体占比较高（${percentage}%），为主要服务对象`)
+    recommendations.push('建议针对学生群体优化就诊时间安排，如增加晚间和周末门诊')
+  }
+  
+  // 如果没有特殊发现，添加默认内容
+  if (findings.length === 0) {
+    findings.push('当前运营数据整体平稳，各项指标正常')
+  }
+  if (recommendations.length === 0) {
+    recommendations.push('建议持续监控关键指标，及时发现并解决潜在问题')
+  }
+  
+  return { findings, recommendations }
+}
+
+// 获取所有图表的 Base64 图片
+const getAllChartsAsImages = async () => {
+  const chartImages = []
+  const chartIds = [
+    'appointmentTrendChart',
+    'paymentStatusChart',
+    'historicalAppointmentChart',
+    'historicalCancellationChart',
+    'titleDistributionChart',
+    'departmentBusyChart',
+    'doctorWorkloadChart',
+    'userGrowthChart',
+    'patientTypeChart',
+    'timeSlotChart'
+  ]
+  
+  for (const chartId of chartIds) {
+    const chartInstance = chartInstances.get(chartId)
+    if (chartInstance && !chartInstance.isDisposed()) {
+      try {
+        // 获取图表截图
+        const dataUrl = chartInstance.getDataURL({
+          type: 'png',
+          pixelRatio: 1.5,
+          backgroundColor: '#fff'
+        })
+        chartImages.push({
+          id: chartId,
+          dataUrl
+        })
+      } catch (error) {
+        console.warn(`无法获取图表 ${chartId} 的图片:`, error)
+      }
+    }
+  }
+  
+  return chartImages
+}
+
+// 导出PDF - 使用 jsPDF.html() 方法
 const handleExportPDF = async () => {
   exporting.value = true
   try {
@@ -1021,6 +1275,8 @@ const setupResizeObserver = () => {
   const chartIds = [
     'appointmentTrendChart',
     'paymentStatusChart',
+    'historicalAppointmentChart',
+    'historicalCancellationChart',
     'titleDistributionChart',
     'departmentBusyChart',
     'doctorWorkloadChart',
@@ -1040,6 +1296,234 @@ const setupResizeObserver = () => {
 }
 
 let resizeObserver = null
+
+// 加载数据
+const loadOverviewData = async () => {
+  try {
+    loading.value = true
+    console.log('开始加载运营总览数据...')
+    const response = await getOverviewStats()
+    console.log('运营总览API响应:', response)
+    console.log('响应类型:', typeof response)
+    console.log('响应是否为对象:', response && typeof response === 'object')
+    
+    // Spring Boot 直接返回数据，不是包装在 data 中
+    const data = response || {}
+    console.log('解析后的数据:', data)
+    
+    mockData.overview.todayAppointments = data.todayAppointments ?? 0
+    mockData.overview.activeDoctorsToday = data.activeDoctorsToday ?? 0
+    mockData.overview.pendingPatients = data.pendingPatients ?? 0
+    mockData.overview.totalPatients = data.totalPatients ?? 0
+    mockData.overview.last7DaysDates = data.last7DaysDates || []
+    mockData.overview.last7DaysCounts = data.last7DaysCounts || []
+    mockData.overview.paymentStatus = data.paymentStatus || []
+    mockData.overview.totalHistoricalAppointments = data.totalHistoricalAppointments ?? 0
+    mockData.overview.totalHistoricalCancellations = data.totalHistoricalCancellations ?? 0
+    mockData.overview.last30DaysAppointmentDates = data.last30DaysAppointmentDates || []
+    mockData.overview.last30DaysAppointmentCounts = data.last30DaysAppointmentCounts || []
+    mockData.overview.last30DaysCancellationDates = data.last30DaysCancellationDates || []
+    mockData.overview.last30DaysCancellationCounts = data.last30DaysCancellationCounts || []
+    
+    console.log('更新后的运营总览数据:', mockData.overview)
+    console.log('今日挂号量:', mockData.overview.todayAppointments)
+    console.log('今日出诊医生:', mockData.overview.activeDoctorsToday)
+    console.log('当前候诊人数:', mockData.overview.pendingPatients)
+    console.log('累计注册用户:', mockData.overview.totalPatients)
+    console.log('历史挂号总数:', mockData.overview.totalHistoricalAppointments)
+    console.log('历史退号总数:', mockData.overview.totalHistoricalCancellations)
+  } catch (error) {
+    console.error('加载运营总览数据失败:', error)
+    console.error('错误详情:', {
+      message: error.message,
+      response: error.response,
+      request: error.request,
+      config: error.config
+    })
+    
+    let errorMsg = '加载数据失败'
+    if (error.response) {
+      errorMsg = `后端错误 (${error.response.status}): ${error.response.data?.message || error.response.statusText}`
+    } else if (error.request) {
+      errorMsg = '无法连接到后端服务，请检查：1. 后端服务是否启动 2. 后端地址是否为 http://localhost:8080'
+    } else {
+      errorMsg = error.message || '未知错误'
+    }
+    
+    ElMessage.error(errorMsg)
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadDoctorsData = async () => {
+  try {
+    loading.value = true
+    const response = await getDoctorsStats()
+    console.log('医生资源分析API响应:', response)
+    // Spring Boot 直接返回数据，不是包装在 data 中
+    const data = response || {}
+    mockData.doctors.totalDoctors = data.totalDoctors || 0
+    mockData.doctors.todayLeaveCount = data.todayLeaveCount || 0
+    mockData.doctors.totalDepartments = data.totalDepartments || 0
+    mockData.doctors.titleDistribution = data.titleDistribution || []
+    mockData.doctors.departmentBusy = data.departmentBusy || []
+    mockData.doctors.doctorWorkload = (data.doctorWorkload || []).map(item => ({
+      name: item.name,
+      department: item.department,
+      value: item.value
+    }))
+    console.log('更新后的医生资源分析数据:', mockData.doctors)
+  } catch (error) {
+    console.error('加载医生资源分析数据失败:', error)
+    ElMessage.error('加载数据失败: ' + (error.message || '请检查后端服务'))
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadPatientsData = async () => {
+  try {
+    loading.value = true
+    // 获取日期范围参数
+    const startDate = timeSlotDateRange.value && timeSlotDateRange.value.length > 0 ? timeSlotDateRange.value[0] : null
+    const endDate = timeSlotDateRange.value && timeSlotDateRange.value.length > 1 ? timeSlotDateRange.value[1] : null
+    const response = await getPatientsStats(startDate, endDate)
+    console.log('患者群体画像API响应:', response)
+    // Spring Boot 直接返回数据，不是包装在 data 中
+    const data = response || {}
+    mockData.patients.monthlyNewRegistrations = data.monthlyNewRegistrations || 0
+    mockData.patients.teacherStaffStudentRatio = data.teacherStaffStudentRatio || '0:0:0'
+    mockData.patients.totalNoShows = data.totalNoShows || 0
+    mockData.patients.last30DaysDates = data.last30DaysDates || []
+    mockData.patients.last30DaysCounts = (data.last30DaysCounts || []).map(count => Number(count))
+    mockData.patients.patientType = (data.patientType && data.patientType.length > 0) ? data.patientType : getDefaultPatientType()
+    mockData.patients.timeSlotData = (data.timeSlotData || []).map(item => ({
+      time: item.time,
+      count: item.count
+    }))
+    console.log('更新后的患者群体画像数据:', mockData.patients)
+  } catch (error) {
+    console.error('加载患者群体画像数据失败:', error)
+    ElMessage.error('加载数据失败: ' + (error.message || '请检查后端服务'))
+  } finally {
+    loading.value = false
+  }
+}
+
+// 处理就诊时段日期范围变化
+const handleTimeSlotDateChange = () => {
+  // 日期变化时自动刷新图表
+  refreshTimeSlotChart()
+}
+
+// 刷新就诊时段热力图
+const refreshTimeSlotChart = async () => {
+  try {
+    loading.value = true
+    // 只刷新就诊时段数据
+    const startDate = timeSlotDateRange.value && timeSlotDateRange.value.length > 0 ? timeSlotDateRange.value[0] : null
+    const endDate = timeSlotDateRange.value && timeSlotDateRange.value.length > 1 ? timeSlotDateRange.value[1] : null
+    const response = await getPatientsStats(startDate, endDate)
+    const data = response || {}
+    mockData.patients.timeSlotData = (data.timeSlotData || []).map(item => ({
+      time: item.time,
+      count: item.count
+    }))
+    // 只更新就诊时段图表
+    nextTick(() => {
+      setTimeout(() => {
+        initChart('timeSlotChart', {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' }
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            top: '10%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'category',
+            data: mockData.patients.timeSlotData.map(d => d.time),
+            axisLine: { lineStyle: { color: '#4a5568' } },
+            axisLabel: { color: '#718096', rotate: 45 }
+          },
+          yAxis: {
+            type: 'value',
+            axisLine: { lineStyle: { color: '#4a5568' } },
+            axisLabel: { color: '#718096' },
+            splitLine: { lineStyle: { color: '#e2e8f0', type: 'dashed' } }
+          },
+          series: [
+            {
+              name: '挂号量',
+              type: 'bar',
+              data: mockData.patients.timeSlotData.map(d => d.count),
+              itemStyle: {
+                color: function (params) {
+                  const colors = [
+                    ['#4299e1', '#3182ce'],
+                    ['#48bb78', '#38a169'],
+                    ['#f59e0b', '#d97706'],
+                    ['#f56565', '#e53e3e']
+                  ]
+                  const colorIndex = Math.floor(params.dataIndex / 3) % colors.length
+                  return new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                    { offset: 0, color: colors[colorIndex][0] },
+                    { offset: 1, color: colors[colorIndex][1] }
+                  ])
+                }
+              },
+              label: {
+                show: true,
+                position: 'top',
+                color: '#2d3748'
+              }
+            }
+          ]
+        })
+      }, 100)
+    })
+    ElMessage.success('数据已刷新')
+  } catch (error) {
+    console.error('刷新就诊时段数据失败:', error)
+    ElMessage.error('刷新失败: ' + (error.message || '请检查后端服务'))
+  } finally {
+    loading.value = false
+  }
+}
+
+// 处理 Tab 切换
+const handleTabChange = (tabName) => {
+  nextTick(() => {
+    // 延迟初始化图表，确保 DOM 已渲染
+    setTimeout(() => {
+      switch (tabName) {
+        case 'overview':
+          loadOverviewData().then(() => {
+            initOverviewCharts()
+          })
+          break
+        case 'doctors':
+          loadDoctorsData().then(() => {
+            initDoctorsCharts()
+          })
+          break
+        case 'patients':
+          loadPatientsData().then(() => {
+            initPatientsCharts()
+          })
+          break
+      }
+      // 触发所有图表 resize
+      resizeAllCharts()
+    }, 100)
+  })
+}
 
 onMounted(() => {
   // 初始化第一个 Tab 的图表
@@ -1209,6 +1693,10 @@ onUnmounted(() => {
   border-left-color: #667eea;
 }
 
+.stat-card-cyan {
+  border-left-color: #06b6d4;
+}
+
 .stat-icon {
   width: 64px;
   height: 64px;
@@ -1246,6 +1734,11 @@ onUnmounted(() => {
 
 .stat-card-indigo .stat-icon {
   background: linear-gradient(135deg, #667eea 0%, #5a67d8 100%);
+  color: white;
+}
+
+.stat-card-cyan .stat-icon {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
   color: white;
 }
 

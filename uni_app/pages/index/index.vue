@@ -791,10 +791,10 @@
 				this.showAllDepartments = !this.showAllDepartments
 			},
 			
-			// 切换学号脱敏显示
-			toggleIdentifierMask() {
-				this.identifierMasked = !this.identifierMasked
-			},
+		// 切换学号脱敏显示
+		toggleIdentifierMask() {
+			this.identifierMasked = !this.identifierMasked
+		},
 
 		// 导航到 AI 预问诊
 		navigateToPreTriage() {
@@ -809,8 +809,8 @@
 				url: '/pages/ai-assistant/index'
 			})
 		}
-		}
 	}
+}
 </script>
 
 <style lang="scss">

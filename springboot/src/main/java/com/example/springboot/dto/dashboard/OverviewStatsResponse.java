@@ -15,6 +15,13 @@ public class OverviewStatsResponse {
     private List<Integer> last7DaysCounts;
 
     private List<SimpleNameValue> paymentStatus; // 已支付/待支付/退款
+
+    private long totalHistoricalAppointments;
+    private long totalHistoricalCancellations;
+    private List<String> last30DaysAppointmentDates;
+    private List<Integer> last30DaysAppointmentCounts;
+    private List<String> last30DaysCancellationDates;
+    private List<Integer> last30DaysCancellationCounts;
 }
 
 

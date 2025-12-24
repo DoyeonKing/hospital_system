@@ -1,6 +1,7 @@
 package com.example.springboot.repository;
 
 import com.example.springboot.entity.Appointment;
+import com.example.springboot.entity.Department;
 import com.example.springboot.entity.Patient;
 import com.example.springboot.entity.Schedule;
 import com.example.springboot.entity.enums.AppointmentStatus;
@@ -320,4 +321,76 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
             @Param("status") AppointmentStatus status,
             @Param("today") LocalDate today,
             @Param("now") LocalTime now);
+
+    /**
+     * 按日期范围统计历史挂号数量（按排班日期分组）
+     */
+    @Query("SELECT DATE(s.scheduleDate) as date, COUNT(a) as count " +
+           "FROM Appointment a " +
+           "JOIN a.schedule s " +
+           "WHERE s.scheduleDate BETWEEN :startDate AND :endDate " +
+           "GROUP BY DATE(s.scheduleDate) " +
+           "ORDER BY DATE(s.scheduleDate)")
+    List<Map<String, Object>> countHistoricalAppointmentsByDateRange(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
+    /**
+     * 按日期范围统计历史退号数量（按更新时间分组）
+     */
+    @Query("SELECT DATE(a.updatedAt) as date, COUNT(a) as count " +
+           "FROM Appointment a " +
+           "WHERE a.status = com.example.springboot.entity.enums.AppointmentStatus.cancelled " +
+           "AND DATE(a.updatedAt) BETWEEN :startDate AND :endDate " +
+           "GROUP BY DATE(a.updatedAt) " +
+           "ORDER BY DATE(a.updatedAt)")
+    List<Map<String, Object>> countHistoricalCancellationsByDateRange(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
+    /**
+     * 统计总挂号数量
+     */
+    @Query("SELECT COUNT(a) FROM Appointment a")
+    long countTotalAppointments();
+
+    /**
+     * 统计总退号数量
+     */
+    @Query("SELECT COUNT(a) FROM Appointment a WHERE a.status = com.example.springboot.entity.enums.AppointmentStatus.cancelled")
+    long countTotalCancellations();
+
+    /**
+     * 统计患者在指定日期范围内的有效预约数量（排除已取消的）
+     * 用于规则1：同一就诊人8天内最多可挂10个号
+     */
+    @Query("SELECT COUNT(a) FROM Appointment a " +
+           "WHERE a.patient = :patient " +
+           "AND a.schedule.scheduleDate BETWEEN :startDate AND :endDate " +
+           "AND a.status != com.example.springboot.entity.enums.AppointmentStatus.cancelled")
+    long countByPatientAndScheduleDateRangeAndStatusNotCancelled(
+            @Param("patient") Patient patient,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
+    /**
+     * 检查患者在同一天、同一科室、同一医生等级是否已有有效预约
+     * 用于规则2：同一患者同一诊疗单元内，最多可挂同一科室同一等级医生的号各一个
+     * 诊疗单元定义：同一天的同一科室
+     */
+    @Query("SELECT COUNT(a) > 0 FROM Appointment a " +
+           "JOIN a.schedule s " +
+           "JOIN s.doctor d " +
+           "WHERE a.patient = :patient " +
+           "AND d.department = :department " +
+           "AND d.titleLevel = :titleLevel " +
+           "AND s.scheduleDate = :scheduleDate " +
+           "AND a.status != com.example.springboot.entity.enums.AppointmentStatus.cancelled " +
+           "AND a.appointmentId != :excludeAppointmentId")
+    boolean existsByPatientAndDepartmentAndTitleLevelOnDate(
+            @Param("patient") Patient patient,
+            @Param("department") Department department,
+            @Param("titleLevel") Integer titleLevel,
+            @Param("scheduleDate") LocalDate scheduleDate,
+            @Param("excludeAppointmentId") Integer excludeAppointmentId);
 }

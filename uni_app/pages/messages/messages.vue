@@ -167,6 +167,7 @@
 		getTypeName(type) {
 			const typeMap = {
 				'payment_success': '支付通知',
+				'appointment_success': '预约成功',
 				'appointment_reminder': '预约提醒',
 				'cancellation': '取消通知',
 				'waitlist_available': '候补通知',
@@ -178,9 +179,21 @@
 		
 		// 处理对话点击
 		handleConversationClick(conversation) {
-			console.log('点击对话', conversation)
+			console.log('[消息列表] 点击对话', conversation)
+			console.log('[消息列表] conversation数据:', JSON.stringify(conversation, null, 2))
+			
 			// 检查是否有效
-			if (!conversation || !conversation.senderId) {
+			if (!conversation) {
+				console.error('[消息列表] conversation为空')
+				uni.showToast({
+					title: '对话数据错误',
+					icon: 'none'
+				})
+				return
+			}
+			
+			if (!conversation.senderId) {
+				console.error('[消息列表] senderId为空', conversation)
 				uni.showToast({
 					title: '对话数据错误',
 					icon: 'none'
@@ -189,19 +202,23 @@
 			}
 			
 			// 跳转到对话详情页
-			const url = `/pages/messages/message-conversation?senderId=${encodeURIComponent(conversation.senderId)}`
-			console.log('跳转URL', url)
+			const senderId = String(conversation.senderId)
+			const url = `/pages/messages/message-conversation?senderId=${encodeURIComponent(senderId)}`
+			console.log('[消息列表] 跳转URL:', url)
+			console.log('[消息列表] senderId原始值:', senderId)
 			
 			uni.navigateTo({
 				url: url,
-				success: () => {
-					console.log('跳转成功')
+				success: (res) => {
+					console.log('[消息列表] 跳转成功', res)
 				},
 				fail: (err) => {
-					console.error('跳转失败', err)
+					console.error('[消息列表] 跳转失败', err)
+					console.error('[消息列表] 错误详情:', JSON.stringify(err, null, 2))
 					uni.showToast({
-						title: '跳转失败',
-						icon: 'none'
+						title: '跳转失败: ' + (err.errMsg || '未知错误'),
+						icon: 'none',
+						duration: 3000
 					})
 				}
 			})
@@ -280,6 +297,8 @@
 		align-items: center;
 		box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
 		transition: all 0.3s ease;
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
 	}
 	
 	.conversation-item:active {

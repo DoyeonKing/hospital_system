@@ -135,6 +135,72 @@ public class DashboardServiceImpl implements DashboardService {
             .collect(Collectors.toList());
         response.setPaymentStatus(paymentStatus);
 
+        // 7. 历史挂号总数
+        long totalHistoricalAppointments = appointmentRepository.countTotalAppointments();
+        response.setTotalHistoricalAppointments(totalHistoricalAppointments);
+        System.out.println("历史挂号总数: " + totalHistoricalAppointments);
+
+        // 8. 历史退号总数
+        long totalHistoricalCancellations = appointmentRepository.countTotalCancellations();
+        response.setTotalHistoricalCancellations(totalHistoricalCancellations);
+        System.out.println("历史退号总数: " + totalHistoricalCancellations);
+
+        // 9. 近30天挂号趋势
+        LocalDate thirtyDaysAgo = today.minusDays(29);
+        List<Map<String, Object>> appointmentTrendData = appointmentRepository.countHistoricalAppointmentsByDateRange(
+            thirtyDaysAgo, today
+        );
+        
+        List<String> appointmentDates = new ArrayList<>();
+        List<Integer> appointmentCounts = new ArrayList<>();
+        DateTimeFormatter formatter30 = DateTimeFormatter.ofPattern("MM-dd");
+        
+        for (int i = 0; i < 30; i++) {
+            LocalDate date = thirtyDaysAgo.plusDays(i);
+            String dateStr = date.format(formatter30);
+            appointmentDates.add(dateStr);
+            
+            Optional<Map<String, Object>> dayData = appointmentTrendData.stream()
+                .filter(d -> {
+                    LocalDate dDate = ((java.sql.Date) d.get("date")).toLocalDate();
+                    return dDate.equals(date);
+                })
+                .findFirst();
+            
+            appointmentCounts.add(dayData.map(d -> ((Number) d.get("count")).intValue()).orElse(0));
+        }
+        
+        response.setLast30DaysAppointmentDates(appointmentDates);
+        response.setLast30DaysAppointmentCounts(appointmentCounts);
+        System.out.println("近30天挂号趋势数据点数: " + appointmentCounts.size());
+
+        // 10. 近30天退号趋势
+        List<Map<String, Object>> cancellationTrendData = appointmentRepository.countHistoricalCancellationsByDateRange(
+            thirtyDaysAgo, today
+        );
+        
+        List<String> cancellationDates = new ArrayList<>();
+        List<Integer> cancellationCounts = new ArrayList<>();
+        
+        for (int i = 0; i < 30; i++) {
+            LocalDate date = thirtyDaysAgo.plusDays(i);
+            String dateStr = date.format(formatter30);
+            cancellationDates.add(dateStr);
+            
+            Optional<Map<String, Object>> dayData = cancellationTrendData.stream()
+                .filter(d -> {
+                    LocalDate dDate = ((java.sql.Date) d.get("date")).toLocalDate();
+                    return dDate.equals(date);
+                })
+                .findFirst();
+            
+            cancellationCounts.add(dayData.map(d -> ((Number) d.get("count")).intValue()).orElse(0));
+        }
+        
+        response.setLast30DaysCancellationDates(cancellationDates);
+        response.setLast30DaysCancellationCounts(cancellationCounts);
+        System.out.println("近30天退号趋势数据点数: " + cancellationCounts.size());
+
         return response;
     }
 
