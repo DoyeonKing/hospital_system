@@ -1,10 +1,12 @@
 package com.example.springboot.service.impl;
 
 import com.example.springboot.dto.schedule.*;
+import com.example.springboot.entity.Appointment;
 import com.example.springboot.entity.Doctor;
 import com.example.springboot.entity.Location;
 import com.example.springboot.entity.Schedule;
 import com.example.springboot.entity.TimeSlot;
+import com.example.springboot.entity.enums.AppointmentStatus;
 import com.example.springboot.entity.enums.ScheduleStatus;
 import com.example.springboot.exception.BadRequestException;
 import com.example.springboot.exception.ResourceNotFoundException;
@@ -265,7 +267,25 @@ public class ScheduleServiceImpl implements ScheduleService {
             throw new BadRequestException("排班地点不匹配，无法删除");
         }
 
-        // 4. 执行删除
+        // 4. 🔥 检查是否有预约记录（外键约束会阻止删除任何有预约的排班）
+        long totalAppointmentCount = appointmentRepository.countBySchedule(schedule);
+        if (totalAppointmentCount > 0) {
+            // 统计未完成的预约数量（用于更友好的提示）
+            List<Appointment> appointments = appointmentRepository.findBySchedule(schedule);
+            long activeAppointmentCount = appointments.stream()
+                    .filter(apt -> apt.getStatus() != AppointmentStatus.cancelled 
+                               && apt.getStatus() != AppointmentStatus.completed)
+                    .count();
+            
+            if (activeAppointmentCount > 0) {
+                throw new BadRequestException("无法删除排班：该排班存在 " + activeAppointmentCount + " 个未完成的预约记录，请先处理相关预约后再删除");
+            } else {
+                // 如果只有已取消或已完成的预约，理论上外键约束仍然会阻止删除
+                throw new BadRequestException("无法删除排班：该排班存在 " + totalAppointmentCount + " 个预约记录（包括已取消和已完成的），请先处理相关预约后再删除");
+            }
+        }
+
+        // 5. 执行删除
         scheduleRepository.delete(schedule);
     }
 

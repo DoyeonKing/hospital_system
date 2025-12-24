@@ -30,6 +30,35 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
     }
 
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<Result> handleBadRequestException(BadRequestException ex, WebRequest request) {
+        Result errorResponse = Result.error("400", ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * 处理数据完整性违反异常（外键约束等）
+     */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<Result> handleDataIntegrityViolationException(org.springframework.dao.DataIntegrityViolationException ex, WebRequest request) {
+        String errorMsg = ex.getMessage();
+        String friendlyMsg = "操作失败：数据完整性约束违反";
+        
+        // 🔥 检查是否是外键约束错误
+        if (errorMsg != null) {
+            if (errorMsg.contains("foreign key constraint") || errorMsg.contains("Cannot delete or update a parent row")) {
+                if (errorMsg.contains("appointments")) {
+                    friendlyMsg = "无法删除排班：该排班存在关联的预约记录，请先处理相关预约后再删除";
+                } else {
+                    friendlyMsg = "无法删除：该记录存在关联数据，请先处理相关记录";
+                }
+            }
+        }
+        
+        Result errorResponse = Result.error("400", friendlyMsg);
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Result> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();

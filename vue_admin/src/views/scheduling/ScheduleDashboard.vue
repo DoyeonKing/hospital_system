@@ -928,10 +928,7 @@ const removeDoctorFromShift = async (doctor, date, shift, showMessage = true) =>
   if (shiftEntry) {
     const docIndex = shiftEntry.doctors.findIndex(d => d.id === doctor.id);
     if (docIndex > -1) {
-      // 先从前端数据中移除
-      shiftEntry.doctors.splice(docIndex, 1);
-      
-      // 尝试从后端删除排班记录
+      // 🔥 修改逻辑：先调用后端删除，成功后再更新前端状态
       try {
         // 获取当前时段的时间段信息（只使用手动拖拽的时间段）
         const timeSlotsForShift = getTimeSlotsForShift(shift);
@@ -962,50 +959,58 @@ const removeDoctorFromShift = async (doctor, date, shift, showMessage = true) =>
         console.log(`时间段信息:`, timeSlot);
         console.log(`地点信息:`, location);
         
-        if (timeSlot && location) {
-          // 构建删除参数
-          const deleteData = {
-            doctorId: parseInt(doctor.id),
-            slotId: parseInt(timeSlot.slotId || timeSlot.slot_id || 1),
-            locationId: parseInt(location.location_id || 1),
-            scheduleDate: date // 确保日期格式为 YYYY-MM-DD
-          };
-          
-          console.log('删除排班参数:', deleteData);
-          console.log('日期格式检查:', {
-            originalDate: date,
-            dateType: typeof date,
-            isValidFormat: /^\d{4}-\d{2}-\d{2}$/.test(date)
-          });
-          
-          // 调用后端删除接口
-          await deleteScheduleByParams(deleteData);
-          
-          console.log(`✅ 成功从后端删除排班: ${doctor.name} - ${date} ${shift}`);
-          
+        if (!timeSlot) {
+          console.warn('无法删除后端排班记录：缺少时间段信息');
           if (showMessage) {
-            ElMessage.success(`已取消 ${doctor.name} 在 ${date} ${shift} 的排班`);
+            ElMessage.warning('无法删除后端排班记录：缺少时间段信息');
           }
-        } else {
-          if (!timeSlot) {
-            console.warn('无法删除后端排班记录：缺少时间段信息');
-          if (showMessage) {
-              ElMessage.warning('无法删除后端排班记录：缺少时间段信息');
-            }
-          } else if (!location) {
-            console.warn('无法删除后端排班记录：医生未分配地点');
-            if (showMessage) {
-              ElMessage.warning('无法删除后端排班记录：医生未分配地点');
-            }
-          }
+          return;
         }
+        
+        if (!location) {
+          console.warn('无法删除后端排班记录：医生未分配地点');
+          if (showMessage) {
+            ElMessage.warning('无法删除后端排班记录：医生未分配地点');
+          }
+          return;
+        }
+        
+        // 构建删除参数
+        const deleteData = {
+          doctorId: parseInt(doctor.id),
+          slotId: parseInt(timeSlot.slotId || timeSlot.slot_id || 1),
+          locationId: parseInt(location.location_id || 1),
+          scheduleDate: date // 确保日期格式为 YYYY-MM-DD
+        };
+        
+        console.log('删除排班参数:', deleteData);
+        console.log('日期格式检查:', {
+          originalDate: date,
+          dateType: typeof date,
+          isValidFormat: /^\d{4}-\d{2}-\d{2}$/.test(date)
+        });
+        
+        // 🔥 调用后端删除接口
+        await deleteScheduleByParams(deleteData);
+        
+        console.log(`✅ 成功从后端删除排班: ${doctor.name} - ${date} ${shift}`);
+        
+        // 🔥 后端删除成功后，才从前端移除
+        shiftEntry.doctors.splice(docIndex, 1);
+        
+        if (showMessage) {
+          ElMessage.success(`已取消 ${doctor.name} 在 ${date} ${shift} 的排班`);
+        }
+        
       } catch (error) {
         console.error('删除后端排班记录失败:', error);
+        // 🔥 提取后端返回的错误消息
+        const errorMsg = error.response?.data?.msg || error.response?.data?.message || error.message || '未知错误';
         if (showMessage) {
-          ElMessage.error(`删除排班失败: ${error.message || '未知错误'}`);
+          ElMessage.error(`删除排班失败: ${errorMsg}`);
         }
-        // 如果后端删除失败，可以选择是否回滚前端状态
-        // shiftEntry.doctors.splice(docIndex, 0, doctor);
+        // 🔥 后端删除失败，不移除前端状态，保持界面和后端一致
+        return;
       }
       
       console.log(`移除医生 ${doctor.name} 从 ${date} ${shift}`);
