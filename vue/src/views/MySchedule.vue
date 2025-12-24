@@ -552,24 +552,26 @@ const loadSchedules = async () => {
     console.log('响应中的 content:', response?.content)
     console.log('content 长度:', response?.content?.length)
     
-    // 处理返回的数据
+    // 处理返回的数据，过滤掉已取消的排班
     if (response && response.content) {
-      schedules.value = response.content.map(schedule => ({
-        scheduleId: schedule.scheduleId,
-        doctorId: schedule.doctorId,
-        scheduleDate: schedule.scheduleDate,
-        slotId: schedule.slotId,
-        slotName: schedule.slotName,
-        startTime: schedule.startTime,
-        endTime: schedule.endTime,
-        locationId: schedule.locationId,
-        location: schedule.location,
-        totalSlots: schedule.totalSlots,
-        bookedSlots: schedule.bookedSlots,
-        fee: schedule.fee,
-        status: schedule.status,
-        remarks: schedule.remarks
-      }))
+      schedules.value = response.content
+        .filter(schedule => schedule.status !== 'cancelled')
+        .map(schedule => ({
+          scheduleId: schedule.scheduleId,
+          doctorId: schedule.doctorId,
+          scheduleDate: schedule.scheduleDate,
+          slotId: schedule.slotId,
+          slotName: schedule.slotName,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          locationId: schedule.locationId,
+          location: schedule.location,
+          totalSlots: schedule.totalSlots,
+          bookedSlots: schedule.bookedSlots,
+          fee: schedule.fee,
+          status: schedule.status,
+          remarks: schedule.remarks
+        }))
       console.log('处理后的排班数据:', schedules.value)
       ElMessage.success(`排班数据加载成功，共 ${schedules.value.length} 条`)
     } else {
