@@ -1010,26 +1010,52 @@ public class AppointmentService {
                 isCrossSession, isLate, isOnTimeCheckIn, checkInEndTime);
 
         // 7. 更新签到时间和状态（先不分配实时候诊序号）
+        // 🔥 检查是否是过号后重新签到
+        boolean isMissedCallRecheck = (appointment.getMissedCallCount() != null && appointment.getMissedCallCount() > 0);
+        
+        // 🔥 无论是否过号重新签到，都设置 checkInTime（用于显示）
         appointment.setCheckInTime(now);
+        
+        if (isMissedCallRecheck) {
+            // 🔥 过号后重新签到：额外设置 recheckInTime（用于排序）
+            appointment.setRecheckInTime(now);
+            logger.info("过号后重新签到 - 预约ID: {}, 过号次数: {}, 签到时间: {}, 重新签到时间: {}", 
+                    appointmentId, appointment.getMissedCallCount(), now, now);
+        }
+        
         appointment.setIsOnTime(isOnTimeCheckIn); // 记录是否按时签到
         appointment.setIsLate(isLate); // 记录是否迟到
         appointment.setStatus(AppointmentStatus.CHECKED_IN); // 设置状态为已签到
         
         // 8. 保存预约
         try {
-            appointmentRepository.save(appointment);
-            logger.info("签到信息已保存 - 预约ID: {}, 签到时间: {}, 是否按时: {}, 是否迟到: {}, 新状态: CHECKED_IN", 
-                    appointmentId, now, isOnTimeCheckIn, isLate, appointment.getStatus());
+            Appointment savedAppointment = appointmentRepository.save(appointment);
+            logger.info("签到信息已保存 - 预约ID: {}, 签到时间: {}, 重新签到时间: {}, 是否按时: {}, 是否迟到: {}, 新状态: CHECKED_IN, 过号次数: {}", 
+                    appointmentId, savedAppointment.getCheckInTime(), savedAppointment.getRecheckInTime(), 
+                    isOnTimeCheckIn, isLate, savedAppointment.getStatus(), savedAppointment.getMissedCallCount());
+            
+            // 🔥 验证数据是否正确保存
+            if (savedAppointment.getCheckInTime() == null) {
+                logger.error("警告：签到时间保存后为空！预约ID: {}", appointmentId);
+            }
         } catch (Exception e) {
             logger.error("保存签到信息失败 - 预约ID: {}, 错误信息: {}", appointmentId, e.getMessage(), e);
             throw new BadRequestException("签到失败，请重试");
         }
         
         // 9. 分配实时候诊序号（先签到先就诊）- 在保存后重新计算
-        Integer realTimeQueueNumber = assignRealTimeQueueNumber(schedule, appointment, isLate);
-        appointment.setRealTimeQueueNumber(realTimeQueueNumber);
-        appointmentRepository.save(appointment);
-        logger.info("实时候诊序号已分配 - 预约ID: {}, 实时候诊序号: {}", appointmentId, realTimeQueueNumber);
+        // 🔥 过号后重新签到不分配实时队列号，排在队尾
+        if (!isMissedCallRecheck) {
+            Integer realTimeQueueNumber = assignRealTimeQueueNumber(schedule, appointment, isLate);
+            appointment.setRealTimeQueueNumber(realTimeQueueNumber);
+            appointmentRepository.save(appointment);
+            logger.info("实时候诊序号已分配 - 预约ID: {}, 实时候诊序号: {}", appointmentId, realTimeQueueNumber);
+        } else {
+            // 过号后重新签到：清空实时队列号，依靠 recheckInTime 排在队尾
+            appointment.setRealTimeQueueNumber(null);
+            appointmentRepository.save(appointment);
+            logger.info("过号后重新签到 - 预约ID: {}, 不分配实时队列号，将排在队尾", appointmentId);
+        }
 
         // 7. 立即删除Token（确保一次性使用）
         try {
@@ -1405,14 +1431,26 @@ public class AppointmentService {
             throw new BadRequestException("该预约还未被叫号，无法标记过号");
         }
 
-        // 仅增加过号次数，保留签到/叫号状态
+        // 🔥 增加过号次数
         appointment.setMissedCallCount(
                 (appointment.getMissedCallCount() == null ? 0 : appointment.getMissedCallCount()) + 1);
 
+        // 🔥 状态改回scheduled，允许重新扫码签到
+        appointment.setStatus(AppointmentStatus.scheduled);
+        
+        // 🔥 清除签到时间，允许重新签到
+        appointment.setCheckInTime(null);
+        
+        // 🔥 清除叫号时间
+        appointment.setCalledAt(null);
+        
+        // 🔥 清除重新签到时间
+        appointment.setRecheckInTime(null);
+
         appointmentRepository.save(appointment);
 
-        logger.info("标记过号成功 - 预约ID: {}, 患者: {}, 过号次数: {}, 状态保持为 {}",
-                appointmentId, appointment.getPatient().getFullName(), appointment.getMissedCallCount(), appointment.getStatus());
+        logger.info("标记过号成功 - 预约ID: {}, 患者: {}, 过号次数: {}, 状态改为: scheduled，已清除签到/叫号记录",
+                appointmentId, appointment.getPatient().getFullName(), appointment.getMissedCallCount());
 
         return convertToResponseDto(appointment);
     }

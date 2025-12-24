@@ -113,24 +113,113 @@
       </div>
     </el-card>
 
-    <!-- 详情对话框 -->
-    <el-dialog v-model="detailDialogVisible" title="审计日志详情" width="700px">
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="日志ID">{{ currentLog.logId }}</el-descriptions-item>
-        <el-descriptions-item label="操作者ID">{{ currentLog.actorId }}</el-descriptions-item>
-        <el-descriptions-item label="操作者类型">
-          {{ getActorTypeLabel(currentLog.actorType) }}
-        </el-descriptions-item>
-        <el-descriptions-item label="操作时间">{{ currentLog.createdAt }}</el-descriptions-item>
-        <el-descriptions-item label="操作行为" :span="2">{{ currentLog.action }}</el-descriptions-item>
-        <el-descriptions-item label="目标实体">{{ currentLog.targetEntity }}</el-descriptions-item>
-        <el-descriptions-item label="目标ID">{{ currentLog.targetId }}</el-descriptions-item>
-        <el-descriptions-item label="详细信息" :span="2">
-          <pre style="max-height: 300px; overflow: auto;">{{ formatDetails(currentLog.details) }}</pre>
-        </el-descriptions-item>
-      </el-descriptions>
+    <!-- 详情对话框 - 美化版 -->
+    <el-dialog 
+      v-model="detailDialogVisible" 
+      title="审计日志详情" 
+      width="800px"
+      :close-on-click-modal="false"
+      class="audit-detail-dialog"
+    >
+      <div class="audit-detail-content">
+        <!-- 基本信息卡片 -->
+        <el-card class="info-card" shadow="never">
+          <template #header>
+            <div class="card-title">
+              <el-icon><Document /></el-icon>
+              <span>基本信息</span>
+            </div>
+          </template>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">日志ID</span>
+              <span class="info-value">
+                <el-tag type="info" size="small">{{ currentLog.logId }}</el-tag>
+              </span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">操作时间</span>
+              <span class="info-value">
+                <el-icon><Clock /></el-icon>
+                {{ currentLog.createdAt }}
+              </span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">操作者类型</span>
+              <span class="info-value">
+                <el-tag :type="getActorTypeTag(currentLog.actorType)" size="default">
+                  {{ getActorTypeLabel(currentLog.actorType) }}
+                </el-tag>
+              </span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">操作者ID</span>
+              <span class="info-value">
+                <el-tag type="warning" size="small">{{ currentLog.actorId }}</el-tag>
+              </span>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 操作信息卡片 -->
+        <el-card class="info-card" shadow="never">
+          <template #header>
+            <div class="card-title">
+              <el-icon><Operation /></el-icon>
+              <span>操作信息</span>
+            </div>
+          </template>
+          <div class="info-grid">
+            <div class="info-item full-width">
+              <span class="info-label">操作行为</span>
+              <span class="info-value action-text">{{ currentLog.action }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">目标实体</span>
+              <span class="info-value">
+                <el-tag type="success" effect="plain">{{ currentLog.targetEntity }}</el-tag>
+              </span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">目标ID</span>
+              <span class="info-value">
+                <el-tag type="primary" effect="plain">{{ currentLog.targetId }}</el-tag>
+              </span>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 详细信息卡片 -->
+        <el-card class="info-card details-card" shadow="never">
+          <template #header>
+            <div class="card-title">
+              <el-icon><Tickets /></el-icon>
+              <span>详细信息</span>
+              <el-button 
+                v-if="currentLog.details" 
+                size="small" 
+                text 
+                @click="copyDetails"
+                style="margin-left: auto;"
+              >
+                <el-icon><CopyDocument /></el-icon>
+                复制
+              </el-button>
+            </div>
+          </template>
+          <div class="json-viewer" v-if="currentLog.details">
+            <pre class="json-content">{{ formatDetails(currentLog.details) }}</pre>
+          </div>
+          <div v-else class="no-details">
+            <el-empty description="暂无详细信息" :image-size="80" />
+          </div>
+        </el-card>
+      </div>
+
       <template #footer>
-        <el-button @click="detailDialogVisible = false">关闭</el-button>
+        <div class="dialog-footer">
+          <el-button @click="detailDialogVisible = false" size="large">关闭</el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -139,7 +228,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight, Download } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, Download, Document, Clock, Operation, Tickets, CopyDocument } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 
 // 查询表单
@@ -224,8 +313,12 @@ const fetchStatistics = async () => {
   try {
     const response = await request.get('/api/audit-logs/statistics')
     if (response.code === '200') {
-      statistics.total = response.data.total
-      // 这里可以根据实际返回的数据设置今日、本周、本月的统计
+      const data = response.data
+      statistics.total = data.total || 0
+      statistics.today = data.today || 0
+      statistics.week = data.week || 0
+      statistics.month = data.month || 0
+      console.log('统计信息已更新:', statistics)
     }
   } catch (error) {
     console.error('Failed to fetch statistics:', error)
@@ -312,6 +405,17 @@ const formatDetails = (details) => {
   }
 }
 
+// 复制详细信息
+const copyDetails = async () => {
+  try {
+    const details = formatDetails(currentLog.value.details)
+    await navigator.clipboard.writeText(details)
+    ElMessage.success('复制成功！')
+  } catch (error) {
+    ElMessage.error('复制失败，请手动复制')
+  }
+}
+
 // 初始化
 onMounted(() => {
   fetchAuditLogs()
@@ -340,11 +444,176 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
-pre {
-  background-color: #f5f5f5;
-  padding: 10px;
+/* 审计详情弹窗样式 */
+.audit-detail-dialog :deep(.el-dialog__body) {
+  padding: 20px;
+  background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%);
+}
+
+.audit-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-card {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.info-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.info-card :deep(.el-card__header) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 12px 20px;
+  border-bottom: none;
+}
+
+.info-card.details-card :deep(.el-card__header) {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.card-title .el-icon {
+  font-size: 18px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  padding: 8px 0;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.info-item:hover {
+  background: #e9ecef;
+  transform: translateY(-2px);
+}
+
+.info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.info-label {
+  font-size: 13px;
+  color: #6c757d;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #212529;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-text {
+  color: #495057;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 4px 0;
+}
+
+/* JSON查看器样式 */
+.json-viewer {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e9ecef;
+}
+
+.json-content {
+  background: linear-gradient(to bottom, #2d3748 0%, #1a202c 100%);
+  color: #68d391;
+  padding: 20px;
+  margin: 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+  border-radius: 8px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.json-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.json-content::-webkit-scrollbar-track {
+  background: #1a202c;
   border-radius: 4px;
-  font-size: 12px;
+}
+
+.json-content::-webkit-scrollbar-thumb {
+  background: #4a5568;
+  border-radius: 4px;
+}
+
+.json-content::-webkit-scrollbar-thumb:hover {
+  background: #718096;
+}
+
+.no-details {
+  padding: 40px 0;
+  text-align: center;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+/* 美化标签 */
+.info-value .el-tag {
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 4px 12px;
+}
+
+/* 时钟图标动画 */
+.info-value .el-icon {
+  color: #667eea;
+  font-size: 16px;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .audit-detail-dialog :deep(.el-dialog) {
+    width: 95% !important;
+  }
 }
 </style>
 
