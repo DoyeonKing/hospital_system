@@ -69,3 +69,7 @@ SELECT COUNT(*) as appointment_count FROM appointments LIMIT 1;
 -- 4. 记录断开和恢复的时间点
 
 
+
+
+
+

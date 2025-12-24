@@ -20,9 +20,13 @@ spring:
     upload-dir: images/doctors/
 
   datasource:
-    url: jdbc:mysql://123.249.30.241:3306/hospital_db?useSSL=true&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
+    # 远程数据库配置（如果连接失败，请检查：1.云服务器MySQL是否运行 2.防火墙是否开放3306端口 3.MySQL是否允许远程连接）
+    url: jdbc:mysql://123.249.30.241:3306/hospital_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=30000&socketTimeout=30000
     username: root
     password: "123456" # 使用引号包裹密码，避免特殊字符解析问题
+    
+    # 本地数据库配置（如果需要切换到本地数据库，取消下面的注释并注释掉上面的配置）
+    #url: jdbc:mysql://localhost:3306/hospital_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
 
     #url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3307/hospital_07?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000}
     #username: ${SPRING_DATASOURCE_USERNAME:root}

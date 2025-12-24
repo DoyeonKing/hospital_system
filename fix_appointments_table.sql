@@ -9,3 +9,7 @@ ALTER TABLE appointments ADD COLUMN payment_deadline DATETIME DEFAULT NULL COMME
 
 
 
+
+
+
+

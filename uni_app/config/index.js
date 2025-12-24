@@ -85,14 +85,30 @@ const development = {
 	aiBaseURL: `http://${CURRENT_IP}:5000`
 }
 
-// 生产环境配置
+// ==================== 生产环境配置 ====================
+// ⚠️ 发布体验版前，请修改以下配置为你的实际API域名
+// 注意：必须使用 https:// 协议，且域名必须在微信公众平台配置
 const production = {
-	baseURL: 'https://your-production-api.com',
-	aiBaseURL: 'https://your-ai-api.com'
+	// 主后端服务（Spring Boot）- 改为你的实际API域名
+	baseURL: 'https://your-production-api.com',  // 👈 发布体验版时修改这里
+	
+	// AI 预问诊后端服务（Node.js）- 改为你的实际AI服务域名
+	aiBaseURL: 'https://your-ai-api.com'  // 👈 发布体验版时修改这里
 }
 
+// ==================== 环境切换 ====================
+// 切换方式：
+// 1. 开发环境：USE_PRODUCTION = false（默认）
+// 2. 生产环境（体验版）：USE_PRODUCTION = true
+// 
+// 发布体验版步骤：
+// 1. 修改上面的 production 配置为实际域名
+// 2. 将 USE_PRODUCTION 改为 true
+// 3. 重新编译并上传
+const USE_PRODUCTION = false  // 👈 发布体验版时改为 true
+
 // 当前使用的配置
-const config = development
+const config = USE_PRODUCTION ? production : development
 
 // 同时支持 default 和 named export
 export default config
