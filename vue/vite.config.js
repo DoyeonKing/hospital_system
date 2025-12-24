@@ -11,6 +11,8 @@ import ElementPlus from 'unplugin-element-plus/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/doctor/',
+
   plugins: [
     vue(),
     vueDevTools(),
@@ -36,8 +38,9 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        changeOrigin: true
+        // 注意：不要去掉 /api 前缀，因为后端接口都是以 /api 开头的
+        // rewrite: (path) => path.replace(/^\/api/, '')  // ❌ 这个配置会导致路径错误
       }
     }
   },

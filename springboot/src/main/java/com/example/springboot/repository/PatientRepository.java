@@ -18,6 +18,7 @@ import java.util.Optional;
 public interface PatientRepository extends JpaRepository<Patient, Long>, JpaSpecificationExecutor<Patient> {
     Optional<Patient> findByIdentifier(String identifier);
     boolean existsByIdentifier(String identifier);
+    Optional<Patient> findByPhoneNumber(String phoneNumber);
 
     long countByStatusNot(PatientStatus status);
 

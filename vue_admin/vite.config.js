@@ -11,6 +11,8 @@ import ElementPlus from 'unplugin-element-plus/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/admin/',
+
   plugins: [
     vue(),
     vueDevTools(),
@@ -35,7 +37,10 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
+        // ✅ 本地开发模式：使用本地后端
         target: 'http://localhost:8080',
+        // 云服务器配置（已注释，如需切换回云服务器可取消注释）：
+        // target: 'http://123.249.30.241:8080',
         changeOrigin: true,
         // 保留 /api 前缀，因为后端接口路径包含 /api
         // rewrite: (path) => path.replace(/^\/api/, '')

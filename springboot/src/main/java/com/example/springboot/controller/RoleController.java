@@ -16,7 +16,6 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/role")
-@CrossOrigin(origins = "*")
 public class RoleController {
 
     private final RoleService roleService;

@@ -1,5 +1,6 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.dto.common.PageResponse;
 import com.example.springboot.dto.guideline.MedicalGuidelineRequest;
 import com.example.springboot.dto.guideline.MedicalGuidelineResponse;
@@ -46,6 +47,7 @@ public class MedicalGuidelineController {
      * 创建规范
      */
     @PostMapping
+    @AuditLog(action = "创建就医规范", targetEntity = "medical_guidelines")
     public ResponseEntity<MedicalGuidelineResponse> createGuideline(
             @Valid @RequestBody MedicalGuidelineRequest request) {
         MedicalGuidelineResponse response = guidelineService.createGuideline(request);
@@ -56,6 +58,7 @@ public class MedicalGuidelineController {
      * 更新规范
      */
     @PutMapping("/{id}")
+    @AuditLog(action = "更新就医规范", targetEntity = "medical_guidelines")
     public ResponseEntity<MedicalGuidelineResponse> updateGuideline(
             @PathVariable Integer id,
             @Valid @RequestBody MedicalGuidelineRequest request) {
@@ -67,6 +70,7 @@ public class MedicalGuidelineController {
      * 删除规范
      */
     @DeleteMapping("/{id}")
+    @AuditLog(action = "删除就医规范", targetEntity = "medical_guidelines")
     public ResponseEntity<Void> deleteGuideline(@PathVariable Integer id) {
         guidelineService.deleteGuideline(id);
         return ResponseEntity.noContent().build();

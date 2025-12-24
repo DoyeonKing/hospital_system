@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
@@ -26,6 +27,7 @@ public class PatientAppointmentDTO {
     private LocalDateTime checkInTime;  // 现场签到时间
     
     // 排班时间信息
+    private LocalDate scheduleDate;     // 就诊日期
     private LocalTime startTime;        // 时段开始时间
     private LocalTime endTime;          // 时段结束时间
     private String slotName;            // 时段名称
@@ -93,14 +95,18 @@ public class PatientAppointmentDTO {
                     .build();
         }
         
-        // 获取时间段信息
+        // 获取排班日期和时间段信息
+        LocalDate scheduleDate = null;
         LocalTime startTime = null;
         LocalTime endTime = null;
         String slotName = null;
-        if (appointment.getSchedule() != null && appointment.getSchedule().getSlot() != null) {
-            startTime = appointment.getSchedule().getSlot().getStartTime();
-            endTime = appointment.getSchedule().getSlot().getEndTime();
-            slotName = appointment.getSchedule().getSlot().getSlotName();
+        if (appointment.getSchedule() != null) {
+            scheduleDate = appointment.getSchedule().getScheduleDate();
+            if (appointment.getSchedule().getSlot() != null) {
+                startTime = appointment.getSchedule().getSlot().getStartTime();
+                endTime = appointment.getSchedule().getSlot().getEndTime();
+                slotName = appointment.getSchedule().getSlot().getSlotName();
+            }
         }
         
         // 构建预约信息
@@ -109,6 +115,7 @@ public class PatientAppointmentDTO {
                 .appointmentNumber(appointment.getAppointmentNumber())
                 .status(appointment.getStatus())
                 .checkInTime(appointment.getCheckInTime())
+                .scheduleDate(scheduleDate)
                 .startTime(startTime)
                 .endTime(endTime)
                 .slotName(slotName)

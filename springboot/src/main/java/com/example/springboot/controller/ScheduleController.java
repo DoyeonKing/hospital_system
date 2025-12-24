@@ -1,5 +1,6 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.dto.*;
 import com.example.springboot.dto.AutoScheduleRequest;
 import com.example.springboot.dto.AutoScheduleResponse;
@@ -28,7 +29,6 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/schedules")
-@CrossOrigin(origins = "*")
 public class ScheduleController {
 
     @Autowired
@@ -160,6 +160,7 @@ public class ScheduleController {
      * 创建排班
      */
     @PostMapping("/create")
+    @AuditLog(action = "创建排班", targetEntity = "schedules")
     public ResponseEntity<ScheduleResponse> createSchedule(@Valid @RequestBody ScheduleCreateRequest request) {
         try {
             ScheduleResponse schedule = scheduleService.createSchedule(request);
@@ -192,6 +193,7 @@ public class ScheduleController {
      * 更新单个排班
      */
     @PutMapping("/{id}")
+    @AuditLog(action = "更新排班信息", targetEntity = "schedules")
     public ResponseEntity<ScheduleResponse> updateSchedule(
             @PathVariable Integer id,
             @RequestBody ScheduleUpdateRequest request) {
@@ -240,6 +242,7 @@ public class ScheduleController {
      * 删除排班
      */
     @DeleteMapping("/{id}")
+    @AuditLog(action = "删除排班", targetEntity = "schedules")
     public ResponseEntity<Void> deleteSchedule(@PathVariable Integer id) {
         try {
             scheduleService.deleteSchedule(id);
@@ -254,6 +257,7 @@ public class ScheduleController {
      * 自动生成排班
      */
     @PostMapping("/auto-generate")
+    @AuditLog(action = "自动生成排班", targetEntity = "schedules")
     public ResponseEntity<AutoScheduleResponse> autoGenerateSchedule(
             @Valid @RequestBody AutoScheduleRequest request) {
         try {

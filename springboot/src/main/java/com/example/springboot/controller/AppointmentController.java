@@ -1,5 +1,6 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.dto.appointment.AppointmentCreateRequest;
 import com.example.springboot.dto.appointment.AppointmentResponse;
 import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
@@ -62,6 +63,7 @@ public class AppointmentController {
      * 创建预约
      */
     @PostMapping
+    @AuditLog(action = "创建预约", targetEntity = "appointments")
     public ResponseEntity<AppointmentResponse> createAppointment(@RequestBody AppointmentCreateRequest request) {
         return ResponseEntity.ok(appointmentService.createAppointment(request));
     }
@@ -70,6 +72,7 @@ public class AppointmentController {
      * 现场挂号（分诊台辅助患者挂号）
      */
     @PostMapping("/walk-in")
+    @AuditLog(action = "创建现场挂号", targetEntity = "appointments")
     public ResponseEntity<AppointmentResponse> createWalkInAppointment(@RequestBody AppointmentCreateRequest request) {
         return ResponseEntity.ok(appointmentService.createWalkInAppointment(request));
     }
@@ -78,6 +81,7 @@ public class AppointmentController {
      * 取消预约
      */
     @PutMapping("/{appointmentId}/cancel")
+    @AuditLog(action = "取消预约", targetEntity = "appointments")
     public ResponseEntity<AppointmentResponse> cancelAppointment(@PathVariable Integer appointmentId) {
         return ResponseEntity.ok(appointmentService.cancelAppointment(appointmentId));
     }
@@ -94,6 +98,7 @@ public class AppointmentController {
      * 更新预约支付状态
      */
     @PutMapping("/{appointmentId}")
+    @AuditLog(action = "更新预约支付信息", targetEntity = "appointments")
     public ResponseEntity<AppointmentResponse> updateAppointmentPayment(
             @PathVariable Integer appointmentId,
             @RequestBody AppointmentUpdateRequest request) {
@@ -104,6 +109,7 @@ public class AppointmentController {
      * 支付挂号费用
      */
     @PostMapping("/{appointmentId}/pay")
+    @AuditLog(action = "支付预约费用", targetEntity = "appointments")
     public ResponseEntity<AppointmentResponse> payForAppointment(
             @PathVariable Integer appointmentId,
             @RequestBody AppointmentUpdateRequest paymentData) {
@@ -147,6 +153,7 @@ public class AppointmentController {
      * 扫码签到
      */
     @PostMapping("/check-in")
+    @AuditLog(action = "患者签到", targetEntity = "appointments")
     public ResponseEntity<CheckInResponse> checkIn(@RequestBody CheckInRequest request) {
         return ResponseEntity.ok(appointmentService.checkIn(request));
     }
@@ -155,6 +162,7 @@ public class AppointmentController {
      * 清除预约签到时间（管理员功能，用于测试或误操作）
      */
     @DeleteMapping("/{appointmentId}/check-in")
+    @AuditLog(action = "清除签到状态", targetEntity = "appointments")
     public ResponseEntity<AppointmentResponse> clearCheckIn(@PathVariable Integer appointmentId) {
         return ResponseEntity.ok(appointmentService.clearCheckIn(appointmentId));
     }
@@ -183,6 +191,7 @@ public class AppointmentController {
      * 执行叫号
      */
     @PostMapping("/{appointmentId}/call")
+    @AuditLog(action = "呼叫患者就诊", targetEntity = "appointments")
     public ResponseEntity<AppointmentResponse> callAppointment(@PathVariable Integer appointmentId) {
         return ResponseEntity.ok(appointmentService.callAppointment(appointmentId));
     }
@@ -191,6 +200,7 @@ public class AppointmentController {
      * 标记过号（仅标记，不重新排队，需要患者重新扫码才能重新排队）
      */
     @PostMapping("/{appointmentId}/mark-missed")
+    @AuditLog(action = "标记过号", targetEntity = "appointments")
     public ResponseEntity<AppointmentResponse> markMissedCall(@PathVariable Integer appointmentId) {
         return ResponseEntity.ok(appointmentService.markMissedCall(appointmentId));
     }
@@ -200,6 +210,7 @@ public class AppointmentController {
      * 规则：患者重新扫码后调用此接口，系统将其放在当前时段最后一位
      */
     @PostMapping("/{appointmentId}/recheck-in")
+    @AuditLog(action = "过号后重新签到", targetEntity = "appointments")
     public ResponseEntity<AppointmentResponse> recheckInAfterMissedCall(@PathVariable Integer appointmentId) {
         return ResponseEntity.ok(appointmentService.recheckInAfterMissedCall(appointmentId));
     }
@@ -208,6 +219,7 @@ public class AppointmentController {
      * 标记就诊完成（医生完成就诊后调用，会自动叫号下一位）
      */
     @PostMapping("/{appointmentId}/complete")
+    @AuditLog(action = "完成就诊", targetEntity = "appointments")
     public ResponseEntity<AppointmentResponse> completeAppointment(@PathVariable Integer appointmentId) {
         return ResponseEntity.ok(appointmentService.completeAppointment(appointmentId));
     }

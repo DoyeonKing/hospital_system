@@ -78,12 +78,22 @@
           <p class="card-desc">管理用户病史记录</p>
         </div>
       </router-link>
+      
+      <router-link to="/admin/identity-verification" class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper verification">
+            <el-icon :size="24"><DocumentChecked /></el-icon>
+          </div>
+          <h3>身份验证审核</h3>
+          <p class="card-desc">审核新注册用户身份验证申请</p>
+        </div>
+      </router-link>
     </div>
   </div>
 </template>
 
 <script setup>
-import { Plus, Search, Edit, Memo, Upload } from '@element-plus/icons-vue';
+import { Plus, Search, Edit, Memo, Upload, DocumentChecked } from '@element-plus/icons-vue';
 // 导入本地图片
 import doctorImage from '@/assets/doctor.jpg';
 import BackButton from '@/components/BackButton.vue';
@@ -231,6 +241,11 @@ import BackButton from '@/components/BackButton.vue';
 .icon-wrapper.memo {
   background-color: #ede9fe;
   color: #8b5cf6;
+}
+
+.icon-wrapper.verification {
+  background-color: #fee2e2;
+  color: #ef4444;
 }
 
 .feature-card h3 {

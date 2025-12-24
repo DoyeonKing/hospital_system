@@ -83,7 +83,7 @@
 				<view 
 					class="doctor-card" 
 					v-for="(item, index) in doctorList" 
-					:key="item.id || item.doctorId"
+					:key="getDoctorKey(item, index)"
 				>
 					<view class="doctor-info">
 						<view class="doctor-header">
@@ -593,6 +593,11 @@
 				// 处理 LocalTime 格式 (HH:mm:ss) 或 (HH:mm)
 				const time = timeString.split(':')
 				return `${time[0]}:${time[1]}`
+			},
+			
+			// 获取医生列表项的key值（用于非H5平台兼容）
+			getDoctorKey(item, index) {
+				return item.id || item.doctorId || index
 			},
 
 			// 挂号（保留原有方法，用于没有排班信息的情况）

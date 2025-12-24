@@ -54,6 +54,11 @@ import SlotApproval from '@/views/SlotApproval.vue';
 
 // ===== 新增：导入管理员管理页面组件 =====
 import AdminManagement from '@/views/AdminManagement.vue';
+// ===== 新增：导入身份验证审核管理页面组件 =====
+import IdentityVerification from '@/views/admin/IdentityVerification.vue';
+// ===== 新增：导入审计日志和权限管理页面组件 =====
+import AuditLog from '@/views/AuditLog.vue';
+import PermissionManage from '@/views/PermissionManage.vue';
 
 // 通用视图组件导入
 const NotFoundView = () => import('../views/404.vue');
@@ -160,6 +165,25 @@ const routes = [
         name: 'AdminManagement',
         meta: { title: '管理员管理', requiresAuth: true },
         component: AdminManagement
+    },
+    {
+        path: '/admin/identity-verification',
+        name: 'IdentityVerification',
+        meta: { title: '身份验证审核', requiresAuth: true },
+        component: IdentityVerification
+    },
+    // ===== 审计日志和权限管理路由 =====
+    {
+        path: '/audit-logs',
+        name: 'AuditLog',
+        meta: { title: '审计日志', requiresAuth: true },
+        component: AuditLog
+    },
+    {
+        path: '/permission-manage',
+        name: 'PermissionManage',
+        meta: { title: '权限管理', requiresAuth: true },
+        component: PermissionManage
     },
     // =======================================================
 

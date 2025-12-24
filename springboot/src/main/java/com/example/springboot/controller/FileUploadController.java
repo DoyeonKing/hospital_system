@@ -22,7 +22,6 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "*")
 public class FileUploadController {
 
     @Value("${file.upload.path:uploads/}")
@@ -30,6 +29,73 @@ public class FileUploadController {
 
     @Value("${server.port:8080}")
     private String serverPort;
+
+    /**
+     * 上传身份证明材料（校园卡照片等）
+     * URL: POST /api/files/upload-identity-proof
+     */
+    @PostMapping("/files/upload-identity-proof")
+    public ResponseEntity<Map<String, Object>> uploadIdentityProof(@RequestParam("file") MultipartFile file) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // 验证文件
+            if (file.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "文件不能为空");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // 验证文件类型（支持图片和PDF）
+            String contentType = file.getContentType();
+            if (!isValidFileType(contentType)) {
+                response.put("success", false);
+                response.put("message", "只支持 JPG、PNG、PDF 格式的文件");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // 验证文件大小 (5MB)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                response.put("success", false);
+                response.put("message", "文件大小不能超过5MB");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // 创建上传目录（简单方式，参考医生照片的实现）
+            String uploadDir = uploadPath + "identity-proofs/";
+            File directory = new File(uploadDir);
+            if (!directory.exists()) {
+                directory.mkdirs();
+            }
+
+            // 生成唯一文件名
+            String originalFilename = file.getOriginalFilename();
+            String fileExtension = getFileExtension(originalFilename);
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String uniqueFilename = "identity_" + timestamp + "_" + UUID.randomUUID().toString().substring(0, 8) + fileExtension;
+
+            // 保存文件
+            Path filePath = Paths.get(uploadDir + uniqueFilename);
+            Files.copy(file.getInputStream(), filePath);
+
+            // 构建文件访问URL
+            String fileUrl = "/api/files/identity-proofs/" + uniqueFilename;
+
+            response.put("success", true);
+            response.put("message", "文件上传成功");
+            response.put("url", fileUrl);
+            response.put("filename", uniqueFilename);
+            response.put("originalName", originalFilename);
+            response.put("size", file.getSize());
+
+            return ResponseEntity.ok(response);
+
+        } catch (IOException e) {
+            response.put("success", false);
+            response.put("message", "文件上传失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
 
     /**
      * 上传请假证明文件
@@ -98,12 +164,43 @@ public class FileUploadController {
     }
 
     /**
-     * 获取上传的文件
+     * 获取上传的文件（请假证明）
      */
     @GetMapping("/files/leave-proofs/{filename}")
     public ResponseEntity<byte[]> getFile(@PathVariable String filename) {
         try {
             String filePath = uploadPath + "leave-proofs/" + filename;
+            Path path = Paths.get(filePath);
+            
+            if (!Files.exists(path)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            byte[] fileContent = Files.readAllBytes(path);
+            String contentType = Files.probeContentType(path);
+            
+            return ResponseEntity.ok()
+                    .header("Content-Type", contentType != null ? contentType : "application/octet-stream")
+                    .header("Content-Disposition", "inline; filename=\"" + filename + "\"")
+                    .body(fileContent);
+
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * 获取身份证明材料
+     * 注意：这个接口主要用于调试，实际应该通过静态资源映射访问
+     * 静态资源映射在 WebConfig 中配置：/api/files/identity-proofs/** -> file:{projectRoot}/uploads/identity-proofs/
+     */
+    /**
+     * 获取身份证明材料（简单方式，参考请假证明的实现）
+     */
+    @GetMapping("/files/identity-proofs/{filename}")
+    public ResponseEntity<byte[]> getIdentityProof(@PathVariable String filename) {
+        try {
+            String filePath = uploadPath + "identity-proofs/" + filename;
             Path path = Paths.get(filePath);
             
             if (!Files.exists(path)) {

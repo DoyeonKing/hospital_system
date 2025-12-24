@@ -46,10 +46,13 @@ public class WebSecurityConfig {
 
                         // 公开接口（不需要Token）
                         .requestMatchers("/api/auth/patient/login").permitAll()
+                        .requestMatchers("/api/auth/patient/register").permitAll()  // 患者自主注册接口
                         .requestMatchers("/api/auth/admin/login").permitAll()
                         .requestMatchers("/api/doctor/auth/login").permitAll()
                         .requestMatchers("/api/auth/verify-patient").permitAll()
                         .requestMatchers("/api/auth/activate-patient").permitAll()
+                        .requestMatchers("/api/files/upload-identity-proof").permitAll()  // 身份证明材料上传接口
+                        .requestMatchers("/api/files/identity-proofs/**").permitAll()  // 身份证明材料访问接口
 
                         // 允许 Swagger 访问
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
@@ -57,6 +60,9 @@ public class WebSecurityConfig {
                         // 其他所有 /api/** 接口都需要认证
                         .requestMatchers("/api/**").authenticated()
 
+                        // 静态资源路径（明确排除，避免被当作API处理）
+                        .requestMatchers("/images/**", "/static/**", "/css/**", "/js/**", "/favicon.ico").permitAll()
+                        
                         // 其他请求允许访问
                         .anyRequest().permitAll()
                 );
@@ -70,12 +76,9 @@ public class WebSecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         // 💡 使用allowedOriginPatterns支持通配符和null origin
-        // 这样可以同时支持HTTP服务器和file://协议打开的HTML文件
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*",      // 允许所有localhost端口
-            "http://127.0.0.1:*",      // 允许所有127.0.0.1端口
-            "null"                      // 允许file://协议（浏览器发送null作为origin）
-        ));
+        // 这样可以同时支持HTTP服务器、微信小程序、file://协议等
+        // 注意：allowedOriginPatterns可以使用通配符"*"，且可以与allowCredentials=true配合使用
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));  // 允许所有来源（支持微信小程序等）
 
         // 允许常用方法 (GET, POST, PUT, DELETE, OPTIONS)
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

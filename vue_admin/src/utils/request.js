@@ -3,10 +3,16 @@ import {ElMessage} from "element-plus";
 import { getToken, removeToken } from './auth.js'
 import router from '@/router'
 
+// 云服务器IP地址（与数据库同一台服务器）
+// const CLOUD_SERVER_IP = '123.249.30.241'  // 👈 云服务器配置（已注释）
+
 const request = axios.create({
-  // 开发环境使用相对路径，让 Vite 代理处理请求
-  // 生产环境使用完整的 baseURL
-  baseURL: import.meta.env.DEV ? '' : 'http://localhost:8080',
+  // ✅ 本地开发模式：使用空字符串，让 Vite 代理处理请求（代理指向 localhost:8080）
+  baseURL: ``,
+  // 如果不想使用代理，可以直接设置 baseURL（取消注释下面一行，并注释掉上面一行）：
+  // baseURL: import.meta.env.DEV ? 'http://localhost:8080' : 'http://localhost:8080',
+  // 云服务器配置（已注释，如需切换回云服务器可取消注释）：
+  // baseURL: 'http://123.249.30.241:8080',
   timeout: 30000  // 后台接口超时时间
 })
 

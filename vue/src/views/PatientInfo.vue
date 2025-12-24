@@ -63,7 +63,11 @@
               max-height="400"
           >
             <el-table-column type="index" label="序号" width="60" align="center" />
-            <el-table-column prop="scheduleDate" label="就诊日期" width="120" />
+            <el-table-column prop="scheduleDate" label="就诊日期" width="120">
+              <template #default="{ row }">
+                {{ formatDate(row.scheduleDate) }}
+              </template>
+            </el-table-column>
             <el-table-column label="时间段" width="140">
               <template #default="{ row }">
                 {{ row.startTime }} - {{ row.endTime }}
@@ -274,6 +278,21 @@ const formatDateTime = (dateTimeStr) => {
   return date.toLocaleString('zh-CN', { hour12: false });
 };
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  // 如果已经是 YYYY-MM-DD 格式，直接返回
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr;
+  }
+  // 否则转换为日期格式
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const formatPatientType = (type) => {
   const types = {
     'student': '学生',
@@ -294,20 +313,32 @@ const getPatientTypeTag = (type) => {
 
 const formatStatus = (status) => {
   const statuses = {
+    'PENDING_PAYMENT': '待支付',
     'scheduled': '已预约',
+    'SCHEDULED': '已预约',  // 兼容大写
+    'CHECKED_IN': '已签到',
     'completed': '已完成',
+    'COMPLETED': '已完成',  // 兼容大写
     'cancelled': '已取消',
-    'no_show': '爽约'
+    'CANCELLED': '已取消',  // 兼容大写
+    'no_show': '爽约',
+    'NO_SHOW': '爽约'  // 兼容大写
   };
   return statuses[status] || '未知';
 };
 
 const getStatusTag = (status) => {
   const tags = {
+    'PENDING_PAYMENT': 'warning',
     'scheduled': 'primary',
+    'SCHEDULED': 'primary',  // 兼容大写
+    'CHECKED_IN': 'success',
     'completed': 'success',
+    'COMPLETED': 'success',  // 兼容大写
     'cancelled': 'info',
-    'no_show': 'danger'
+    'CANCELLED': 'info',  // 兼容大写
+    'no_show': 'danger',
+    'NO_SHOW': 'danger'  // 兼容大写
   };
   return tags[status] || 'default';
 };
