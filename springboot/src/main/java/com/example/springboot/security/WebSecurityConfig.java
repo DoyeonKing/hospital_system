@@ -60,6 +60,9 @@ public class WebSecurityConfig {
                         // 其他所有 /api/** 接口都需要认证
                         .requestMatchers("/api/**").authenticated()
 
+                        // 静态资源路径（明确排除，避免被当作API处理）
+                        .requestMatchers("/images/**", "/static/**", "/css/**", "/js/**", "/favicon.ico").permitAll()
+                        
                         // 其他请求允许访问
                         .anyRequest().permitAll()
                 );
