@@ -301,11 +301,11 @@ public class PatientService {
                 // 自动锁定账户
                 patient.setStatus(PatientStatus.locked);
                 patient.setLockedUntil(now.plusMinutes(Constants.ACCOUNT_LOCK_DURATION_MINUTES));
-                patientRepository.save(patient);
+                patientRepository.saveAndFlush(patient); // 使用saveAndFlush强制立即写入数据库
                 throw new IllegalArgumentException("登录失败次数过多，账户已被锁定，请" + Constants.ACCOUNT_LOCK_DURATION_MINUTES + "分钟后再试或联系管理员");
             } else {
                 // 未达到阈值，只保存失败次数
-                patientRepository.save(patient);
+                patientRepository.saveAndFlush(patient); // 使用saveAndFlush强制立即写入数据库
                 int remainingAttempts = Constants.MAX_LOGIN_FAILURE_COUNT - newFailureCount;
                 throw new IllegalArgumentException("学号/工号或密码错误，还可尝试" + remainingAttempts + "次");
             }

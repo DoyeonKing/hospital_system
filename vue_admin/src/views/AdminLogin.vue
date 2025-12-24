@@ -143,10 +143,12 @@ const handleLogin = async () => {
       const adminInfo = loginData.userInfo || {}
       console.log('管理员信息:', adminInfo)
       
+      // 传递Token到store
       adminStore.loginSuccess(adminInfo, {
         adminId: adminInfo.adminId,
         username: adminInfo.username,
-        fullName: adminInfo.fullName
+        fullName: adminInfo.fullName,
+        token: loginData.token  // 添加Token
       })
 
       ElMessage.success('登录成功')

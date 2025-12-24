@@ -8,6 +8,7 @@ import com.example.springboot.service.AdminService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -18,9 +19,11 @@ import java.util.Set;
 
 /**
  * 管理员控制器
+ * 所有接口都需要管理员权限
  */
 @RestController
 @RequestMapping("/api/admin")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
     private final AdminService adminService;
@@ -137,8 +140,10 @@ public class AdminController {
 
     /**
      * 创建管理员
+     * 需要 CREATE_ADMIN 权限
      */
     @PostMapping
+    @PreAuthorize("hasAuthority('CREATE_ADMIN')")
     public ResponseEntity<?> createAdmin(@RequestBody AdminCreateRequest request) {
         try {
             AdminResponse admin = adminService.createAdmin(request);
@@ -151,8 +156,10 @@ public class AdminController {
 
     /**
      * 更新管理员
+     * 需要 UPDATE_ADMIN 权限
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('UPDATE_ADMIN')")
     public ResponseEntity<?> updateAdmin(
             @PathVariable Integer id,
             @RequestBody AdminUpdateRequest request) {
@@ -176,8 +183,10 @@ public class AdminController {
 
     /**
      * 删除管理员
+     * 需要 DELETE_ADMIN 权限
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('DELETE_ADMIN')")
     public ResponseEntity<?> deleteAdmin(@PathVariable Integer id) {
         try {
             adminService.deleteAdmin(id);

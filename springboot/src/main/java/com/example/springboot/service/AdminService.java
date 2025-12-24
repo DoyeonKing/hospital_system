@@ -105,11 +105,11 @@ public class AdminService {
                 // 自动锁定账户
                 admin.setStatus(AdminStatus.locked);
                 admin.setLockedUntil(now.plusMinutes(Constants.ACCOUNT_LOCK_DURATION_MINUTES));
-                adminRepository.save(admin);
+                adminRepository.saveAndFlush(admin); // 使用saveAndFlush强制立即写入数据库
                 throw new IllegalArgumentException("登录失败次数过多，账户已被锁定，请" + Constants.ACCOUNT_LOCK_DURATION_MINUTES + "分钟后再试或联系系统管理员");
             } else {
                 // 未达到阈值，只保存失败次数
-                adminRepository.save(admin);
+                adminRepository.saveAndFlush(admin); // 使用saveAndFlush强制立即写入数据库
                 int remainingAttempts = Constants.MAX_LOGIN_FAILURE_COUNT - newFailureCount;
                 throw new IllegalArgumentException("用户名或密码错误，还可尝试" + remainingAttempts + "次");
             }

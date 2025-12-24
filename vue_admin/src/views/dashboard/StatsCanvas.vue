@@ -82,11 +82,34 @@
               </div>
             </div>
 
+            <!-- 历史统计卡片 -->
+            <div class="top-cards" style="margin-top: 20px;">
+              <div class="stat-card stat-card-cyan">
+                <div class="stat-icon">
+                  <el-icon :size="30"><Calendar /></el-icon>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-label">历史挂号总数</div>
+                  <div class="stat-value">{{ mockData.overview.totalHistoricalAppointments }}</div>
+                </div>
+              </div>
+
+              <div class="stat-card stat-card-orange">
+                <div class="stat-icon">
+                  <el-icon :size="30"><Close /></el-icon>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-label">历史退号总数</div>
+                  <div class="stat-value">{{ mockData.overview.totalHistoricalCancellations }}</div>
+                </div>
+              </div>
+            </div>
+
             <!-- 图表区域 -->
             <div class="charts-grid">
               <el-card class="chart-card">
                 <template #header>
-                  <div class="card-header">全院挂号趋势</div>
+                  <div class="card-header">全院挂号趋势（近7天）</div>
                 </template>
                 <div id="appointmentTrendChart" class="chart"></div>
               </el-card>
@@ -96,6 +119,20 @@
                   <div class="card-header">支付状态分布</div>
                 </template>
                 <div id="paymentStatusChart" class="chart"></div>
+              </el-card>
+
+              <el-card class="chart-card chart-full-width">
+                <template #header>
+                  <div class="card-header">历史挂号趋势（近30天）</div>
+                </template>
+                <div id="historicalAppointmentChart" class="chart"></div>
+              </el-card>
+
+              <el-card class="chart-card chart-full-width">
+                <template #header>
+                  <div class="card-header">历史退号趋势（近30天）</div>
+                </template>
+                <div id="historicalCancellationChart" class="chart"></div>
               </el-card>
             </div>
           </div>
@@ -463,7 +500,13 @@ const mockData = reactive({
     totalPatients: 0,
     last7DaysDates: [],
     last7DaysCounts: [],
-    paymentStatus: []
+    paymentStatus: [],
+    totalHistoricalAppointments: 0,
+    totalHistoricalCancellations: 0,
+    last30DaysAppointmentDates: [],
+    last30DaysAppointmentCounts: [],
+    last30DaysCancellationDates: [],
+    last30DaysCancellationCounts: []
   },
   doctors: {
     totalDoctors: 0,
@@ -601,6 +644,96 @@ const initOverviewCharts = () => {
             ][index]
           }
         }))
+      }
+    ]
+  })
+
+  // 历史挂号趋势图（近30天）
+  initChart('historicalAppointmentChart', {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '10%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: mockData.overview.last30DaysAppointmentDates,
+      axisLine: { lineStyle: { color: '#4a5568' } },
+      axisLabel: { color: '#718096', rotate: 45 }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { lineStyle: { color: '#4a5568' } },
+      axisLabel: { color: '#718096' },
+      splitLine: { lineStyle: { color: '#e2e8f0', type: 'dashed' } }
+    },
+    series: [
+      {
+        name: '挂号量',
+        type: 'line',
+        smooth: true,
+        data: mockData.overview.last30DaysAppointmentCounts,
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(99, 102, 241, 0.3)' },
+            { offset: 1, color: 'rgba(99, 102, 241, 0.1)' }
+          ])
+        },
+        lineStyle: { color: '#6366f1', width: 3 },
+        itemStyle: { color: '#6366f1', borderWidth: 2, borderColor: '#fff' }
+      }
+    ]
+  })
+
+  // 历史退号趋势图（近30天）
+  initChart('historicalCancellationChart', {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '10%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: mockData.overview.last30DaysCancellationDates,
+      axisLine: { lineStyle: { color: '#4a5568' } },
+      axisLabel: { color: '#718096', rotate: 45 }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { lineStyle: { color: '#4a5568' } },
+      axisLabel: { color: '#718096' },
+      splitLine: { lineStyle: { color: '#e2e8f0', type: 'dashed' } }
+    },
+    series: [
+      {
+        name: '退号量',
+        type: 'line',
+        smooth: true,
+        data: mockData.overview.last30DaysCancellationCounts,
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(251, 146, 60, 0.3)' },
+            { offset: 1, color: 'rgba(251, 146, 60, 0.1)' }
+          ])
+        },
+        lineStyle: { color: '#fb923c', width: 3 },
+        itemStyle: { color: '#fb923c', borderWidth: 2, borderColor: '#fff' }
       }
     ]
   })
@@ -1018,6 +1151,8 @@ const getAllChartsAsImages = async () => {
   const chartIds = [
     'appointmentTrendChart',
     'paymentStatusChart',
+    'historicalAppointmentChart',
+    'historicalCancellationChart',
     'titleDistributionChart',
     'departmentBusyChart',
     'doctorWorkloadChart',
@@ -1263,6 +1398,8 @@ const setupResizeObserver = () => {
   const chartIds = [
     'appointmentTrendChart',
     'paymentStatusChart',
+    'historicalAppointmentChart',
+    'historicalCancellationChart',
     'titleDistributionChart',
     'departmentBusyChart',
     'doctorWorkloadChart',
@@ -1304,12 +1441,20 @@ const loadOverviewData = async () => {
     mockData.overview.last7DaysDates = data.last7DaysDates || []
     mockData.overview.last7DaysCounts = data.last7DaysCounts || []
     mockData.overview.paymentStatus = data.paymentStatus || []
+    mockData.overview.totalHistoricalAppointments = data.totalHistoricalAppointments ?? 0
+    mockData.overview.totalHistoricalCancellations = data.totalHistoricalCancellations ?? 0
+    mockData.overview.last30DaysAppointmentDates = data.last30DaysAppointmentDates || []
+    mockData.overview.last30DaysAppointmentCounts = data.last30DaysAppointmentCounts || []
+    mockData.overview.last30DaysCancellationDates = data.last30DaysCancellationDates || []
+    mockData.overview.last30DaysCancellationCounts = data.last30DaysCancellationCounts || []
     
     console.log('更新后的运营总览数据:', mockData.overview)
     console.log('今日挂号量:', mockData.overview.todayAppointments)
     console.log('今日出诊医生:', mockData.overview.activeDoctorsToday)
     console.log('当前候诊人数:', mockData.overview.pendingPatients)
     console.log('累计注册用户:', mockData.overview.totalPatients)
+    console.log('历史挂号总数:', mockData.overview.totalHistoricalAppointments)
+    console.log('历史退号总数:', mockData.overview.totalHistoricalCancellations)
   } catch (error) {
     console.error('加载运营总览数据失败:', error)
     console.error('错误详情:', {
@@ -1673,6 +1818,10 @@ onUnmounted(() => {
   border-left-color: #667eea;
 }
 
+.stat-card-cyan {
+  border-left-color: #06b6d4;
+}
+
 .stat-icon {
   width: 48px;
   height: 48px;
@@ -1710,6 +1859,11 @@ onUnmounted(() => {
 
 .stat-card-indigo .stat-icon {
   background: linear-gradient(135deg, #667eea 0%, #5a67d8 100%);
+  color: white;
+}
+
+.stat-card-cyan .stat-icon {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
   color: white;
 }
 

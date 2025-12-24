@@ -31,8 +31,24 @@ export const useDoctorStore = defineStore('doctor', {
     }),
 
     getters: {
-        // isAuthenticated: 检查 token 是否存在
-        isAuthenticated: (state) => !!state.loggedInDoctorBasicInfo?.token,
+        // isAuthenticated: 检查 token 是否存在（同时检查 state 和 localStorage）
+        isAuthenticated: (state) => {
+            // 先检查 state 中的 token
+            const stateToken = state.loggedInDoctorBasicInfo?.token;
+            // 再检查 localStorage 中的 token
+            const storedData = localStorage.getItem(DOCTOR_SESSION_KEY);
+            let storageToken = null;
+            try {
+                if (storedData) {
+                    const parsed = JSON.parse(storedData);
+                    storageToken = parsed?.token;
+                }
+            } catch (e) {
+                console.error('解析 localStorage 数据失败:', e);
+            }
+            // 两者都存在才认为已认证
+            return !!(stateToken && storageToken && stateToken === storageToken);
+        },
 
         // 显示名称: 优先显示真实姓名，没有则显示工号
         displayName: (state) => state.detailedDoctorInfo.name || state.loggedInDoctorBasicInfo?.name || state.loggedInDoctorBasicInfo?.identifier || '医生',
@@ -89,6 +105,8 @@ export const useDoctorStore = defineStore('doctor', {
             // 清除 localStorage
             localStorage.removeItem(DOCTOR_SESSION_KEY);
             localStorage.removeItem(DETAILED_INFO_KEY);
+            // 额外清除可能存在的 token
+            localStorage.removeItem('token');
 
             // 重置 State
             this.loggedInDoctorBasicInfo = null;
@@ -104,6 +122,30 @@ export const useDoctorStore = defineStore('doctor', {
                 photoUrl: '',
             };
             this.error = null;
+            console.log('DoctorStore: 已登出，所有会话数据已清除');
+        },
+
+        // 验证 Token 是否有效（可选：调用后端验证）
+        async validateToken() {
+            if (!this.isAuthenticated) {
+                return false;
+            }
+            try {
+                // 尝试调用一个需要认证的接口来验证 Token
+                await request({
+                    url: '/api/doctors/validate-token',
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${this.loggedInDoctorBasicInfo.token}`
+                    }
+                });
+                return true;
+            } catch (error) {
+                console.error('Token 验证失败:', error);
+                // Token 无效，清除登录状态
+                this.logout();
+                return false;
+            }
         },
 
         // 获取详细医生信息（根据工号获取）
