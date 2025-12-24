@@ -117,12 +117,28 @@
 				<!-- 待支付状态：显示支付和取消按钮 -->
 				<view class="button-row" v-if="isPendingPaymentStatus(appointment.status)">
 					<button class="pay-btn-half" @click="handlePayment">立即支付</button>
-					<button class="cancel-btn-half" @click="handleCancel">取消预约</button>
+					<button 
+						class="cancel-btn-half" 
+						:class="{ 'disabled': isAppointmentTimePassed(appointment) }"
+						:disabled="isAppointmentTimePassed(appointment)"
+						@click="handleCancel"
+					>
+						取消预约
+					</button>
 				</view>
 				<!-- 其他状态：显示返回主页和取消按钮 -->
 				<view class="button-row" v-else>
 					<button class="home-btn" @click="handleBackToHome">返回主页</button>
-					<button class="cancel-btn" v-if="canCancelAppointment(appointment.status)" @click="handleCancel">取消预约</button>
+					<!-- 如果状态允许取消，显示取消按钮（即使时间已过也显示，但禁用） -->
+					<button 
+						class="cancel-btn" 
+						:class="{ 'disabled': !canCancelAppointment(appointment.status) || isAppointmentTimePassed(appointment) }"
+						:disabled="!canCancelAppointment(appointment.status) || isAppointmentTimePassed(appointment)"
+						v-if="canShowCancelButton(appointment.status)"
+						@click="handleCancel"
+					>
+						取消预约
+					</button>
 					<button class="view-btn" v-if="isCompletedStatus(appointment.status) && !isConfirmedStatus(appointment.status)" @click="handleBackToHome">查看其他预约</button>
 				</view>
 			</view>
@@ -625,14 +641,9 @@ onUnload() {
 				return false
 			}
 			// 检查预约时间是否已过去（至少1分钟）
-			if (this.appointment && this.appointment.scheduleTime) {
-				const scheduleTime = new Date(this.appointment.scheduleTime)
-				const now = new Date()
-				// 如果就诊时间已经过去（至少1分钟），不能取消
-				if (scheduleTime.getTime() < (now.getTime() - 60 * 1000)) {
-					console.log('[detail canCancelAppointment] 预约时间已过去，不能取消')
-					return false
-				}
+			if (this.isAppointmentTimePassed(this.appointment)) {
+				console.log('[detail canCancelAppointment] 预约时间已过去，不能取消')
+				return false
 			}
 			// 只有已预约或待支付状态可以取消
 			const canCancel = statusLower === 'confirmed' || 
@@ -641,6 +652,24 @@ onUnload() {
 							  statusLower === 'pending'
 			console.log('[detail canCancelAppointment] 状态:', status, '可以取消:', canCancel)
 			return canCancel
+		},
+		
+		// 判断是否应该显示取消按钮（即使时间已过也显示，但禁用）
+		canShowCancelButton(status) {
+			if (!status || !this.appointment) return false
+			
+			const statusLower = (status || '').toLowerCase()
+			
+			// 已签到、已完成状态不显示取消按钮
+			if (statusLower === 'checked_in' || statusLower === 'completed') {
+				return false
+			}
+			
+			// 已预约或待支付状态显示取消按钮（即使时间已过也显示）
+			return statusLower === 'confirmed' || 
+				   statusLower === 'scheduled' || 
+				   statusLower === 'pending_payment' ||
+				   statusLower === 'pending'
 		},
 		
 		formatDateTime(dateString) {
@@ -1111,6 +1140,21 @@ onUnload() {
 		color: #DC2626;
 		font-size: 32rpx;
 		font-weight: 600;
+	}
+	
+	.cancel-btn.disabled,
+	.cancel-btn-half.disabled {
+		background: #F5F5F5;
+		border-color: #E0E0E0;
+		color: #999999;
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+	
+	.cancel-btn.disabled:active,
+	.cancel-btn-half.disabled:active {
+		opacity: 0.6;
+		transform: none;
 	}
 
 	.cancel-btn-half:active {
