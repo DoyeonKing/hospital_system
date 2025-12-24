@@ -27,3 +27,4 @@ public @interface AuditLog {
     boolean recordDetails() default true;
 }
 
+

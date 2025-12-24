@@ -324,7 +324,7 @@ public class PatientService {
         if (patient.getFailedLoginCount() == null) {
             patient.setFailedLoginCount(0);
         }
-        
+
         // 5. 检查失败登录时间窗口：如果距离最后一次失败登录超过30分钟，重置失败次数
         // 这样可以避免失败次数无限累积，给用户重新尝试的机会
         if (patient.getLastFailedLoginTime() != null && patient.getFailedLoginCount() > 0) {
@@ -708,7 +708,28 @@ public class PatientService {
             throw new IllegalArgumentException("该手机号已被注册");
         }
 
-        // 3. 创建患者账户（状态为inactive，等待审核）
+        // 3. 检查身份证号是否已被使用（包括已审核通过的患者档案和待审核/已通过的验证记录）
+        // 3.1 检查已激活患者的身份证号（在 PatientProfile 中）
+        if (patientProfileRepository.existsByIdCardNumber(request.getIdCardNumber())) {
+            throw new IllegalArgumentException("该身份证号已被注册");
+        }
+        
+        // 3.2 检查身份验证记录中是否已有相同的身份证号（待审核或已通过）
+        // 注意：同一个身份证号可能有多条记录（如被拒绝后重新提交），所以需要查询所有记录
+        List<PatientIdentityVerification> existingVerifications = 
+            verificationRepository.findByIdCardNumberOrderByCreatedAtDesc(request.getIdCardNumber());
+        
+        // 检查是否有待审核或已通过的记录
+        for (PatientIdentityVerification verification : existingVerifications) {
+            if (verification.getStatus() == VerificationStatus.pending) {
+                throw new IllegalArgumentException("该身份证号正在审核中，请勿重复提交");
+            } else if (verification.getStatus() == VerificationStatus.approved) {
+                throw new IllegalArgumentException("该身份证号已被注册");
+            }
+            // 如果状态是 rejected，允许重新提交（继续检查下一条记录）
+        }
+
+        // 4. 创建患者账户（状态为inactive，等待审核）
         Patient patient = new Patient();
         patient.setIdentifier(request.getIdentifier());
         patient.setPasswordHash(passwordEncoderUtil.encodePassword(request.getPassword()));
@@ -720,7 +741,7 @@ public class PatientService {
         
         Patient savedPatient = patientRepository.save(patient);
 
-        // 4. 创建身份验证申请记录
+        // 5. 创建身份验证申请记录
         PatientIdentityVerification verification = new PatientIdentityVerification();
         verification.setPatient(savedPatient);
         verification.setIdentifier(request.getIdentifier());

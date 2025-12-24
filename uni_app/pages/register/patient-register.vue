@@ -288,7 +288,8 @@
 							content: '您的注册申请已提交，请等待管理员审核。审核通过后即可登录。',
 							showCancel: false,
 							success: () => {
-								uni.navigateTo({
+								// 使用 redirectTo 替换当前页面，避免返回时回到注册页
+								uni.redirectTo({
 									url: '/pages/login/patient-login'
 								})
 							}

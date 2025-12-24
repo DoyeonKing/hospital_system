@@ -11,11 +11,64 @@
 // const CLOUD_SERVER_IP = '123.249.30.241'
 
 // ==================== 本地开发配置 ====================
-// 本地后端地址（开发环境使用）
-const LOCAL_BACKEND = 'http://localhost:8080'
-// 真机调试时，需要将 localhost 改为电脑的局域网IP（如：192.168.1.100）
+// 方式1：简单配置（推荐）- 开发者工具和H5使用 localhost，真机自动使用局域网IP
+const USE_AUTO_DETECT = true  // 👈 true=自动检测环境，false=使用固定IP
+
+// 真机调试时使用的局域网IP（仅在 USE_AUTO_DETECT=true 时生效）
 // 获取IP方法：Windows运行 ipconfig，Mac/Linux运行 ifconfig
-// const LOCAL_BACKEND = 'http://192.168.1.100:8080'  // 👈 真机调试时使用这个
+// 常见IP格式：192.168.x.x 或 172.20.x.x
+const LOCAL_IP = '172.20.10.3'  // 👈 请修改为你的电脑局域网IP
+
+// 方式2：固定IP配置（USE_AUTO_DETECT=false 时使用）
+const LOCAL_BACKEND_FIXED = 'http://localhost:8080'  // 👈 固定使用这个地址
+
+// 自动检测环境：开发者工具用 localhost，真机用局域网IP
+function getBackendURL() {
+	if (!USE_AUTO_DETECT) {
+		// 使用固定IP
+		return LOCAL_BACKEND_FIXED
+	}
+	
+	// 自动检测环境
+	try {
+		// #ifdef MP-WEIXIN
+		const systemInfo = uni.getSystemInfoSync()
+		console.log('[CONFIG] 系统信息:', {
+			platform: systemInfo.platform,
+			system: systemInfo.system,
+			model: systemInfo.model
+		})
+		
+		// 在开发者工具中，platform 通常是 'devtools'
+		// 在真机上，platform 是 'ios' 或 'android'
+		// 也可以通过 system 字段判断：开发者工具通常包含 'devtools'
+		const isDevTools = systemInfo.platform === 'devtools' || 
+		                   systemInfo.system && systemInfo.system.includes('devtools') ||
+		                   systemInfo.model && systemInfo.model.includes('devtools')
+		
+		if (isDevTools) {
+			console.log('[CONFIG] 检测到开发者工具，使用 localhost')
+			return 'http://localhost:8080'  // 开发者工具使用 localhost
+		} else {
+			console.log('[CONFIG] 检测到真机环境，使用局域网IP:', LOCAL_IP)
+			return `http://${LOCAL_IP}:8080`  // 真机使用局域网IP
+		}
+		// #endif
+		
+		// #ifndef MP-WEIXIN
+		// 非微信小程序环境（H5等），使用 localhost
+		console.log('[CONFIG] 非微信小程序环境，使用 localhost')
+		return 'http://localhost:8080'
+		// #endif
+	} catch (e) {
+		console.error('[CONFIG] 检测环境失败，使用默认 localhost:', e)
+		// 如果获取失败，默认使用 localhost（但真机应该用局域网IP）
+		// 为了安全，真机环境失败时也尝试使用局域网IP
+		return `http://${LOCAL_IP}:8080`
+	}
+}
+
+const LOCAL_BACKEND = getBackendURL()
 
 // ==================== 开发环境配置 ====================
 const development = {
@@ -25,7 +78,34 @@ const development = {
 	// baseURL: `http://${CLOUD_SERVER_IP}:8080`,
 	
 	// AI 预问诊后端服务（Node.js）- 端口5000（本地开发）
-	aiBaseURL: `http://localhost:5000`
+	aiBaseURL: (() => {
+		if (!USE_AUTO_DETECT) {
+			// 使用固定IP
+			return 'http://localhost:5000'
+		}
+		
+		// 自动检测环境（与 baseURL 保持一致）
+		try {
+			// #ifdef MP-WEIXIN
+			const systemInfo = uni.getSystemInfoSync()
+			const isDevTools = systemInfo.platform === 'devtools' || 
+			                   systemInfo.system && systemInfo.system.includes('devtools') ||
+			                   systemInfo.model && systemInfo.model.includes('devtools')
+			
+			if (isDevTools) {
+				return 'http://localhost:5000'
+			} else {
+				return `http://${LOCAL_IP}:5000`
+			}
+			// #endif
+			// #ifndef MP-WEIXIN
+			return 'http://localhost:5000'
+			// #endif
+		} catch (e) {
+			// 真机环境失败时也使用局域网IP
+			return `http://${LOCAL_IP}:5000`
+		}
+	})()
 	// 云服务器配置（已注释，如需切换回云服务器可取消注释）：
 	// aiBaseURL: `http://${CLOUD_SERVER_IP}:5000`
 }
@@ -43,12 +123,42 @@ const production = {
 const config = development
 
 // 打印当前配置（方便调试）
-console.log('🔧 API配置:', {
-	模式: '本地开发模式',
-	后端地址: config.baseURL,
-	AI后端地址: config.aiBaseURL,
-	提示: '使用本地后端进行开发测试'
-})
+try {
+	if (USE_AUTO_DETECT) {
+		// #ifdef MP-WEIXIN
+		const systemInfo = uni.getSystemInfoSync()
+		console.log('🔧 API配置:', {
+			环境: systemInfo.platform === 'devtools' ? '开发者工具' : '真机调试',
+			模式: '本地开发模式（自动检测）',
+			后端地址: config.baseURL,
+			AI后端地址: config.aiBaseURL,
+			提示: systemInfo.platform === 'devtools' ? '使用 localhost' : `使用局域网IP: ${LOCAL_IP}`
+		})
+		// #endif
+		
+		// #ifndef MP-WEIXIN
+		console.log('🔧 API配置:', {
+			模式: '本地开发模式（自动检测）',
+			后端地址: config.baseURL,
+			AI后端地址: config.aiBaseURL,
+			提示: '使用本地后端进行开发测试'
+		})
+		// #endif
+	} else {
+		console.log('🔧 API配置:', {
+			模式: '本地开发模式（固定IP）',
+			后端地址: config.baseURL,
+			AI后端地址: config.aiBaseURL,
+			提示: '使用固定地址，如需真机测试请设置 USE_AUTO_DETECT=true'
+		})
+	}
+} catch (e) {
+	console.log('🔧 API配置:', {
+		模式: '本地开发模式',
+		后端地址: config.baseURL,
+		AI后端地址: config.aiBaseURL
+	})
+}
 
 // ==================== 以下为旧的本地配置（已注释，如需切换回本地后端可取消注释） ====================
 /*

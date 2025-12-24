@@ -38,5 +38,11 @@ public interface PatientIdentityVerificationRepository extends JpaRepository<Pat
      * 根据学号/工号查找身份验证记录
      */
     Optional<PatientIdentityVerification> findByIdentifier(String identifier);
+
+    /**
+     * 根据身份证号查找所有身份验证记录（用于检查身份证号是否已被使用）
+     * 注意：同一个身份证号可能有多条记录（如被拒绝后重新提交）
+     */
+    List<PatientIdentityVerification> findByIdCardNumberOrderByCreatedAtDesc(String idCardNumber);
 }
 

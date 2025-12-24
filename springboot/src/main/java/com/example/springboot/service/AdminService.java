@@ -94,7 +94,7 @@ public class AdminService {
         if (admin.getFailedLoginCount() == null) {
             admin.setFailedLoginCount(0);
         }
-        
+
         // 5. 检查失败登录时间窗口：如果距离最后一次失败登录超过30分钟，重置失败次数
         // 这样可以避免失败次数无限累积，给用户重新尝试的机会
         if (admin.getLastFailedLoginTime() != null && admin.getFailedLoginCount() > 0) {
