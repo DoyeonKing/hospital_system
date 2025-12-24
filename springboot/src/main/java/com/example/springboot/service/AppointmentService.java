@@ -139,6 +139,33 @@ public class AppointmentService {
             throw new BadRequestException("Patient already has an appointment for this schedule.");
         }
 
+        // 规则1：同一就诊人8天内最多可挂10个号
+        LocalDate today = LocalDate.now();
+        LocalDate endDate = today.plusDays(7); // 8天内（包括今天）
+        long appointmentCount = appointmentRepository.countByPatientAndScheduleDateRangeAndStatusNotCancelled(
+                patient, today, endDate);
+        if (appointmentCount >= 10) {
+            throw new BadRequestException("同一就诊人8天内最多可挂10个号，您已达到上限（" + appointmentCount + "个）");
+        }
+
+        // 规则2：同一患者同一诊疗单元内，最多可挂同一科室同一等级医生的号各一个
+        // 诊疗单元定义：同一天的同一科室
+        if (schedule.getDoctor() != null && schedule.getDoctor().getDepartment() != null && 
+            schedule.getDoctor().getTitleLevel() != null) {
+            boolean hasDuplicate = appointmentRepository.existsByPatientAndDepartmentAndTitleLevelOnDate(
+                    patient,
+                    schedule.getDoctor().getDepartment(),
+                    schedule.getDoctor().getTitleLevel(),
+                    schedule.getScheduleDate(),
+                    -1 // 新建预约，没有现有ID需要排除
+            );
+            if (hasDuplicate) {
+                String titleName = getTitleLevelName(schedule.getDoctor().getTitleLevel());
+                throw new BadRequestException("您已在" + schedule.getDoctor().getDepartment().getName() + 
+                        "挂过" + titleName + "号，同一科室同一等级医生只能挂一个号");
+            }
+        }
+
         Appointment appointment = new Appointment();
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
@@ -455,19 +482,12 @@ public class AppointmentService {
             throw new BadRequestException("Appointment is already canceled");
         }
 
-        // 检查预约时间是否已过去
+        // 规则3和4：检查退号时间限制
         if (appointment.getSchedule() != null && appointment.getSchedule().getScheduleDate() != null 
                 && appointment.getSchedule().getSlot() != null 
                 && appointment.getSchedule().getSlot().getStartTime() != null) {
-            LocalDate scheduleDate = appointment.getSchedule().getScheduleDate();
-            LocalTime startTime = appointment.getSchedule().getSlot().getStartTime();
-            LocalDateTime scheduleDateTime = LocalDateTime.of(scheduleDate, startTime);
             LocalDateTime now = LocalDateTime.now();
-            
-            // 如果预约时间已过去，不允许取消
-            if (scheduleDateTime.isBefore(now) || scheduleDateTime.isEqual(now)) {
-                throw new BadRequestException("Cannot cancel appointment that has already passed");
-            }
+            validateCancellationTime(appointment, now);
         }
 
         AppointmentUpdateRequest request = new AppointmentUpdateRequest();
@@ -644,6 +664,55 @@ public class AppointmentService {
         return status == AppointmentStatus.scheduled || 
                status == AppointmentStatus.PENDING_PAYMENT || 
                status == AppointmentStatus.CHECKED_IN;
+    }
+
+    /**
+     * 验证退号时间限制
+     * 规则3：上午号最晚于就诊日7:00前退号
+     * 规则4：下午号最晚于就诊日13:00前退号
+     */
+    private void validateCancellationTime(Appointment appointment, LocalDateTime now) {
+        LocalDate scheduleDate = appointment.getSchedule().getScheduleDate();
+        LocalTime slotStartTime = appointment.getSchedule().getSlot().getStartTime();
+        
+        // 判断是上午号还是下午号（12:00为分界线）
+        LocalTime noonTime = LocalTime.of(12, 0);
+        boolean isMorningSlot = slotStartTime.isBefore(noonTime);
+        
+        if (isMorningSlot) {
+            // 上午号：必须在就诊日7:00前退号
+            LocalDateTime morningDeadline = LocalDateTime.of(scheduleDate, LocalTime.of(7, 0));
+            if (now.isAfter(morningDeadline) || now.isEqual(morningDeadline)) {
+                throw new BadRequestException("上午号必须在就诊日7:00前退号，当前时间已超过退号截止时间（" + 
+                        scheduleDate + " 07:00）");
+            }
+        } else {
+            // 下午号：必须在就诊日13:00前退号
+            LocalDateTime afternoonDeadline = LocalDateTime.of(scheduleDate, LocalTime.of(13, 0));
+            if (now.isAfter(afternoonDeadline) || now.isEqual(afternoonDeadline)) {
+                throw new BadRequestException("下午号必须在就诊日13:00前退号，当前时间已超过退号截止时间（" + 
+                        scheduleDate + " 13:00）");
+            }
+        }
+    }
+
+    /**
+     * 获取医生职称等级名称
+     */
+    private String getTitleLevelName(Integer titleLevel) {
+        if (titleLevel == null) {
+            return "医生";
+        }
+        switch (titleLevel) {
+            case 0:
+                return "主任医师";
+            case 1:
+                return "副主任医师";
+            case 2:
+                return "主治医师";
+            default:
+                return "医生";
+        }
     }
 
     /**
