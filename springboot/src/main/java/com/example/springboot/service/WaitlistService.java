@@ -157,7 +157,8 @@ public class WaitlistService {
     @Transactional
     public Appointment createAppointmentFromWaitlist(Integer scheduleId) {
         System.out.println("createAppointmentFromWaitlist 被调用，scheduleId: " + scheduleId);
-        Schedule schedule = scheduleRepository.findById(scheduleId)
+        // 使用悲观锁获取排班信息，防止候补并发问题
+        Schedule schedule = scheduleRepository.findByIdWithLock(scheduleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + scheduleId));
 
         // 检查是否有空余号源
@@ -193,12 +194,8 @@ public class WaitlistService {
             }
 
             // 找到合适的候补人员，通知患者支付
-            // 重要：此时需要锁定号源，防止其他人预约
-            // 刷新 schedule 对象，确保获取最新的 bookedSlots 值
-            schedule = scheduleRepository.findById(schedule.getScheduleId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
-            
-            // 再次检查号源是否还有空位（防止并发问题）
+            // 注意：由于已经在方法开始时使用悲观锁锁定了排班记录，这里不需要再次获取锁
+            // 直接进行最终的号源检查即可
             if (schedule.getBookedSlots() >= schedule.getTotalSlots()) {
                 System.out.println("候补填充时号源已被占用，跳过此候补");
                 continue;
@@ -368,8 +365,8 @@ public class WaitlistService {
         Schedule schedule = waitlist.getSchedule();
         Patient patient = waitlist.getPatient();
         
-        // 刷新 schedule 对象，确保获取最新的 bookedSlots 值
-        schedule = scheduleRepository.findById(schedule.getScheduleId())
+        // 使用悲观锁获取排班信息，防止候补支付时的并发问题
+        schedule = scheduleRepository.findByIdWithLock(schedule.getScheduleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
 
         // 3. 检查号源是否已被占用（号源在通知时已锁定，这里只需要检查是否超出）
