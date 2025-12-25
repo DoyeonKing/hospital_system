@@ -135,9 +135,13 @@
 			})
 			
 			this.loadPatientInfo()
-			// 只有从候补页面跳转过来才需要创建预约
+			// 只有从候补页面跳转过来或者没有appointmentId才需要创建预约
+			// 如果已经有appointmentId（从预约详情页面跳转），则直接进入支付流程
 			if (!this.appointmentId) {
 				this.createAppointment()
+			} else {
+				// 已有预约ID，直接计算费用
+				this.calculateFeeFromPatientType()
 			}
 		},
 		methods: {
