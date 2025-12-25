@@ -3,6 +3,7 @@ package com.example.springboot.service;
 import com.example.springboot.dto.appointment.AppointmentResponse;
 import com.example.springboot.dto.appointment.AppointmentUpdateRequest;
 import com.example.springboot.dto.common.PageResponse;
+import com.example.springboot.dto.fee.FeeDetailDTO;
 import com.example.springboot.dto.patient.PatientSimpleResponse;
 import com.example.springboot.dto.payment.PaymentRequest;
 import com.example.springboot.dto.waitlist.*;
@@ -13,6 +14,7 @@ import com.example.springboot.entity.Schedule;
 import com.example.springboot.entity.Waitlist;
 import com.example.springboot.entity.enums.AppointmentStatus;
 import com.example.springboot.entity.enums.BlacklistStatus;
+import com.example.springboot.entity.enums.PatientType;
 import com.example.springboot.entity.enums.WaitlistStatus;
 import com.example.springboot.entity.enums.PaymentStatus;
 import com.example.springboot.entity.enums.PatientStatus;
@@ -22,6 +24,7 @@ import com.example.springboot.repository.AppointmentRepository;
 import com.example.springboot.repository.PatientRepository;
 import com.example.springboot.repository.ScheduleRepository;
 import com.example.springboot.repository.WaitlistRepository;
+import com.example.springboot.util.FeeCalculator;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -31,6 +34,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -272,6 +276,31 @@ public class WaitlistService {
             response.setQueuePosition(null);
         }
         
+        // 计算费用详情（根据患者类型计算报销比例和实际应付费用）
+        if (waitlist.getSchedule() != null && 
+            waitlist.getSchedule().getFee() != null &&
+            waitlist.getPatient() != null &&
+            waitlist.getPatient().getPatientType() != null) {
+            
+            BigDecimal originalFee = waitlist.getSchedule().getFee();
+            PatientType patientType = waitlist.getPatient().getPatientType();
+            
+            BigDecimal reimbursementRate = FeeCalculator.getReimbursementRate(patientType);
+            BigDecimal reimbursementAmount = FeeCalculator.calculateReimbursementAmount(originalFee, patientType);
+            BigDecimal actualFee = FeeCalculator.calculateActualFee(originalFee, patientType);
+            String patientTypeName = FeeCalculator.getPatientTypeName(patientType);
+            
+            FeeDetailDTO feeDetail = new FeeDetailDTO(
+                originalFee, 
+                reimbursementRate, 
+                reimbursementAmount, 
+                actualFee, 
+                patientTypeName
+            );
+            
+            response.setFeeDetail(feeDetail);
+        }
+        
         return response;
     }
 
@@ -387,7 +416,8 @@ public class WaitlistService {
             String doctorName = "未知医生";
             String scheduleDate = "";
             String slotName = "";
-            Double fee = 0.0;
+            Double originalFee = 0.0;
+            Double actualFee = 0.0;
             
             if (schedule != null) {
                 if (schedule.getDoctor() != null && schedule.getDoctor().getDepartment() != null) {
@@ -403,7 +433,18 @@ public class WaitlistService {
                     slotName = schedule.getSlot().getSlotName();
                 }
                 if (schedule.getFee() != null) {
-                    fee = schedule.getFee().doubleValue();
+                    originalFee = schedule.getFee().doubleValue();
+                    // 根据患者类型计算实际应付费用
+                    if (patient != null && patient.getPatientType() != null) {
+                        BigDecimal calculatedActualFee = FeeCalculator.calculateActualFee(
+                            schedule.getFee(), 
+                            patient.getPatientType()
+                        );
+                        actualFee = calculatedActualFee.doubleValue();
+                    } else {
+                        // 如果没有患者类型，实付等于原价
+                        actualFee = originalFee;
+                    }
                 }
             }
             
@@ -414,7 +455,8 @@ public class WaitlistService {
                     doctorName,
                     scheduleDate,
                     slotName,
-                    fee
+                    originalFee,
+                    actualFee
             );
         } catch (Exception e) {
             // 通知发送失败不影响支付流程，只记录日志

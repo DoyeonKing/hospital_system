@@ -557,11 +557,13 @@ public class AppointmentService {
         // 支付成功后发送通知
         try {
             Schedule schedule = appointment.getSchedule();
+            Patient patient = appointment.getPatient();
             String departmentName = "未知科室";
             String doctorName = "未知医生";
             String scheduleDate = "";
             String slotName = "";
-            Double fee = 0.0;
+            Double originalFee = 0.0;
+            Double actualFee = 0.0;
             
             if (schedule != null) {
                 if (schedule.getDoctor() != null && schedule.getDoctor().getDepartment() != null) {
@@ -577,7 +579,18 @@ public class AppointmentService {
                     slotName = schedule.getSlot().getSlotName();
                 }
                 if (schedule.getFee() != null) {
-                    fee = schedule.getFee().doubleValue();
+                    originalFee = schedule.getFee().doubleValue();
+                    // 根据患者类型计算实际应付费用
+                    if (patient != null && patient.getPatientType() != null) {
+                        BigDecimal calculatedActualFee = FeeCalculator.calculateActualFee(
+                            schedule.getFee(), 
+                            patient.getPatientType()
+                        );
+                        actualFee = calculatedActualFee.doubleValue();
+                    } else {
+                        // 如果没有患者类型，实付等于原价
+                        actualFee = originalFee;
+                    }
                 }
             }
             
@@ -588,7 +601,8 @@ public class AppointmentService {
                     doctorName,
                     scheduleDate,
                     slotName,
-                    fee
+                    originalFee,
+                    actualFee
             );
         } catch (Exception e) {
             // 通知发送失败不影响支付流程，只记录日志
