@@ -471,17 +471,14 @@ public class WaitlistService {
     }
 
     private int getNextAppointmentNumber(Schedule schedule, Patient patient) {
-        Appointment lastAppointment = appointmentRepository.findTopByScheduleOrderByAppointmentNumberDesc(schedule);
-        int baseNumber = (lastAppointment == null || lastAppointment.getAppointmentNumber() == null)
-                ? 0
-                : lastAppointment.getAppointmentNumber();
-
-        if (lastAppointment != null && lastAppointment.getPatient() != null
-                && patient != null
-                && Objects.equals(lastAppointment.getPatient().getPatientId(), patient.getPatientId())) {
-            return baseNumber + 1;
-        }
-
+        // 使用数据库聚合函数获取最大序号，避免并发问题
+        Integer maxNumber = appointmentRepository.findMaxAppointmentNumberBySchedule(schedule);
+        int baseNumber = (maxNumber == null) ? 0 : maxNumber;
+        
+        System.out.println("候补分配预约序号 - 排班ID: " + schedule.getScheduleId() + 
+                          ", 当前最大序号: " + maxNumber + 
+                          ", 新序号: " + (baseNumber + 1));
+        
         return baseNumber + 1;
     }
 
