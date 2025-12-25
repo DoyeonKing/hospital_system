@@ -12,12 +12,12 @@
 				<text class="amount-value">¥{{ actualFee }}</text>
 				
 				<!-- 费用明细（如果存在费用详情） -->
-				<view class="fee-detail" v-if="feeDetail && feeDetail.reimbursementRate > 0">
+				<view class="fee-detail" v-if="feeDetail">
 					<view class="fee-row">
 						<text class="fee-label">原价：</text>
 						<text class="fee-value">¥{{ feeDetail.originalFee.toFixed(2) }}</text>
 					</view>
-					<view class="fee-row">
+					<view class="fee-row" v-if="feeDetail.reimbursementRate > 0">
 						<text class="fee-label">{{ feeDetail.patientType }}报销（{{ (feeDetail.reimbursementRate * 100).toFixed(0) }}%）：</text>
 						<text class="fee-value reimbursement">-¥{{ feeDetail.reimbursementAmount.toFixed(2) }}</text>
 					</view>

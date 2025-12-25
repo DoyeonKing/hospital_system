@@ -75,7 +75,22 @@
 				<view class="payment-content">
 					<text class="payment-title">待支付</text>
 					<text class="payment-desc">请尽快完成支付以确认预约</text>
-					<text class="payment-fee">挂号费：¥{{ appointment.fee || 0 }}</text>
+					<!-- 费用明细 -->
+					<view class="fee-section">
+						<view class="fee-row" v-if="appointment.feeDetail">
+							<text class="fee-label">原价：</text>
+							<text class="fee-value">¥{{ appointment.feeDetail.originalFee ? appointment.feeDetail.originalFee.toFixed(2) : (appointment.fee || 0).toFixed(2) }}</text>
+						</view>
+						<view class="fee-row" v-if="appointment.feeDetail && appointment.feeDetail.reimbursementRate > 0">
+							<text class="fee-label">{{ appointment.feeDetail.patientType }}报销（{{ (appointment.feeDetail.reimbursementRate * 100).toFixed(0) }}%）：</text>
+							<text class="fee-value reimbursement-value">-¥{{ appointment.feeDetail.reimbursementAmount.toFixed(2) }}</text>
+						</view>
+						<view class="fee-divider" v-if="appointment.feeDetail"></view>
+						<view class="fee-row total-fee-row">
+							<text class="fee-label">实付：</text>
+							<text class="payment-fee">¥{{ appointment.feeDetail && appointment.feeDetail.actualFee ? appointment.feeDetail.actualFee.toFixed(2) : (appointment.fee || 0).toFixed(2) }}</text>
+						</view>
+					</view>
 					<text class="payment-deadline" v-if="appointment.paymentDeadline">
 						支付截止：{{ formatDateTime(appointment.paymentDeadline) }}
 					</text>
@@ -1248,11 +1263,51 @@ onUnload() {
 		line-height: 1.5;
 	}
 
+	.fee-section {
+		width: 100%;
+		margin-top: 16rpx;
+		padding: 16rpx;
+		background: rgba(255, 255, 255, 0.1);
+		border-radius: 12rpx;
+	}
+	
+	.fee-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 8rpx;
+	}
+	
+	.fee-label {
+		font-size: 24rpx;
+		color: #666;
+	}
+	
+	.fee-value {
+		font-size: 24rpx;
+		color: #333;
+		font-weight: 500;
+	}
+	
+	.reimbursement-value {
+		color: #52C41A;
+	}
+	
+	.fee-divider {
+		height: 1rpx;
+		background: rgba(0, 0, 0, 0.1);
+		margin: 12rpx 0;
+	}
+	
+	.total-fee-row {
+		margin-bottom: 0;
+		margin-top: 8rpx;
+	}
+	
 	.payment-fee {
 		font-size: 32rpx;
 		font-weight: 700;
 		color: #FF4D4F;
-		margin-top: 8rpx;
 	}
 
 	.payment-deadline {

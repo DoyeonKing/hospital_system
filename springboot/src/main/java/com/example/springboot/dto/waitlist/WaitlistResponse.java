@@ -1,5 +1,6 @@
 package com.example.springboot.dto.waitlist;
 
+import com.example.springboot.dto.fee.FeeDetailDTO; // 导入费用详情DTO
 import com.example.springboot.dto.patient.PatientResponse; // 导入患者响应DTO
 import com.example.springboot.dto.schedule.ScheduleResponse; // 导入排班响应DTO
 import com.example.springboot.entity.enums.WaitlistStatus;
@@ -16,4 +17,5 @@ public class WaitlistResponse {
     private LocalDateTime notificationSentAt;
     private LocalDateTime createdAt;
     private Integer queuePosition; // 排队位置（仅 waiting 状态有效）
+    private FeeDetailDTO feeDetail; // 费用详情（包含原价、报销比例、实际费用等）
 }
