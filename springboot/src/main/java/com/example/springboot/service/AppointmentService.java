@@ -172,21 +172,16 @@ public class AppointmentService {
         Appointment appointment = new Appointment();
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
+        appointment.setAppointmentNumber(getNextAppointmentNumberForRebooking(schedule, patient)); // 自动分配就诊序号
         appointment.setStatus(AppointmentStatus.PENDING_PAYMENT); // 初始状态为待支付
         appointment.setPaymentStatus(PaymentStatus.unpaid);
         appointment.setCreatedAt(LocalDateTime.now());
-        
-        // 先保存预约（序号为null），然后在同一事务中原子性地分配序号
-        Appointment savedAppointment = appointmentRepository.save(appointment);
-        
-        // 使用数据库原子操作分配序号
-        Integer nextNumber = getNextAppointmentNumberAtomic(schedule);
-        savedAppointment.setAppointmentNumber(nextNumber);
-        savedAppointment = appointmentRepository.save(savedAppointment);
 
         // 增加排班的已预约数
         schedule.setBookedSlots(schedule.getBookedSlots() + 1);
         scheduleRepository.save(schedule); // 保存更新后的排班信息
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
 
         // 发送预约通知
         try {
@@ -372,7 +367,7 @@ public class AppointmentService {
             } else if (newStatus == AppointmentStatus.cancelled && originalStatus == AppointmentStatus.CHECKED_IN) {
                 // 已签到的预约不能取消
                 throw new BadRequestException("已签到的预约不能取消，如需取消请联系管理员");
-            } else if (originalStatus == AppointmentStatus.cancelled &&  isActiveStatus(newStatus)) {
+            } else if (originalStatus == AppointmentStatus.cancelled && isActiveStatus(newStatus)) {
                 shouldRestoreSlots = true;
                 shouldAssignNewNumber = true;
             }
@@ -662,15 +657,32 @@ public class AppointmentService {
         // 如果预约已经取消，只需要更新支付状态
         appointmentRepository.save(appointment);
 
-        logger.info("退款成功 - 预约ID: {}, 患者: {}, 退款时间: {}", appointmentId, appointment.getPatient().getFullName(), appointment.getUpdatedAt());
-
+        logger.info("退款成功 - 预约ID: {}, 患者: {}, 退款时间: {}", appointmentId, appointment.getPatient().getFullName(), LocalDateTime.now());
         return convertToResponseDto(appointment);
     }
 
     private boolean isActiveStatus(AppointmentStatus status) {
-        return status == AppointmentStatus.scheduled || 
-               status == AppointmentStatus.PENDING_PAYMENT || 
-               status == AppointmentStatus.CHECKED_IN;
+        return status == AppointmentStatus.scheduled || status == AppointmentStatus.CHECKED_IN;
+    }
+
+    private int getNextAppointmentNumberForRebooking(Schedule schedule, Patient patient) {
+        // 获取该排班下所有有效预约（按序号升序排列）
+        List<Appointment> appointments = appointmentRepository.findByScheduleAndStatusNotCancelledOrderByAppointmentNumberAsc(schedule);
+        
+        // 如果没有预约，从1开始
+        if (appointments.isEmpty()) {
+            return 1;
+        }
+        
+        // 找到最大序号
+        int maxNumber = 0;
+        for (Appointment appointment : appointments) {
+            if (appointment.getAppointmentNumber() != null && appointment.getAppointmentNumber() > maxNumber) {
+                maxNumber = appointment.getAppointmentNumber();
+            }
+        }
+        
+        return maxNumber + 1;
     }
 
     /**
@@ -1681,35 +1693,5 @@ public class AppointmentService {
         
         logger.info("自动标记爽约任务完成，共处理 {} 条记录", count);
         return count;
-    }
-
-    /**
-     * 原子性地获取下一个预约序号（真正的并发安全）
-     */
-    private synchronized Integer getNextAppointmentNumberAtomic(Schedule schedule) {
-        // 使用synchronized确保同一时刻只有一个线程能执行此方法
-        Integer maxNumber = appointmentRepository.findMaxAppointmentNumberBySchedule(schedule);
-        int nextNumber = (maxNumber == null) ? 1 : maxNumber + 1;
-        
-        System.out.println("原子分配预约序号 - 排班ID: " + schedule.getScheduleId() + 
-                          ", 当前最大序号: " + maxNumber + 
-                          ", 新序号: " + nextNumber);
-        
-        return nextNumber;
-    }
-
-    /**
-     * 获取下一个预约序号（修复并发问题）
-     */
-    private int getNextAppointmentNumberForRebooking(Schedule schedule, Patient patient) {
-        // 使用数据库聚合函数获取最大序号，避免并发问题
-        Integer maxNumber = appointmentRepository.findMaxAppointmentNumberBySchedule(schedule);
-        int baseNumber = (maxNumber == null) ? 0 : maxNumber;
-        
-        System.out.println("分配预约序号 - 排班ID: " + schedule.getScheduleId() + 
-                          ", 当前最大序号: " + maxNumber + 
-                          ", 新序号: " + (baseNumber + 1));
-        
-        return baseNumber + 1;
     }
 }
