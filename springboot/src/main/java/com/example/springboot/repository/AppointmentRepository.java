@@ -8,8 +8,10 @@ import com.example.springboot.entity.enums.AppointmentStatus;
 import com.example.springboot.entity.enums.AppointmentType;
 import org.apache.ibatis.annotations.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import jakarta.persistence.LockModeType;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -161,12 +163,30 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     Integer findMaxAppointmentNumberByScheduleAndType(
             @Param("schedule") Schedule schedule,
             @Param("appointmentType") AppointmentType appointmentType);
+    
+    /**
+     * 使用悲观锁查询指定排班和类型的有效预约（按序号降序排列）
+     * 用于生成下一个加号预约序号，确保并发安全
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Appointment a WHERE a.schedule = :schedule AND a.appointmentType = :appointmentType AND a.status != com.example.springboot.entity.enums.AppointmentStatus.cancelled ORDER BY a.appointmentNumber DESC")
+    List<Appointment> findByScheduleAndTypeAndStatusNotCancelledOrderByAppointmentNumberDescWithLock(
+            @Param("schedule") Schedule schedule,
+            @Param("appointmentType") AppointmentType appointmentType);
 
     /**
      * 查询指定排班的所有有效预约（排除已取消的预约），按序号升序排列
      */
     @Query("SELECT a FROM Appointment a WHERE a.schedule = :schedule AND a.status != com.example.springboot.entity.enums.AppointmentStatus.cancelled ORDER BY a.appointmentNumber ASC")
     List<Appointment> findByScheduleAndStatusNotCancelledOrderByAppointmentNumberAsc(@Param("schedule") Schedule schedule);
+    
+    /**
+     * 使用悲观锁查询指定排班的所有有效预约（排除已取消的预约），按序号降序排列
+     * 用于生成下一个预约序号，确保并发安全
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Appointment a WHERE a.schedule = :schedule AND a.status != com.example.springboot.entity.enums.AppointmentStatus.cancelled ORDER BY a.appointmentNumber DESC")
+    List<Appointment> findByScheduleAndStatusNotCancelledOrderByAppointmentNumberDescWithLock(@Param("schedule") Schedule schedule);
     
     /**
      * 统计指定排班的待支付加号数量（用于计算实际可用号源）

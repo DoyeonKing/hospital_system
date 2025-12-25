@@ -280,11 +280,9 @@
 
 			// 创建预约
 			async createAppointment(doctor, schedule) {
-				uni.showLoading({ title: '正在预约...' })
 				try {
 					const patientInfo = uni.getStorageSync('patientInfo')
 					if (!patientInfo || !patientInfo.id) {
-						uni.hideLoading()
 						uni.showToast({
 							title: '请先登录',
 							icon: 'none'
@@ -305,7 +303,6 @@
 
 					const response = await createAppointment(appointmentData)
 
-					uni.hideLoading()
 
 					if (response && response.code === '200') {
 						// 预约创建成功，跳转到付费页面
@@ -337,7 +334,6 @@
 					}
 				} catch (error) {
 					console.error('创建预约失败:', error)
-					uni.hideLoading()
 					
 					// 解析错误信息
 					let errorMsg = '预约失败，请重试'
@@ -363,7 +359,6 @@
 						})
 					}
 				} finally {
-					uni.hideLoading()
 				}
 			},
 

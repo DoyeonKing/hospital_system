@@ -25,13 +25,6 @@ function request(options) {
 		console.log(`[REQUEST] ${options.method || 'GET'} ${fullUrl}`)
 		console.log('[REQUEST] 请求参数:', options.data || {})
 		
-		// 显示加载提示（可选，通过 options.showLoading 控制）
-		if (options.showLoading !== false) {
-			uni.showLoading({
-				title: options.loadingText || '加载中...',
-				mask: true
-			})
-		}
 		
 		uni.request({
 			url: fullUrl,
@@ -52,10 +45,6 @@ function request(options) {
 				console.log('[RESPONSE] 状态码:', res.statusCode)
 				console.log('[RESPONSE] 响应数据:', res.data)
 				
-				// 隐藏加载提示
-				if (options.showLoading !== false) {
-					uni.hideLoading()
-				}
 				
 				// 如果请求时间超过3秒，记录警告
 				if (duration > 3000) {
@@ -133,15 +122,7 @@ function request(options) {
 				console.error('[REQUEST] 失败URL:', fullUrl)
 				console.error('[REQUEST] 请求耗时:', duration + 'ms')
 				
-				// 隐藏加载提示（添加错误保护）
-				if (options.showLoading !== false) {
-					try {
-						uni.hideLoading()
-					} catch (e) {
-						// 忽略hideLoading错误（可能toast不存在）
-						console.warn('[REQUEST] hideLoading失败:', e)
-					}
-				}
+				// 完全禁用加载提示
 				
 				// 根据错误类型给出提示
 				// 如果设置了 silentError，则不显示toast（用于后台检查等场景）

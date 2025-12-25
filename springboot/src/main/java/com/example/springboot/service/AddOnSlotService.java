@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -177,18 +178,26 @@ public class AddOnSlotService {
      * 加号患者使用独立的序号范围（从101开始），避免与普通预约冲突
      */
     private Integer getNextAppointmentNumber(Schedule schedule) {
-        // 加号预约从 101 开始编号
-        Integer maxAddOnNumber = appointmentRepository.findMaxAppointmentNumberByScheduleAndType(
+        // 使用悲观锁查询该排班下所有有效的加号预约（按序号降序排列），确保并发安全
+        // 这样可以防止多个并发请求同时生成相同的序号
+        List<Appointment> appointments = appointmentRepository.findByScheduleAndTypeAndStatusNotCancelledOrderByAppointmentNumberDescWithLock(
                 schedule, AppointmentType.ADD_ON);
         
         Integer nextNumber;
-        if (maxAddOnNumber == null || maxAddOnNumber < 101) {
+        if (appointments.isEmpty()) {
             nextNumber = 101; // 第一个加号从101开始
         } else {
-            nextNumber = maxAddOnNumber + 1;
+            // 找到最大序号（列表已按降序排列，第一个就是最大值）
+            Integer maxAddOnNumber = appointments.get(0).getAppointmentNumber();
+            if (maxAddOnNumber == null || maxAddOnNumber < 101) {
+                nextNumber = 101;
+            } else {
+                nextNumber = maxAddOnNumber + 1;
+            }
         }
         
-        logger.info("分配加号序号 - 当前最大加号序号: {}, 新序号: {}", maxAddOnNumber, nextNumber);
+        logger.info("分配加号序号 - 当前最大加号序号: {}, 新序号: {}", 
+                appointments.isEmpty() ? null : appointments.get(0).getAppointmentNumber(), nextNumber);
         return nextNumber;
     }
 
@@ -267,13 +276,22 @@ public class AddOnSlotService {
         appointmentRepository.save(appointment);
 
         // 更新排班的已预约数（加号支付成功后才占用号源）
+        // 使用原子更新确保并发安全
         Schedule schedule = appointment.getSchedule();
-        Integer currentBooked = schedule.getBookedSlots();
-        schedule.setBookedSlots(currentBooked + 1);
-        scheduleRepository.save(schedule);
+        Integer scheduleId = schedule.getScheduleId();
+        int updatedRows = scheduleRepository.incrementBookedSlotsAtomically(scheduleId);
         
-        logger.info("更新排班已预约数 - scheduleId: {}, 原已预约: {}, 新已预约: {}",
-                schedule.getScheduleId(), currentBooked, schedule.getBookedSlots());
+        if (updatedRows == 0) {
+            logger.warn("加号支付成功但号源已满 - appointmentId: {}, scheduleId: {}", appointmentId, scheduleId);
+            // 虽然理论上不应该发生（加号是预留的），但为了安全还是记录警告
+        }
+        
+        // 刷新 schedule 对象以获取最新的 bookedSlots 值
+        schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new RuntimeException("Schedule not found"));
+        
+        logger.info("更新排班已预约数 - scheduleId: {}, 新已预约: {}",
+                scheduleId, schedule.getBookedSlots());
 
         logger.info("加号支付处理完成 - appointmentId: {}, scheduleId: {}", 
                 appointmentId, schedule.getScheduleId());
