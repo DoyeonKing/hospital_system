@@ -181,8 +181,7 @@
 				waitlistCount: 0,
 				unreadCount: 0,
 				showAllDepartments: false,
-				identifierMasked: true,
-				refreshTimer: null // 定时刷新定时器
+				identifierMasked: true
 			}
 		},
 		computed: {
@@ -239,8 +238,6 @@
 		onLoad() {
 			this.checkLoginStatus()
 			this.loadPageData()
-			// 启动定时刷新
-			this.startAutoRefresh()
 		},
 		onShow() {
 			// 页面显示时先重置候补数量，避免显示旧数据
@@ -257,14 +254,9 @@
 		onPullDownRefresh() {
 			// 下拉刷新
 			this.isRefreshing = true
-			this.loadPageData().then(() => {
-				this.isRefreshing = false
-				uni.stopPullDownRefresh()
-			})
-		},
-		onUnload() {
-			// 页面卸载时清除定时器
-			this.stopAutoRefresh()
+			this.loadPageData()
+			this.isRefreshing = false
+			uni.stopPullDownRefresh()
 		},
 		methods: {
 			// 检查登录状态

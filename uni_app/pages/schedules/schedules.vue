@@ -159,8 +159,7 @@
 				isReschedule: false, // 是否为改约场景
 				rescheduleType: '', // 改约类型：'time' 换时间段, 'doctor' 换医生
 				originalAppointmentId: null, // 原预约ID
-				originalDoctorId: null, // 原医生ID（换时间段时使用）
-				refreshTimer: null // 定时刷新定时器
+				originalDoctorId: null // 原医生ID（换时间段时使用）
 			}
 		},
 		computed: {
@@ -279,8 +278,6 @@
 				}
 				
 				this.loadSchedules()
-				// 启动定时刷新
-				this.startAutoRefresh()
 			} catch (error) {
 				console.error('排班页加载失败:', error)
 				uni.showToast({
@@ -288,22 +285,6 @@
 					icon: 'error'
 				})
 			}
-		},
-		onShow() {
-			// 页面显示时刷新数据
-			console.log('[schedules onShow] 页面显示，刷新排班列表')
-			this.loadSchedules()
-		},
-		onPullDownRefresh() {
-			// 下拉刷新
-			console.log('[schedules onPullDownRefresh] 下拉刷新')
-			this.loadSchedules().then(() => {
-				uni.stopPullDownRefresh()
-			})
-		},
-		onUnload() {
-			// 页面卸载时清除定时器
-			this.stopAutoRefresh()
 		},
 		methods: {
 			// 判断号源是否已满
@@ -511,25 +492,6 @@
 		// 选择医生
 		selectDoctor(doctorId) {
 			this.selectedDoctorId = doctorId
-		},
-		
-		// 启动自动刷新
-		startAutoRefresh() {
-			// 清除之前的定时器
-			this.stopAutoRefresh()
-			// 设置30秒自动刷新
-			this.refreshTimer = setInterval(() => {
-				console.log('[schedules] 自动刷新排班列表')
-				this.loadSchedules()
-			}, 30000) // 30秒刷新一次
-		},
-		
-		// 停止自动刷新
-		stopAutoRefresh() {
-			if (this.refreshTimer) {
-				clearInterval(this.refreshTimer)
-				this.refreshTimer = null
-			}
 		},
 		
 		// 格式化日期标题
