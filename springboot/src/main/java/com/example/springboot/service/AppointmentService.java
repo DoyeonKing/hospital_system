@@ -367,7 +367,7 @@ public class AppointmentService {
             } else if (newStatus == AppointmentStatus.cancelled && originalStatus == AppointmentStatus.CHECKED_IN) {
                 // 已签到的预约不能取消
                 throw new BadRequestException("已签到的预约不能取消，如需取消请联系管理员");
-            } else if (originalStatus == AppointmentStatus.cancelled && isActiveStatus(newStatus)) {
+            } else if (originalStatus == AppointmentStatus.cancelled &&  isActiveStatus(newStatus)) {
                 shouldRestoreSlots = true;
                 shouldAssignNewNumber = true;
             }
@@ -657,12 +657,15 @@ public class AppointmentService {
         // 如果预约已经取消，只需要更新支付状态
         appointmentRepository.save(appointment);
 
-        logger.info("退款成功 - 预约ID: {}, 患者: {}, 退款时间: {}", 
-               appointment.getId(), 
-               appointment.getPatient().getName(), 
-               LocalDateTime.now());
-        
+        logger.info("退款成功 - 预约ID: {}, 患者: {}, 退款时间: {}", appointmentId, appointment.getPatient().getFullName(), appointment.getUpdatedAt());
+
         return convertToResponseDto(appointment);
+    }
+
+    private boolean isActiveStatus(AppointmentStatus status) {
+        return status == AppointmentStatus.scheduled || 
+               status == AppointmentStatus.PENDING_PAYMENT || 
+               status == AppointmentStatus.CHECKED_IN;
     }
 
     /**
