@@ -21,16 +21,6 @@
 				</view>
 			</view>
 			
-		<!-- 待就诊卡片 -->
-		<view class="upcoming-card" v-if="upcomingAppointment" @click="navigateToAppointments">
-			<view class="upcoming-icon">🩺</view>
-			<view class="upcoming-content">
-				<text class="upcoming-title">待就诊</text>
-				<text class="upcoming-info">{{ formatAppointmentTime(upcomingAppointment.scheduleTime) }} · {{ upcomingAppointment.departmentName }}</text>
-			</view>
-			<text class="upcoming-arrow">></text>
-		</view>
-
 		<!-- 候补提醒卡片 -->
 		<view class="waitlist-card" v-if="waitlistCount > 0" @click="navigateToWaitlist">
 			<view class="waitlist-icon">⏳</view>
@@ -58,11 +48,6 @@
 				<text class="menu-text">编辑资料</text>
 				<text class="menu-arrow">></text>
 			</view>
-			<view class="menu-item" @click="navigateToSettings">
-				<text class="menu-icon">⚙️</text>
-				<text class="menu-text">设置</text>
-				<text class="menu-arrow">></text>
-			</view>
 			<view class="menu-item" @click="showAbout">
 				<text class="menu-icon">ℹ️</text>
 				<text class="menu-text">关于我们</text>
@@ -88,7 +73,6 @@
 					name: '张三',
 					identifier: '2021001001'
 				},
-				upcomingAppointment: null,
 				waitlistCount: 0,
 				identifierMasked: true
 			}
@@ -105,7 +89,6 @@
 		},
 		onLoad() {
 			this.loadPatientInfo()
-			this.loadUpcomingCount()
 			this.loadWaitlistCount()
 		},
 		onShow() {
@@ -113,7 +96,6 @@
 			this.$set(this, 'waitlistCount', 0)
 			// 页面显示时刷新数据
 			this.loadPatientInfo()
-			this.loadUpcomingCount()
 			this.loadWaitlistCount()
 		},
 		methods: {
@@ -134,41 +116,12 @@
 					url: '/pages/profile/edit'
 				})
 			},
-			navigateToSettings() {
-				uni.showToast({
-					title: '设置功能开发中',
-					icon: 'none',
-					duration: 2000
-				})
-			},
 			showAbout() {
 				uni.showModal({
 					title: '关于我们',
 					content: 'XX大学校医院\n地址：XX市XX区XX路XX号\n总机：0512-66666666\n急诊：0512-66666120\n\n门诊时间\n工作日 8:00-11:30 / 14:00-17:30\n周末仅上午',
 					showCancel: false,
 					confirmText: '知道了'
-				})
-			},
-			loadUpcomingCount() {
-				const upcomingAppointment = uni.getStorageSync('upcomingAppointment')
-				if (upcomingAppointment) {
-					this.upcomingAppointment = upcomingAppointment
-				} else {
-					this.upcomingAppointment = null
-				}
-			},
-			formatAppointmentTime(timeString) {
-				if (!timeString) return ''
-				const date = new Date(timeString)
-				const month = date.getMonth() + 1
-				const day = date.getDate()
-				const hours = date.getHours().toString().padStart(2, '0')
-				const minutes = date.getMinutes().toString().padStart(2, '0')
-				return month + '月' + day + '日 ' + hours + ':' + minutes
-			},
-			navigateToAppointments() {
-				uni.switchTab({
-					url: '/pages/appointments/appointments'
 				})
 			},
 			async loadWaitlistCount() {
@@ -352,51 +305,6 @@
 	.eye-icon {
 		font-size: 20rpx;
 		opacity: 0.7;
-	}
-	
-	.upcoming-card {
-		background: #ffffff;
-		border-radius: 20rpx;
-		padding: 24rpx 30rpx;
-		margin-bottom: 30rpx;
-		box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.08);
-		display: flex;
-		align-items: center;
-		transition: all 0.3s ease;
-	}
-	
-	.upcoming-card:active {
-		transform: translateY(-2rpx);
-		box-shadow: 0 6rpx 24rpx rgba(0, 0, 0, 0.12);
-	}
-	
-	.upcoming-icon {
-		font-size: 40rpx;
-		margin-right: 20rpx;
-	}
-	
-	.upcoming-content {
-		flex: 1;
-	}
-	
-	.upcoming-title {
-		display: block;
-		font-size: 28rpx;
-		font-weight: 700;
-		color: #1A202C;
-		margin-bottom: 8rpx;
-	}
-	
-	.upcoming-info {
-		display: block;
-		font-size: 24rpx;
-		color: #718096;
-	}
-	
-	.upcoming-arrow {
-		font-size: 36rpx;
-		color: #A0AEC0;
-		font-weight: bold;
 	}
 
 	/* 候补提醒卡片样式 */
