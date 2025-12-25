@@ -187,6 +187,15 @@ public class SlotApplicationService {
     public List<SlotApplicationResponse> getAllApplications() {
         List<SlotApplication> applications = slotApplicationRepository.findAll();
         return applications.stream()
+                .sorted((a1, a2) -> {
+                    // 按创建时间倒序排列（最新的在最上面）
+                    LocalDateTime time1 = a1.getCreatedAt();
+                    LocalDateTime time2 = a2.getCreatedAt();
+                    if (time1 == null && time2 == null) return 0;
+                    if (time1 == null) return 1;
+                    if (time2 == null) return -1;
+                    return time2.compareTo(time1); // 倒序：time2 与 time1 比较
+                })
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }

@@ -725,24 +725,24 @@ onUnload() {
 				return
 			}
 			
-			// 显示支付方式选择
-			uni.showActionSheet({
-				itemList: this.paymentMethods.map(m => m.icon + ' ' + m.name),
-				success: async (res) => {
-					const selectedMethod = this.paymentMethods[res.tapIndex]
-					this.selectedPaymentMethod = selectedMethod.value
-					
-					// 确认支付
-					uni.showModal({
-						title: '确认支付',
-						content: `使用${selectedMethod.name}支付 ¥${this.appointment.fee || 0}？`,
-						success: async (modalRes) => {
-							if (modalRes.confirm) {
-								await this.processPayment()
-							}
-						}
-					})
-				}
+			// 跳转到支付页面
+			const params = {
+				appointmentId: this.appointmentId,
+				fee: this.appointment.fee || 0,
+				departmentName: encodeURIComponent(this.appointment.departmentName || ''),
+				doctorName: encodeURIComponent(this.appointment.doctorName || ''),
+				doctorTitle: encodeURIComponent(''), // 从医生名称中提取职称或留空
+				scheduleDate: encodeURIComponent(this.formatDateTime(this.appointment.scheduleTime) || ''),
+				slotName: encodeURIComponent(this.appointment.slotName || ''),
+				location: encodeURIComponent(this.getLocationName(this.appointment) || '')
+			}
+			
+			const queryString = Object.keys(params)
+				.map(key => `${key}=${params[key]}`)
+				.join('&')
+			
+			uni.navigateTo({
+				url: `/pages/payment/payment?${queryString}`
 			})
 		},
 		
