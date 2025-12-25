@@ -657,30 +657,32 @@ public class AppointmentService {
         // 如果预约已经取消，只需要更新支付状态
         appointmentRepository.save(appointment);
 
-        logger.info("退款成功 - 预约ID: {}, 患者: {}, 退款时间: {}", 
-                appointmentId, appointment.getPatient().getFullName(), appointment.getUpdatedAt());
-
+        logger.info("退款成功 - 预约ID: {}, 患者: {}, 退款时间: {}", appointmentId, appointment.getPatient().getFullName(), LocalDateTime.now());
         return convertToResponseDto(appointment);
     }
 
-    private int getNextAppointmentNumberForRebooking(Schedule schedule, Patient patient) {
-        Appointment lastAppointment = appointmentRepository.findTopByScheduleOrderByAppointmentNumberDesc(schedule);
-        int baseNumber = (lastAppointment == null || lastAppointment.getAppointmentNumber() == null)
-                ? 0
-                : lastAppointment.getAppointmentNumber();
-
-        if (lastAppointment != null && lastAppointment.getPatient() != null
-                && Objects.equals(lastAppointment.getPatient().getPatientId(), patient.getPatientId())) {
-            return baseNumber + 1;
-        }
-
-        return baseNumber + 1;
+    private boolean isActiveStatus(AppointmentStatus status) {
+        return status == AppointmentStatus.scheduled || status == AppointmentStatus.CHECKED_IN;
     }
 
-    private boolean isActiveStatus(AppointmentStatus status) {
-        return status == AppointmentStatus.scheduled || 
-               status == AppointmentStatus.PENDING_PAYMENT || 
-               status == AppointmentStatus.CHECKED_IN;
+    private int getNextAppointmentNumberForRebooking(Schedule schedule, Patient patient) {
+        // 获取该排班下所有有效预约（按序号升序排列）
+        List<Appointment> appointments = appointmentRepository.findByScheduleAndStatusNotCancelledOrderByAppointmentNumberAsc(schedule);
+        
+        // 如果没有预约，从1开始
+        if (appointments.isEmpty()) {
+            return 1;
+        }
+        
+        // 找到最大序号
+        int maxNumber = 0;
+        for (Appointment appointment : appointments) {
+            if (appointment.getAppointmentNumber() != null && appointment.getAppointmentNumber() > maxNumber) {
+                maxNumber = appointment.getAppointmentNumber();
+            }
+        }
+        
+        return maxNumber + 1;
     }
 
     /**

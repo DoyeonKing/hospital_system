@@ -161,6 +161,12 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Intege
     Integer findMaxAppointmentNumberByScheduleAndType(
             @Param("schedule") Schedule schedule,
             @Param("appointmentType") AppointmentType appointmentType);
+
+    /**
+     * 查询指定排班的所有有效预约（排除已取消的预约），按序号升序排列
+     */
+    @Query("SELECT a FROM Appointment a WHERE a.schedule = :schedule AND a.status != com.example.springboot.entity.enums.AppointmentStatus.cancelled ORDER BY a.appointmentNumber ASC")
+    List<Appointment> findByScheduleAndStatusNotCancelledOrderByAppointmentNumberAsc(@Param("schedule") Schedule schedule);
     
     /**
      * 统计指定排班的待支付加号数量（用于计算实际可用号源）
