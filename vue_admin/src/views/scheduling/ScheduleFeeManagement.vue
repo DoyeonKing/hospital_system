@@ -457,6 +457,7 @@ const loadSchedules = async () => {
     
     console.log('=== 前端请求参数详情 ===');
     console.log('科室ID:', departmentId, '(类型:', typeof departmentId, ')');
+    console.log('科室名称:', selectedDepartmentName.value);
     console.log('开始日期原始:', weekStart);
     console.log('开始日期格式化:', formattedStartDate, '(类型:', typeof formattedStartDate, ')');
     console.log('结束日期原始:', weekEnd);
@@ -467,6 +468,8 @@ const loadSchedules = async () => {
     
     const response = await getSchedules(requestParams);
     
+    console.log('=== API响应详情 ===');
+    console.log('科室:', selectedDepartmentName.value);
     console.log('API响应:', response);
     console.log('响应数据类型:', typeof response);
     console.log('响应数据结构:', response);
@@ -489,12 +492,26 @@ const loadSchedules = async () => {
     }
     
     scheduleData.value[activeSub.value] = schedules;
+    console.log('=== 数据存储结果 ===');
+    console.log('科室:', selectedDepartmentName.value);
     console.log('最终存储的排班数据:', schedules);
     console.log('排班数据长度:', schedules.length);
     console.log('存储到科室:', activeSub.value);
     console.log('scheduleData状态:', scheduleData.value);
+    console.log('==================');
+    
+    // 数据加载完成后，延迟保存原始数据
+    setTimeout(() => {
+      console.log('=== 准备保存原始数据 ===');
+      console.log('科室:', selectedDepartmentName.value);
+      console.log('当前scheduleList长度:', scheduleList.value.length);
+      saveOriginalData();
+    }, 100);
     
   } catch (error) {
+    console.error('=== 加载排班数据失败 ===');
+    console.error('科室:', selectedDepartmentName.value);
+    console.error('错误:', error);
     ElMessage.error('加载排班数据失败：' + (error.message || '未知错误'));
   } finally {
     loading.value = false;
@@ -610,7 +627,7 @@ const changeWeek = (offset) => {
         cancelButtonText: '取消',
         type: 'warning',
       }
-    ).then(() => {
+    ).then(async () => {
       if (offset === 0) {
         currentMonday.value = getCurrentMonday(); // 跳转到真正的本周
       } else {
@@ -625,11 +642,7 @@ const changeWeek = (offset) => {
         tableRef.value.clearSelection();
       }
       // 加载新周次的数据
-      loadSchedules();
-      // 保存新周次的原始数据
-      setTimeout(() => {
-        saveOriginalData();
-      }, 100);
+      await loadSchedules();
     }).catch(() => {
       // 取消切换
     });
@@ -649,10 +662,6 @@ const changeWeek = (offset) => {
     }
     // 加载新周次的数据
     loadSchedules();
-    // 保存新周次的原始数据
-    setTimeout(() => {
-      saveOriginalData();
-    }, 100);
   }
 };
 
@@ -687,7 +696,7 @@ const handleSubSelect = (id) => {
         cancelButtonText: '取消',
         type: 'warning',
       }
-    ).then(() => {
+    ).then(async () => {
       activeSub.value = id;
       selectedSchedules.value = [];
       selectAll.value = false;
@@ -696,11 +705,7 @@ const handleSubSelect = (id) => {
         tableRef.value.clearSelection();
       }
       // 加载新科室的数据
-      loadSchedules();
-      // 保存新科室的原始数据
-      setTimeout(() => {
-        saveOriginalData();
-      }, 100);
+      await loadSchedules();
     }).catch(() => {
       // 取消切换
     });
@@ -714,10 +719,6 @@ const handleSubSelect = (id) => {
     }
     // 加载新科室的数据
     loadSchedules();
-    // 保存新科室的原始数据
-    setTimeout(() => {
-      saveOriginalData();
-    }, 100);
   }
 };
 
@@ -739,13 +740,19 @@ const handleSelectAll = (val) => {
 };
 
 const handleFeeChange = (row) => {
+  console.log('费用变更:', row.scheduleId, '新费用:', row.fee);
   // 检查是否与原始数据不同
   const original = originalData.value[row.scheduleId];
-  if (original && original.fee !== row.fee) {
+  console.log('原始费用:', original?.fee);
+  
+  if (original && parseFloat(original.fee) !== parseFloat(row.fee)) {
     modifiedSchedules.value.add(row.scheduleId);
-  } else if (original && original.fee === row.fee) {
+    console.log('标记为已修改:', row.scheduleId);
+  } else if (original && parseFloat(original.fee) === parseFloat(row.fee)) {
     modifiedSchedules.value.delete(row.scheduleId);
+    console.log('取消修改标记:', row.scheduleId);
   }
+  console.log('当前修改数量:', modifiedSchedules.value.size);
 };
 
 const handleSlotsChange = (row) => {
@@ -754,13 +761,19 @@ const handleSlotsChange = (row) => {
     row.totalSlots = row.bookedSlots;
     return;
   }
+  console.log('号源变更:', row.scheduleId, '新限额:', row.totalSlots);
   // 检查是否与原始数据不同
   const original = originalData.value[row.scheduleId];
-  if (original && original.totalSlots !== row.totalSlots) {
+  console.log('原始限额:', original?.totalSlots);
+  
+  if (original && parseInt(original.totalSlots) !== parseInt(row.totalSlots)) {
     modifiedSchedules.value.add(row.scheduleId);
-  } else if (original && original.totalSlots === row.totalSlots) {
+    console.log('标记为已修改:', row.scheduleId);
+  } else if (original && parseInt(original.totalSlots) === parseInt(row.totalSlots)) {
     modifiedSchedules.value.delete(row.scheduleId);
+    console.log('取消修改标记:', row.scheduleId);
   }
+  console.log('当前修改数量:', modifiedSchedules.value.size);
 };
 
 const showBatchEditDialog = (type) => {
@@ -808,14 +821,20 @@ const handleBatchSave = () => {
 
 // 保存原始数据
 const saveOriginalData = () => {
+  console.log('保存原始数据，排班数量:', scheduleList.value.length);
   originalData.value = {};
   scheduleList.value.forEach(schedule => {
     originalData.value[schedule.scheduleId] = {
+      fee: parseFloat(schedule.fee),
+      totalSlots: parseInt(schedule.totalSlots)
+    };
+    console.log('保存原始数据:', schedule.scheduleId, {
       fee: schedule.fee,
       totalSlots: schedule.totalSlots
-    };
+    });
   });
   modifiedSchedules.value.clear();
+  console.log('原始数据保存完成，数据量:', Object.keys(originalData.value).length);
 };
 
 // 保存所有修改
@@ -897,11 +916,7 @@ onMounted(async () => {
   if (departments.value.length > 0) {
     handleParentSelect(departments.value[0].id);
     // 初始加载时从后端获取数据
-    loadSchedules();
-    // 初始加载时保存原始数据
-    setTimeout(() => {
-      saveOriginalData();
-    }, 200);
+    await loadSchedules();
   }
 });
 </script>

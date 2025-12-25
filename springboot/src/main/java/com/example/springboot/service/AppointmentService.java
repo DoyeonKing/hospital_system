@@ -117,17 +117,20 @@ public class AppointmentService {
             throw new BadRequestException("Patient is blacklisted and cannot make appointments.");
         }
 
-        Schedule schedule = scheduleRepository.findById(request.getScheduleId())
+        // 使用悲观锁获取排班信息，防止并发抢号问题
+        Schedule schedule = scheduleRepository.findByIdWithLock(request.getScheduleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + request.getScheduleId()));
 
-        System.out.println("创建预约检查 - scheduleId: " + request.getScheduleId() + ", patientId: " + request.getPatientId() + ", bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
+        System.out.println("创建预约检查（已加锁） - scheduleId: " + request.getScheduleId() + ", patientId: " + request.getPatientId() + ", bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
         
         if (schedule.getStatus() != ScheduleStatus.available) {
             throw new BadRequestException("Schedule is not active for booking.");
         }
+        
+        // 再次检查号源是否可用（在锁保护下进行最终检查）
         if (schedule.getBookedSlots() >= schedule.getTotalSlots()) {
             System.out.println("创建预约失败 - 号源已满: bookedSlots(" + schedule.getBookedSlots() + ") >= totalSlots(" + schedule.getTotalSlots() + ")");
-            throw new BadRequestException("No available slots for this schedule.");
+            throw new BadRequestException("抱歉，该号源已被抢完，请选择其他时段或加入候补队列");
         }
         if (schedule.getScheduleDate().isBefore(java.time.LocalDate.now()) ||
                 (schedule.getScheduleDate().isEqual(java.time.LocalDate.now()) && schedule.getSlot().getEndTime().isBefore(java.time.LocalTime.now()))) {
@@ -654,30 +657,32 @@ public class AppointmentService {
         // 如果预约已经取消，只需要更新支付状态
         appointmentRepository.save(appointment);
 
-        logger.info("退款成功 - 预约ID: {}, 患者: {}, 退款时间: {}", 
-                appointmentId, appointment.getPatient().getFullName(), appointment.getUpdatedAt());
-
+        logger.info("退款成功 - 预约ID: {}, 患者: {}, 退款时间: {}", appointmentId, appointment.getPatient().getFullName(), LocalDateTime.now());
         return convertToResponseDto(appointment);
     }
 
-    private int getNextAppointmentNumberForRebooking(Schedule schedule, Patient patient) {
-        Appointment lastAppointment = appointmentRepository.findTopByScheduleOrderByAppointmentNumberDesc(schedule);
-        int baseNumber = (lastAppointment == null || lastAppointment.getAppointmentNumber() == null)
-                ? 0
-                : lastAppointment.getAppointmentNumber();
-
-        if (lastAppointment != null && lastAppointment.getPatient() != null
-                && Objects.equals(lastAppointment.getPatient().getPatientId(), patient.getPatientId())) {
-            return baseNumber + 1;
-        }
-
-        return baseNumber + 1;
+    private boolean isActiveStatus(AppointmentStatus status) {
+        return status == AppointmentStatus.scheduled || status == AppointmentStatus.CHECKED_IN;
     }
 
-    private boolean isActiveStatus(AppointmentStatus status) {
-        return status == AppointmentStatus.scheduled || 
-               status == AppointmentStatus.PENDING_PAYMENT || 
-               status == AppointmentStatus.CHECKED_IN;
+    private int getNextAppointmentNumberForRebooking(Schedule schedule, Patient patient) {
+        // 获取该排班下所有有效预约（按序号升序排列）
+        List<Appointment> appointments = appointmentRepository.findByScheduleAndStatusNotCancelledOrderByAppointmentNumberAsc(schedule);
+        
+        // 如果没有预约，从1开始
+        if (appointments.isEmpty()) {
+            return 1;
+        }
+        
+        // 找到最大序号
+        int maxNumber = 0;
+        for (Appointment appointment : appointments) {
+            if (appointment.getAppointmentNumber() != null && appointment.getAppointmentNumber() > maxNumber) {
+                maxNumber = appointment.getAppointmentNumber();
+            }
+        }
+        
+        return maxNumber + 1;
     }
 
     /**

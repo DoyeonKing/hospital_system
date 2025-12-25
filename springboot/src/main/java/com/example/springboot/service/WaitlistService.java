@@ -157,7 +157,8 @@ public class WaitlistService {
     @Transactional
     public Appointment createAppointmentFromWaitlist(Integer scheduleId) {
         System.out.println("createAppointmentFromWaitlist 被调用，scheduleId: " + scheduleId);
-        Schedule schedule = scheduleRepository.findById(scheduleId)
+        // 使用悲观锁获取排班信息，防止候补并发问题
+        Schedule schedule = scheduleRepository.findByIdWithLock(scheduleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + scheduleId));
 
         // 检查是否有空余号源
@@ -193,12 +194,8 @@ public class WaitlistService {
             }
 
             // 找到合适的候补人员，通知患者支付
-            // 重要：此时需要锁定号源，防止其他人预约
-            // 刷新 schedule 对象，确保获取最新的 bookedSlots 值
-            schedule = scheduleRepository.findById(schedule.getScheduleId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
-            
-            // 再次检查号源是否还有空位（防止并发问题）
+            // 注意：由于已经在方法开始时使用悲观锁锁定了排班记录，这里不需要再次获取锁
+            // 直接进行最终的号源检查即可
             if (schedule.getBookedSlots() >= schedule.getTotalSlots()) {
                 System.out.println("候补填充时号源已被占用，跳过此候补");
                 continue;
@@ -266,12 +263,19 @@ public class WaitlistService {
         
         // 计算排队位置（仅对 waiting 状态）
         if (waitlist.getStatus() == WaitlistStatus.waiting) {
-            long position = waitlistRepository.countByScheduleAndStatusAndCreatedAtBefore(
-                waitlist.getSchedule(), 
-                WaitlistStatus.waiting, 
-                waitlist.getCreatedAt()
-            ) + 1;
-            response.setQueuePosition((int) position);
+            // 获取同一排班下状态为waiting的所有候补记录（按创建时间升序）
+            List<Waitlist> waitingList = waitlistRepository
+                    .findByScheduleAndStatusOrderByCreatedAtAsc(waitlist.getSchedule(), WaitlistStatus.waiting);
+            
+            // 计算当前位置
+            int position = 0;
+            for (int i = 0; i < waitingList.size(); i++) {
+                if (waitingList.get(i).getWaitlistId().equals(waitlist.getWaitlistId())) {
+                    position = i + 1; // 位置从1开始
+                    break;
+                }
+            }
+            response.setQueuePosition(position > 0 ? position : null);
         } else {
             response.setQueuePosition(null);
         }
@@ -368,8 +372,8 @@ public class WaitlistService {
         Schedule schedule = waitlist.getSchedule();
         Patient patient = waitlist.getPatient();
         
-        // 刷新 schedule 对象，确保获取最新的 bookedSlots 值
-        schedule = scheduleRepository.findById(schedule.getScheduleId())
+        // 使用悲观锁获取排班信息，防止候补支付时的并发问题
+        schedule = scheduleRepository.findByIdWithLock(schedule.getScheduleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
 
         // 3. 检查号源是否已被占用（号源在通知时已锁定，这里只需要检查是否超出）
@@ -467,18 +471,23 @@ public class WaitlistService {
     }
 
     private int getNextAppointmentNumber(Schedule schedule, Patient patient) {
-        Appointment lastAppointment = appointmentRepository.findTopByScheduleOrderByAppointmentNumberDesc(schedule);
-        int baseNumber = (lastAppointment == null || lastAppointment.getAppointmentNumber() == null)
-                ? 0
-                : lastAppointment.getAppointmentNumber();
-
-        if (lastAppointment != null && lastAppointment.getPatient() != null
-                && patient != null
-                && Objects.equals(lastAppointment.getPatient().getPatientId(), patient.getPatientId())) {
-            return baseNumber + 1;
+        // 获取该排班下所有有效预约（按序号升序排列）
+        List<Appointment> appointments = appointmentRepository.findByScheduleAndStatusNotCancelledOrderByAppointmentNumberAsc(schedule);
+        
+        // 如果没有预约，从1开始
+        if (appointments.isEmpty()) {
+            return 1;
         }
-
-        return baseNumber + 1;
+        
+        // 找到最大序号
+        int maxNumber = 0;
+        for (Appointment appointment : appointments) {
+            if (appointment.getAppointmentNumber() != null && appointment.getAppointmentNumber() > maxNumber) {
+                maxNumber = appointment.getAppointmentNumber();
+            }
+        }
+        
+        return maxNumber + 1;
     }
 
     @Transactional(readOnly = true)
@@ -564,9 +573,19 @@ public class WaitlistService {
 
                     // 计算候补位置（仅waiting状态有效）
                     if (waitlist.getStatus() == WaitlistStatus.waiting) {
-                        long position = waitlistRepository.countByScheduleAndStatusAndCreatedAtBefore(
-                                schedule, WaitlistStatus.waiting, waitlist.getCreatedAt()) + 1;
-                        response.setPosition((int) position);
+                        // 获取同一排班下状态为waiting的所有候补记录（按创建时间升序）
+                        List<Waitlist> waitingList = waitlistRepository
+                                .findByScheduleAndStatusOrderByCreatedAtAsc(schedule, WaitlistStatus.waiting);
+                        
+                        // 计算当前位置
+                        int position = 0;
+                        for (int i = 0; i < waitingList.size(); i++) {
+                            if (waitingList.get(i).getWaitlistId().equals(waitlist.getWaitlistId())) {
+                                position = i + 1; // 位置从1开始
+                                break;
+                            }
+                        }
+                        response.setPosition(position > 0 ? position : null);
                     } else {
                         response.setPosition(null);
                     }
