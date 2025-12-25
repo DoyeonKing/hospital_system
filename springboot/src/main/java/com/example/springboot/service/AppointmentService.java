@@ -172,16 +172,21 @@ public class AppointmentService {
         Appointment appointment = new Appointment();
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
-        appointment.setAppointmentNumber(getNextAppointmentNumberForRebooking(schedule, patient)); // 自动分配就诊序号
         appointment.setStatus(AppointmentStatus.PENDING_PAYMENT); // 初始状态为待支付
         appointment.setPaymentStatus(PaymentStatus.unpaid);
         appointment.setCreatedAt(LocalDateTime.now());
+        
+        // 先保存预约（序号为null），然后在同一事务中原子性地分配序号
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        
+        // 使用数据库原子操作分配序号
+        Integer nextNumber = getNextAppointmentNumberAtomic(schedule);
+        savedAppointment.setAppointmentNumber(nextNumber);
+        savedAppointment = appointmentRepository.save(savedAppointment);
 
         // 增加排班的已预约数
         schedule.setBookedSlots(schedule.getBookedSlots() + 1);
         scheduleRepository.save(schedule); // 保存更新后的排班信息
-
-        Appointment savedAppointment = appointmentRepository.save(appointment);
 
         // 发送预约通知
         try {
@@ -1676,6 +1681,21 @@ public class AppointmentService {
         
         logger.info("自动标记爽约任务完成，共处理 {} 条记录", count);
         return count;
+    }
+
+    /**
+     * 原子性地获取下一个预约序号（真正的并发安全）
+     */
+    private synchronized Integer getNextAppointmentNumberAtomic(Schedule schedule) {
+        // 使用synchronized确保同一时刻只有一个线程能执行此方法
+        Integer maxNumber = appointmentRepository.findMaxAppointmentNumberBySchedule(schedule);
+        int nextNumber = (maxNumber == null) ? 1 : maxNumber + 1;
+        
+        System.out.println("原子分配预约序号 - 排班ID: " + schedule.getScheduleId() + 
+                          ", 当前最大序号: " + maxNumber + 
+                          ", 新序号: " + nextNumber);
+        
+        return nextNumber;
     }
 
     /**

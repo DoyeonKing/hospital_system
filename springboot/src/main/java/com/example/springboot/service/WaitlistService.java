@@ -396,10 +396,15 @@ public class WaitlistService {
         Appointment appointment = new Appointment();
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
-        appointment.setAppointmentNumber(getNextAppointmentNumber(schedule, patient));
         appointment.setStatus(AppointmentStatus.scheduled);  // 已预约状态
         appointment.setPaymentStatus(PaymentStatus.paid);    // 已支付
         appointment.setPaymentMethod(paymentData.getPaymentMethod());
+        
+        // 先保存预约，然后原子性地分配序号
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        Integer nextNumber = getNextAppointmentNumberAtomic(schedule);
+        savedAppointment.setAppointmentNumber(nextNumber);
+        savedAppointment = appointmentRepository.save(savedAppointment);
         appointment.setTransactionId(paymentData.getTransactionId());
         appointment.setCreatedAt(LocalDateTime.now());
 
@@ -468,6 +473,21 @@ public class WaitlistService {
         }
         
         return appointmentService.findAppointmentById(savedAppointment.getAppointmentId());
+    }
+
+    /**
+     * 原子性地获取下一个预约序号（真正的并发安全）
+     */
+    private synchronized Integer getNextAppointmentNumberAtomic(Schedule schedule) {
+        // 使用synchronized确保同一时刻只有一个线程能执行此方法
+        Integer maxNumber = appointmentRepository.findMaxAppointmentNumberBySchedule(schedule);
+        int nextNumber = (maxNumber == null) ? 1 : maxNumber + 1;
+        
+        System.out.println("候补原子分配预约序号 - 排班ID: " + schedule.getScheduleId() + 
+                          ", 当前最大序号: " + maxNumber + 
+                          ", 新序号: " + nextNumber);
+        
+        return nextNumber;
     }
 
     private int getNextAppointmentNumber(Schedule schedule, Patient patient) {
