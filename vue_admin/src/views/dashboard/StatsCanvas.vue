@@ -878,28 +878,6 @@ const initPatientsCharts = () => {
   })
 }
 
-// 处理 Tab 切换
-const handleTabChange = (tabName) => {
-  nextTick(() => {
-    // 延迟初始化图表，确保 DOM 已渲染
-    setTimeout(() => {
-      switch (tabName) {
-        case 'overview':
-          initOverviewCharts()
-          break
-        case 'doctors':
-          initDoctorsCharts()
-          break
-        case 'patients':
-          initPatientsCharts()
-          break
-      }
-      // 触发所有图表 resize
-      resizeAllCharts()
-    }, 100)
-  })
-}
-
 // 处理窗口大小变化
 const handleResize = () => {
   resizeAllCharts()
