@@ -101,26 +101,51 @@ public class NotificationService {
     public NotificationResponse sendPaymentSuccessNotification(Integer patientId, Integer appointmentId, 
                                                                String departmentName, String doctorName, 
                                                                String scheduleDate, String slotName, 
-                                                               Double fee) {
+                                                               Double originalFee, Double actualFee) {
         NotificationCreateRequest request = new NotificationCreateRequest();
         request.setUserId(patientId);
         request.setUserType(UserType.patient);
         request.setType(NotificationType.payment_success);
         request.setTitle("支付成功");
-        request.setContent(String.format("您的挂号费用已支付成功！\n科室：%s\n医生：%s\n就诊时间：%s %s\n费用：¥%.2f\n请按时就诊，祝您早日康复！", 
-                departmentName, doctorName, scheduleDate, slotName, fee));
+        
+        // 构建费用信息（显示原价和实付）
+        String feeInfo;
+        if (Math.abs(originalFee - actualFee) < 0.01) {
+            // 原价和实付相同，只显示一个金额
+            feeInfo = String.format("费用：¥%.2f", actualFee);
+        } else {
+            // 有报销，显示原价和实付
+            feeInfo = String.format("原价：¥%.2f\n实付：¥%.2f", originalFee, actualFee);
+        }
+        
+        request.setContent(String.format("恭喜，挂号预约已支付成功！\n科室：%s\n医生：%s\n就诊时间：%s %s\n%s\n请按时就诊，祝您早日康复！", 
+                departmentName, doctorName, scheduleDate, slotName, feeInfo));
         request.setRelatedEntity("appointment");
         request.setRelatedId(appointmentId);
         request.setPriority(NotificationPriority.high);
 
         NotificationResponse response = createNotification(request);
         
-        // 发送短信通知
-        String smsContent = String.format("您的挂号费用已支付成功！科室：%s，医生：%s，就诊时间：%s %s，费用：¥%.2f。请按时就诊，祝您早日康复！", 
-                departmentName, doctorName, scheduleDate, slotName, fee);
+        // 发送短信通知（使用实付金额）
+        String smsContent = String.format("恭喜，挂号预约已支付成功！科室：%s，医生：%s，就诊时间：%s %s，实付：¥%.2f。请按时就诊，祝您早日康复！", 
+                departmentName, doctorName, scheduleDate, slotName, actualFee);
         sendSmsIfNeeded(patientId, smsContent);
         
         return response;
+    }
+    
+    /**
+     * 发送支付成功通知（兼容旧版本方法）
+     * @deprecated 使用 sendPaymentSuccessNotification(patientId, appointmentId, departmentName, doctorName, scheduleDate, slotName, originalFee, actualFee)
+     */
+    @Deprecated
+    public NotificationResponse sendPaymentSuccessNotification(Integer patientId, Integer appointmentId, 
+                                                               String departmentName, String doctorName, 
+                                                               String scheduleDate, String slotName, 
+                                                               Double fee) {
+        // 兼容旧版本：原价和实付相同
+        return sendPaymentSuccessNotification(patientId, appointmentId, departmentName, doctorName, 
+                scheduleDate, slotName, fee, fee);
     }
 
     /**

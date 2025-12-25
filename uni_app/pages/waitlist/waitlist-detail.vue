@@ -39,7 +39,25 @@
 				</view>
 				<view class="info-row">
 					<text class="label">挂号费用：</text>
-					<text class="value fee-value">¥{{ waitlist.fee ? waitlist.fee.toFixed(2) : 'N/A' }}</text>
+					<view class="fee-detail-column">
+						<!-- 如果有费用详情，显示明细 -->
+						<view v-if="waitlist.feeDetail" class="fee-breakdown">
+							<view class="fee-item">
+								<text class="fee-item-label">原价：</text>
+								<text class="fee-item-value">¥{{ waitlist.feeDetail.originalFee ? waitlist.feeDetail.originalFee.toFixed(2) : (waitlist.fee || 0).toFixed(2) }}</text>
+							</view>
+							<view class="fee-item" v-if="waitlist.feeDetail.reimbursementRate > 0">
+								<text class="fee-item-label">{{ waitlist.feeDetail.patientType }}报销（{{ (waitlist.feeDetail.reimbursementRate * 100).toFixed(0) }}%）：</text>
+								<text class="fee-item-value reimbursement">-¥{{ waitlist.feeDetail.reimbursementAmount.toFixed(2) }}</text>
+							</view>
+							<view class="fee-item actual-fee">
+								<text class="fee-item-label">实付：</text>
+								<text class="fee-item-value actual">¥{{ waitlist.feeDetail.actualFee ? waitlist.feeDetail.actualFee.toFixed(2) : (waitlist.fee || 0).toFixed(2) }}</text>
+							</view>
+						</view>
+						<!-- 如果没有费用详情，只显示原价 -->
+						<text v-else class="value fee-value">¥{{ waitlist.fee ? waitlist.fee.toFixed(2) : 'N/A' }}</text>
+					</view>
 				</view>
 				
 				<!-- 排队位置 -->
@@ -419,6 +437,53 @@
 		color: #FF6B6B;
 		font-weight: 700;
 		font-size: 32rpx;
+	}
+	
+	.fee-detail-column {
+		flex: 1;
+	}
+	
+	.fee-breakdown {
+		display: flex;
+		flex-direction: column;
+		gap: 8rpx;
+	}
+	
+	.fee-item {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-size: 24rpx;
+	}
+	
+	.fee-item-label {
+		color: #666;
+	}
+	
+	.fee-item-value {
+		color: #333;
+		font-weight: 500;
+	}
+	
+	.fee-item-value.reimbursement {
+		color: #52C41A;
+	}
+	
+	.fee-item.actual-fee {
+		padding-top: 8rpx;
+		border-top: 1rpx solid #f0f0f0;
+		margin-top: 4rpx;
+		
+		.fee-item-label {
+			font-weight: 600;
+			color: #333;
+		}
+		
+		.fee-item-value.actual {
+			color: #FF6B6B;
+			font-weight: 700;
+			font-size: 28rpx;
+		}
 	}
 
 	.countdown-notice {

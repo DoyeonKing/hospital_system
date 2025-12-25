@@ -121,6 +121,8 @@ export function adaptAppointment(appointment) {
 		locationId: schedule.locationId || null,
 		fee: parseFloat(schedule.fee || 0),
 		paymentDeadline: appointment.paymentDeadline || '',
+		// 保留费用详情（包含原价、报销比例、实际应付费用等）
+		feeDetail: appointment.feeDetail || null,
 		// 保留schedule对象以便访问locationId等字段
 		schedule: {
 			scheduleId: schedule.scheduleId,
@@ -150,7 +152,9 @@ export function adaptAppointment(appointment) {
 		scheduleEndTime: adapted.scheduleEndTime,
 		hasScheduleEndTime: !!adapted.scheduleEndTime,
 		hasDepartmentName: !!adapted.departmentName,
-		hasDoctorName: !!adapted.doctorName
+		hasDoctorName: !!adapted.doctorName,
+		hasFeeDetail: !!adapted.feeDetail,
+		feeDetail: adapted.feeDetail
 	})
 	
 	return adapted
@@ -290,7 +294,9 @@ export function adaptWaitlist(waitlist) {
 		notificationSentAt: waitlist.notificationSentAt || '',
 		createdAt: waitlist.createdAt || '',
 		patientName: patient.fullName || '',
-		patientId: patient.patientId
+		patientId: patient.patientId,
+		// 保留费用详情（包含原价、报销比例、实际应付费用等）
+		feeDetail: waitlist.feeDetail || null
 	}
 }
 
