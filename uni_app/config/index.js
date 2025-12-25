@@ -11,7 +11,7 @@
 
 // ==================== 云服务器配置（已注释，如需切换回云服务器可取消注释） ====================
 // 云服务器IP地址（与数据库同一台服务器）
-// const CLOUD_SERVER_IP = '123.249.30.241'
+const CLOUD_SERVER_IP = '123.249.30.241'
 
 // ==================== 本地开发配置 ====================
 // 方式1：简单配置（推荐）- 开发者工具和H5使用 localhost，真机自动使用局域网IP
@@ -23,7 +23,8 @@ const USE_AUTO_DETECT = true  // 👈 true=自动检测环境，false=使用固�
 const LOCAL_IP = '10.248.1.166'  // 👈 WLAN适配器IP地址
 
 // 方式2：固定IP配置（USE_AUTO_DETECT=false 时使用）
-const LOCAL_BACKEND_FIXED = 'http://localhost:8080'  // 👈 固定使用这个地址
+//const LOCAL_BACKEND_FIXED = 'http://localhost:8080'  // 👈 固定使用这个地址
+const LOCAL_BACKEND_FIXED = 'http://123.249.30.241:8080'  // 👈 固定使用这个地址
 
 // 自动检测环境：开发者工具用 localhost，真机用局域网IP
 function getBackendURL() {
@@ -51,7 +52,8 @@ function getBackendURL() {
 		
 		if (isDevTools) {
 			console.log('[CONFIG] 检测到开发者工具，使用 localhost')
-			return 'http://localhost:8080'  // 开发者工具使用 localhost
+			//return 'http://localhost:8080'  // 开发者工具使用 localhost
+			return 'http://123.249.30.241:8080'  // 开发者工具使用 localhost
 		} else {
 			console.log('[CONFIG] 检测到真机环境，使用局域网IP:', LOCAL_IP)
 			return `http://${LOCAL_IP}:8080`  // 真机使用局域网IP
@@ -61,7 +63,8 @@ function getBackendURL() {
 		// #ifndef MP-WEIXIN
 		// 非微信小程序环境（H5等），使用 localhost
 		console.log('[CONFIG] 非微信小程序环境，使用 localhost')
-		return 'http://localhost:8080'
+		//return 'http://localhost:8080'
+		return 'http://123.249.30.241:8080'
 		// #endif
 	} catch (e) {
 		console.error('[CONFIG] 检测环境失败，使用默认 localhost:', e)
@@ -84,7 +87,8 @@ const development = {
 	aiBaseURL: (() => {
 		if (!USE_AUTO_DETECT) {
 			// 使用固定IP
-			return 'http://localhost:3000'
+			//return 'http://localhost:3000'
+			return 'http://123.249.30.241:3000'
 		}
 		
 		// 自动检测环境（与 baseURL 保持一致）
@@ -96,13 +100,15 @@ const development = {
 			                   systemInfo.model && systemInfo.model.includes('devtools')
 			
 			if (isDevTools) {
-				return 'http://localhost:3000'
+				//return 'http://localhost:3000'
+				return 'http://123.249.30.241:3000'
 			} else {
 				return `http://${LOCAL_IP}:3000`
 			}
 			// #endif
 			// #ifndef MP-WEIXIN
-			return 'http://localhost:3000'
+			//return 'http://localhost:3000'
+			return 'http://123.249.30.241:3000'
 			// #endif
 		} catch (e) {
 			// 真机环境失败时也使用局域网IP
@@ -116,10 +122,11 @@ const development = {
 // 生产环境配置
 const production = {
 	// 生产环境可以使用云服务器或本地服务器
-	baseURL: LOCAL_BACKEND,  // 👈 生产环境如需使用云服务器，改为：`http://${CLOUD_SERVER_IP}:8080`
+	//baseURL: LOCAL_BACKEND,  // 👈 生产环境如需使用云服务器，改为：`http://${CLOUD_SERVER_IP}:8080`
+	baseURL: `http://${CLOUD_SERVER_IP}:8080`,  // 👈 生产环境如需使用云服务器，改为：`http://${CLOUD_SERVER_IP}:8080`
 	// baseURL: `http://${CLOUD_SERVER_IP}:8080`,  // 👈 云服务器配置（已注释）
-	aiBaseURL: `http://localhost:3000`
-	// aiBaseURL: `http://${CLOUD_SERVER_IP}:3000`  // 👈 云服务器配置（已注释）
+	//aiBaseURL: `http://localhost:3000`
+	aiBaseURL: `http://${CLOUD_SERVER_IP}:3000`  // 👈 云服务器配置（已注释）
 }
 
 // 当前使用的配置（本地开发模式）
@@ -180,9 +187,9 @@ try {
 // // 请根据你的网络环境修改以下IP地址
 
 // 电脑端（开发者工具）使用的IP - 本地开发模式
-const DEVICE_IP = 'localhost' // 👈 开发者工具调试用这个（电脑端）
+//const DEVICE_IP = 'localhost' // 👈 开发者工具调试用这个（电脑端）
 // 云服务器配置（已注释，如需切换回云服务器可取消注释）：
-// const DEVICE_IP = '123.249.30.241'
+const DEVICE_IP = '123.249.30.241'
 
 // // 真机调试使用的局域网IP - 请修改为你的电脑IP
 // // 检测到的可用IP：
