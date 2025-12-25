@@ -1203,7 +1203,8 @@ const handleCalendarDatesSet = async (dateInfo) => {
     const response = await getSchedules(params);
     
     if (response && response.content) {
-      const schedules = response.content;
+      // 过滤掉已取消的排班
+      const schedules = response.content.filter(schedule => schedule.status !== 'cancelled');
       const key = activeSub.value;
       
       // 🔥 关键修复：合并数据而不是替换
@@ -2616,8 +2617,8 @@ const loadSchedulesFromBackend = async () => {
     console.log('排班数据API响应:', response);
     
     if (response && response.content) {
-      // 转换后端数据格式为前端格式
-      const schedules = response.content;
+      // 过滤掉已取消的排班
+      const schedules = response.content.filter(schedule => schedule.status !== 'cancelled');
       
       console.log('后端返回的排班数据:', schedules);
       console.log('当前选中的科室ID:', activeSub.value);

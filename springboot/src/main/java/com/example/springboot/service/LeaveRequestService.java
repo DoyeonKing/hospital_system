@@ -512,38 +512,51 @@ public class LeaveRequestService {
                 if (substituteDoctorId == null) {
                     // 取消排班
                     Doctor originalDoctor = schedule.getDoctor();
-                    schedule.setStatus(ScheduleStatus.cancelled);
-                    scheduleRepository.save(schedule);
                     
-                    logger.info("排班 #{} 已取消，开始发送通知给 {} 位患者", scheduleId, appointments.size());
-                    
-                    // 给所有患者发送排班取消通知
-                    int notificationCount = 0;
-                    for (com.example.springboot.entity.Appointment appointment : appointments) {
-                        try {
-                            logger.info("发送取消通知给患者 #{}, 预约 #{}", 
-                                appointment.getPatient().getPatientId(), appointment.getAppointmentId());
-                            
-                            notificationService.sendScheduleCancelledNotification(
-                                appointment.getPatient().getPatientId().intValue(),
-                                appointment.getAppointmentId(),
-                                originalDoctor.getFullName(),
-                                originalDoctor.getDepartment().getName(),
-                                schedule.getScheduleDate().toString(),
-                                schedule.getSlot().getSlotName()
-                            );
-                            notificationCount++;
-                            logger.info("成功发送取消通知给患者 #{}", appointment.getPatient().getPatientId());
-                        } catch (Exception notifError) {
-                            // 通知发送失败不影响主流程
-                            logger.error("发送取消通知失败 - 患者 #{}: {}", 
-                                appointment.getPatient().getPatientId(), notifError.getMessage(), notifError);
+                    // 检查是否有预约记录
+                    if (appointments.isEmpty()) {
+                        // 没有预约记录，直接删除排班
+                        logger.info("排班 #{} 没有预约记录，直接删除", scheduleId);
+                        scheduleRepository.delete(schedule);
+                        cancelledCount++;
+                        messages.add("排班 #" + scheduleId + " 已删除（无预约记录）");
+                        logger.info("排班 #{} 删除完成", scheduleId);
+                    } else {
+                        // 有预约记录，只能标记为取消状态
+                        logger.info("排班 #{} 有 {} 个预约记录，标记为取消状态", scheduleId, appointments.size());
+                        schedule.setStatus(ScheduleStatus.cancelled);
+                        scheduleRepository.save(schedule);
+                        
+                        logger.info("排班 #{} 已取消，开始发送通知给 {} 位患者", scheduleId, appointments.size());
+                        
+                        // 给所有患者发送排班取消通知
+                        int notificationCount = 0;
+                        for (com.example.springboot.entity.Appointment appointment : appointments) {
+                            try {
+                                logger.info("发送取消通知给患者 #{}, 预约 #{}", 
+                                    appointment.getPatient().getPatientId(), appointment.getAppointmentId());
+                                
+                                notificationService.sendScheduleCancelledNotification(
+                                    appointment.getPatient().getPatientId().intValue(),
+                                    appointment.getAppointmentId(),
+                                    originalDoctor.getFullName(),
+                                    originalDoctor.getDepartment().getName(),
+                                    schedule.getScheduleDate().toString(),
+                                    schedule.getSlot().getSlotName()
+                                );
+                                notificationCount++;
+                                logger.info("成功发送取消通知给患者 #{}", appointment.getPatient().getPatientId());
+                            } catch (Exception notifError) {
+                                // 通知发送失败不影响主流程
+                                logger.error("发送取消通知失败 - 患者 #{}: {}", 
+                                    appointment.getPatient().getPatientId(), notifError.getMessage(), notifError);
+                            }
                         }
+                        
+                        cancelledCount++;
+                        messages.add("排班 #" + scheduleId + " 已取消，已通知 " + notificationCount + "/" + appointments.size() + " 位患者");
+                        logger.info("排班 #{} 取消完成，成功通知 {}/{} 位患者", scheduleId, notificationCount, appointments.size());
                     }
-                    
-                    cancelledCount++;
-                    messages.add("排班 #" + scheduleId + " 已取消，已通知 " + notificationCount + "/" + appointments.size() + " 位患者");
-                    logger.info("排班 #{} 取消完成，成功通知 {}/{} 位患者", scheduleId, notificationCount, appointments.size());
                 } else {
                     // 替换医生
                     Doctor substituteDoctor = doctorRepository.findById(substituteDoctorId)

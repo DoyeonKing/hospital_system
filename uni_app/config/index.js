@@ -20,7 +20,7 @@ const USE_AUTO_DETECT = true  // 👈 true=自动检测环境，false=使用固�
 // 真机调试时使用的局域网IP（仅在 USE_AUTO_DETECT=true 时生效）
 // 获取IP方法：Windows运行 ipconfig，Mac/Linux运行 ifconfig
 // 常见IP格式：192.168.x.x 或 172.20.x.x
-const LOCAL_IP = '172.20.10.3'  // 👈 请修改为你的电脑局域网IP
+const LOCAL_IP = '172.20.10.3'  // 👈 手机热点IP地址
 
 // 方式2：固定IP配置（USE_AUTO_DETECT=false 时使用）
 const LOCAL_BACKEND_FIXED = 'http://localhost:8080'  // 👈 固定使用这个地址
@@ -80,11 +80,11 @@ const development = {
 	// 云服务器配置（已注释，如需切换回云服务器可取消注释）：
 	// baseURL: `http://${CLOUD_SERVER_IP}:8080`,
 	
-	// AI 预问诊后端服务（Node.js）- 端口5000（本地开发）
+	// AI 预问诊后端服务（Node.js）- 端口3000（本地开发）
 	aiBaseURL: (() => {
 		if (!USE_AUTO_DETECT) {
 			// 使用固定IP
-			return 'http://localhost:5000'
+			return 'http://localhost:3000'
 		}
 		
 		// 自动检测环境（与 baseURL 保持一致）
@@ -96,17 +96,17 @@ const development = {
 			                   systemInfo.model && systemInfo.model.includes('devtools')
 			
 			if (isDevTools) {
-				return 'http://localhost:5000'
+				return 'http://localhost:3000'
 			} else {
-				return `http://${LOCAL_IP}:5000`
+				return `http://${LOCAL_IP}:3000`
 			}
 			// #endif
 			// #ifndef MP-WEIXIN
-			return 'http://localhost:5000'
+			return 'http://localhost:3000'
 			// #endif
 		} catch (e) {
 			// 真机环境失败时也使用局域网IP
-			return `http://${LOCAL_IP}:5000`
+			return `http://${LOCAL_IP}:3000`
 		}
 	})()
 	// 云服务器配置（已注释，如需切换回云服务器可取消注释）：
@@ -118,8 +118,8 @@ const production = {
 	// 生产环境可以使用云服务器或本地服务器
 	baseURL: LOCAL_BACKEND,  // 👈 生产环境如需使用云服务器，改为：`http://${CLOUD_SERVER_IP}:8080`
 	// baseURL: `http://${CLOUD_SERVER_IP}:8080`,  // 👈 云服务器配置（已注释）
-	aiBaseURL: `http://localhost:5000`
-	// aiBaseURL: `http://${CLOUD_SERVER_IP}:5000`  // 👈 云服务器配置（已注释）
+	aiBaseURL: `http://localhost:3000`
+	// aiBaseURL: `http://${CLOUD_SERVER_IP}:3000`  // 👈 云服务器配置（已注释）
 }
 
 // ==================== 环境切换 ====================

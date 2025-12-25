@@ -213,7 +213,7 @@ const leaveHistory = ref([]);
 const applyFormRef = ref(null);
 const fileList = ref([]);
 const currentFeedback = ref(null);
-const uploadAction = ref('http://localhost:8080/api/upload'); // 文件上传接口地址
+const uploadAction = ref('/api/upload'); // 文件上传接口地址（使用相对路径，让Vite代理处理）
 
 // 从 localStorage 获取当前医生ID（参考 MySchedule.vue 的实现）
 const getCurrentDoctorId = () => {
@@ -411,9 +411,11 @@ const beforeUpload = (file) => {
 
 // 文件上传成功
 const handleUploadSuccess = (response, file) => {
+  console.log('文件上传响应:', response);
   if (response.success) {
     ElMessage.success('文件上传成功');
-    applyForm.proofDocumentUrl = 'http://localhost:8080' + response.url;
+    // 直接使用后端返回的URL（已包含/api前缀）
+    applyForm.proofDocumentUrl = response.url;
   } else {
     ElMessage.error(response.message || '文件上传失败');
   }
@@ -426,7 +428,9 @@ const handleUploadError = () => {
 
 // 查看证明文件
 const viewProof = (url) => {
-  window.open(url, '_blank');
+  // 如果URL是相对路径，需要拼接完整URL
+  const fullUrl = url.startsWith('http') ? url : `http://localhost:8080${url}`;
+  window.open(fullUrl, '_blank');
 };
 
 // 查看返回意见

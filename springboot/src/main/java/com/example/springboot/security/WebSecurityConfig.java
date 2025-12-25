@@ -55,6 +55,8 @@ public class WebSecurityConfig {
                         .requestMatchers("/api/auth/activate-patient").permitAll()
                         .requestMatchers("/api/files/upload-identity-proof").permitAll()  // 身份证明材料上传接口
                         .requestMatchers("/api/files/identity-proofs/**").permitAll()  // 身份证明材料访问接口
+                        .requestMatchers("/api/upload").permitAll()  // 请假证明文件上传接口
+                        .requestMatchers("/api/files/leave-proofs/**").permitAll()  // 请假证明文件访问接口
 
                         // 允许 Swagger 访问
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()

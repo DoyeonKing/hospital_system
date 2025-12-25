@@ -313,8 +313,12 @@ const fetchStatistics = async () => {
   try {
     const response = await request.get('/api/audit-logs/statistics')
     if (response.code === '200') {
-      statistics.total = response.data.total
-      // 这里可以根据实际返回的数据设置今日、本周、本月的统计
+      const data = response.data
+      statistics.total = data.total || 0
+      statistics.today = data.today || 0
+      statistics.week = data.week || 0
+      statistics.month = data.month || 0
+      console.log('统计信息已更新:', statistics)
     }
   } catch (error) {
     console.error('Failed to fetch statistics:', error)

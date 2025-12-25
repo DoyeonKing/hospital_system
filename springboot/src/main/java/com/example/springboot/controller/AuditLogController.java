@@ -152,23 +152,54 @@ public class AuditLogController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
         try {
-            // 如果没有提供时间范围，默认查询最近7天
-            if (start == null) {
-                start = LocalDateTime.now().minusDays(7);
-            }
-            if (end == null) {
-                end = LocalDateTime.now();
-            }
+            LocalDateTime now = LocalDateTime.now();
             
-            List<AuditLogResponse> logs = auditLogService.findLogsByTimeRange(start, end);
+            // 获取所有审计日志
+            List<AuditLogResponse> allLogs = auditLogService.findAllAuditLogs();
+            
+            // 计算今日统计（从今天0点开始）
+            LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+            long todayCount = allLogs.stream()
+                    .filter(log -> log.getCreatedAt() != null && log.getCreatedAt().isAfter(todayStart))
+                    .count();
+            
+            // 计算本周统计（从本周一0点开始）
+            LocalDateTime weekStart = now.toLocalDate()
+                    .minusDays(now.getDayOfWeek().getValue() - 1)
+                    .atStartOfDay();
+            long weekCount = allLogs.stream()
+                    .filter(log -> log.getCreatedAt() != null && log.getCreatedAt().isAfter(weekStart))
+                    .count();
+            
+            // 计算本月统计（从本月1号0点开始）
+            LocalDateTime monthStart = now.toLocalDate()
+                    .withDayOfMonth(1)
+                    .atStartOfDay();
+            long monthCount = allLogs.stream()
+                    .filter(log -> log.getCreatedAt() != null && log.getCreatedAt().isAfter(monthStart))
+                    .count();
+            
+            // 如果提供了自定义时间范围，则查询该范围内的日志
+            List<AuditLogResponse> logs;
+            if (start != null && end != null) {
+                logs = auditLogService.findLogsByTimeRange(start, end);
+            } else {
+                // 默认查询最近7天
+                start = now.minusDays(7);
+                end = now;
+                logs = auditLogService.findLogsByTimeRange(start, end);
+            }
             
             // 统计信息
             Map<String, Object> statistics = new HashMap<>();
-            statistics.put("total", logs.size());
+            statistics.put("total", allLogs.size());
+            statistics.put("today", todayCount);
+            statistics.put("week", weekCount);
+            statistics.put("month", monthCount);
             statistics.put("startTime", start);
             statistics.put("endTime", end);
             
-            // 按操作类型统计
+            // 按操作类型统计（基于最近7天或自定义时间范围）
             Map<String, Long> actionCount = new HashMap<>();
             logs.forEach(log -> {
                 String action = log.getAction();
@@ -176,7 +207,7 @@ public class AuditLogController {
             });
             statistics.put("actionCount", actionCount);
             
-            // 按操作者类型统计
+            // 按操作者类型统计（基于最近7天或自定义时间范围）
             Map<String, Long> actorTypeCount = new HashMap<>();
             logs.forEach(log -> {
                 String actorType = log.getActorType() != null ? log.getActorType().toString() : "unknown";
