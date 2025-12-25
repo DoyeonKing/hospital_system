@@ -658,28 +658,6 @@ public class AppointmentService {
         appointmentRepository.save(appointment);
 
         logger.info("退款成功 - 预约ID: {}, 患者: {}, 退款时间: {}", 
-                appointmentId, appointment.getPatient().getFullName(), appointment.getUpdatedAt());
-
-        return convertToResponseDto(appointment);
-    }
-
-    private int getNextAppointmentNumberForRebooking(Schedule schedule, Patient patient) {
-        Appointment lastAppointment = appointmentRepository.findTopByScheduleOrderByAppointmentNumberDesc(schedule);
-        int baseNumber = (lastAppointment == null || lastAppointment.getAppointmentNumber() == null)
-                ? 0
-                : lastAppointment.getAppointmentNumber();
-
-        if (lastAppointment != null && lastAppointment.getPatient() != null
-                && Objects.equals(lastAppointment.getPatient().getPatientId(), patient.getPatientId())) {
-            return baseNumber + 1;
-        }
-
-        return baseNumber + 1;
-    }
-
-    private boolean isActiveStatus(AppointmentStatus status) {
-        return status == AppointmentStatus.scheduled || 
-               status == AppointmentStatus.PENDING_PAYMENT || 
                status == AppointmentStatus.CHECKED_IN;
     }
 
@@ -1691,5 +1669,20 @@ public class AppointmentService {
         
         logger.info("自动标记爽约任务完成，共处理 {} 条记录", count);
         return count;
+    }
+
+    /**
+     * 获取下一个预约序号（修复并发问题）
+     */
+    private int getNextAppointmentNumberForRebooking(Schedule schedule, Patient patient) {
+        // 使用数据库聚合函数获取最大序号，避免并发问题
+        Integer maxNumber = appointmentRepository.findMaxAppointmentNumberBySchedule(schedule);
+        int baseNumber = (maxNumber == null) ? 0 : maxNumber;
+        
+        System.out.println("分配预约序号 - 排班ID: " + schedule.getScheduleId() + 
+                          ", 当前最大序号: " + maxNumber + 
+                          ", 新序号: " + (baseNumber + 1));
+        
+        return baseNumber + 1;
     }
 }
