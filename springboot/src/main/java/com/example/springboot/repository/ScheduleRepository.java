@@ -7,16 +7,17 @@ import com.example.springboot.entity.enums.ScheduleStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import jakarta.persistence.LockModeType;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-
-@Repository
 public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
     List<Schedule> findByDoctorAndScheduleDateBetween(Doctor doctor, LocalDate startDate, LocalDate endDate);
     List<Schedule> findByScheduleDateAndStatus(LocalDate scheduleDate, ScheduleStatus status);
@@ -114,4 +115,11 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
     void deleteByDepartmentAndDateRange(@Param("departmentId") Integer departmentId,
                                         @Param("startDate") LocalDate startDate,
                                         @Param("endDate") LocalDate endDate);
+
+    /**
+     * 使用悲观锁查找排班，防止并发抢号问题
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM Schedule s WHERE s.scheduleId = :scheduleId")
+    Optional<Schedule> findByIdWithLock(@Param("scheduleId") Integer scheduleId);
 }
