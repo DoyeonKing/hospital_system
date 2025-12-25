@@ -818,7 +818,6 @@
 				success: async (res) => {
 					if (res.confirm) {
 						try {
-							uni.showLoading({ title: '取消中...' })
 							// 调用取消预约 API
 							const response = await cancelAppointment(appointmentId)
 							console.log('取消预约响应:', response)
@@ -843,7 +842,6 @@
 								icon: 'none'
 							})
 						} finally {
-							uni.hideLoading()
 						}
 					}
 				}

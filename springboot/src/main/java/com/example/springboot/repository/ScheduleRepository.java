@@ -122,4 +122,26 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM Schedule s WHERE s.scheduleId = :scheduleId")
     Optional<Schedule> findByIdWithLock(@Param("scheduleId") Integer scheduleId);
+
+    /**
+     * 原子性地增加 bookedSlots，只有在 bookedSlots < totalSlots 时才会更新
+     * 返回受影响的行数，如果返回 0 表示号源已满或不存在
+     * 这个方法使用数据库级别的原子更新，确保并发安全
+     */
+    @Modifying
+    @Query("UPDATE Schedule s SET s.bookedSlots = s.bookedSlots + 1 " +
+           "WHERE s.scheduleId = :scheduleId " +
+           "AND s.bookedSlots < s.totalSlots " +
+           "AND s.status = com.example.springboot.entity.enums.ScheduleStatus.available")
+    int incrementBookedSlotsAtomically(@Param("scheduleId") Integer scheduleId);
+
+    /**
+     * 原子性地减少 bookedSlots，确保不会小于 0
+     * 返回受影响的行数
+     */
+    @Modifying
+    @Query("UPDATE Schedule s SET s.bookedSlots = s.bookedSlots - 1 " +
+           "WHERE s.scheduleId = :scheduleId " +
+           "AND s.bookedSlots > 0")
+    int decrementBookedSlotsAtomically(@Param("scheduleId") Integer scheduleId);
 }

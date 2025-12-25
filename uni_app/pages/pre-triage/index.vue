@@ -142,11 +142,35 @@
 				analysisResult: null,
 				selectedDeptId: null,
 				selectedDeptName: '',
-				doctorList: []
+				doctorList: [],
+				refreshTimer: null, // 定时刷新定时器
+				isRefreshing: false // 是否正在刷新
 			}
 		},
 		onLoad() {
 			this.fetchPopularSymptoms()
+		},
+		onShow() {
+			// 页面显示时，如果有选中的科室，刷新医生列表（静默刷新，不显示加载提示）
+			if (this.selectedDeptId && this.doctorList.length > 0) {
+				this.refreshDoctorList(true) // true 表示静默刷新
+			}
+		},
+		onUnload() {
+			// 页面卸载时清除定时器
+			this.stopAutoRefresh()
+		},
+		onPullDownRefresh() {
+			// 下拉刷新
+			if (this.selectedDeptId) {
+				this.refreshDoctorList().finally(() => {
+					uni.stopPullDownRefresh()
+				})
+			} else {
+				this.fetchPopularSymptoms().finally(() => {
+					uni.stopPullDownRefresh()
+				})
+			}
 		},
 		methods: {
 			// 获取患者ID（从本地存储）
@@ -158,7 +182,6 @@
 			// 获取热门症状 - 调用真实 API
 			async fetchPopularSymptoms() {
 				try {
-					uni.showLoading({ title: '加载中...' })
 					
 					// 使用 AI 服务的 baseURL
 					const response = await new Promise((resolve, reject) => {
@@ -200,7 +223,6 @@
 					// 降级到默认症状
 					this.popularSymptoms = ['头痛', '发热', '咳嗽', '腹痛', '皮疹', '失眠']
 				} finally {
-					uni.hideLoading()
 				}
 			},
 
@@ -229,7 +251,6 @@
 				this.selectedDeptId = null
 
 				try {
-					uni.showLoading({ title: 'AI 正在分析...' })
 
 					const patientId = this.getPatientId()
 					
@@ -331,21 +352,57 @@
 					})
 				} finally {
 					this.loading = false
-					uni.hideLoading()
 				}
 			},
 
+			// 启动自动刷新
+			startAutoRefresh() {
+				// 每10秒刷新一次号源信息（仅在已选择科室且有医生列表时，降低刷新频率）
+				this.refreshTimer = setInterval(() => {
+					if (this.selectedDeptId && this.doctorList.length > 0 && !this.isRefreshing) {
+						console.log('预问诊页面 - 定时刷新号源信息...')
+						this.refreshDoctorList(true) // true 表示静默刷新
+					}
+				}, 10000) // 10秒刷新一次，减少干扰
+			},
+			
+			// 停止自动刷新
+			stopAutoRefresh() {
+				if (this.refreshTimer) {
+					clearInterval(this.refreshTimer)
+					this.refreshTimer = null
+				}
+			},
+			
+			// 刷新医生列表（用于实时更新号源）
+			async refreshDoctorList(silent = false) {
+				if (!this.selectedDeptId) {
+					return
+				}
+				// 防止重复刷新
+				if (this.isRefreshing) {
+					return
+				}
+				this.isRefreshing = true
+				try {
+					await this.fetchRecommendedDoctors(this.selectedDeptId, this.symptomText, silent)
+				} finally {
+					this.isRefreshing = false
+				}
+			},
+			
 			// 选择科室
 			selectDepartment(id, name) {
 				this.selectedDeptId = id
 				this.selectedDeptName = name
+				// 停止之前的定时器
+				this.stopAutoRefresh()
 				this.fetchRecommendedDoctors(id, this.symptomText)
 			},
 
 			// 获取推荐医生 - 调用带排班信息的接口
-			async fetchRecommendedDoctors(deptId, symptomText) {
+			async fetchRecommendedDoctors(deptId, symptomText, silent = false) {
 				try {
-					uni.showLoading({ title: '查找专家中...' })
 					
 					const patientId = this.getPatientId()
 					
@@ -457,7 +514,10 @@
 					})
 					this.doctorList = []
 				} finally {
-					uni.hideLoading()
+					// 如果有医生列表，启动自动刷新
+					if (this.doctorList.length > 0 && !this.refreshTimer) {
+						this.startAutoRefresh()
+					}
 				}
 			},
 
@@ -490,11 +550,9 @@
 
 			// 创建预约
 			async createAppointment(doctor, schedule) {
-				uni.showLoading({ title: '正在预约...' })
 				try {
 					const patientInfo = uni.getStorageSync('patientInfo')
 					if (!patientInfo || !patientInfo.id) {
-						uni.hideLoading()
 						uni.showToast({
 							title: '请先登录',
 							icon: 'none'
@@ -515,8 +573,6 @@
 
 					const { createAppointment } = await import('../../api/appointment.js')
 					const response = await createAppointment(appointmentData)
-
-					uni.hideLoading()
 
 					if (response && response.code === '200') {
 						// 预约创建成功，跳转到付费页面
@@ -548,7 +604,6 @@
 					}
 				} catch (error) {
 					console.error('创建预约失败:', error)
-					uni.hideLoading()
 					
 					// 解析错误信息
 					let errorMsg = '预约失败，请重试'
@@ -574,7 +629,6 @@
 						})
 					}
 				} finally {
-					uni.hideLoading()
 				}
 			},
 

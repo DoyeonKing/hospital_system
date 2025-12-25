@@ -95,12 +95,8 @@
 				<text class="card-title">今日可预约</text>
 				<text class="view-all" @click="navigateToDepartments">查看全部 ></text>
 			</view>
-			<!-- 骨架屏 -->
-			<view class="skeleton-container" v-if="loading && todaySchedules.length === 0">
-				<view class="skeleton-item" v-for="i in 4" :key="i" :style="{ animationDelay: `${(i - 1) * 100}ms` }"></view>
-			</view>
 			<!-- 数据列表 -->
-			<view class="schedule-grid" v-else-if="todaySchedules.length > 0">
+			<view class="schedule-grid" v-if="todaySchedules.length > 0">
 				<view 
 					class="schedule-item" 
 					v-for="schedule in todaySchedules.slice(0, 4)" 
@@ -123,12 +119,8 @@
 			<view class="card-header">
 				<text class="card-title">热门科室</text>
 			</view>
-			<!-- 热门科室骨架屏 -->
-			<view class="skeleton-tags" v-if="loading && popularDepartments.length === 0">
-				<view class="skeleton-tag" v-for="i in 6" :key="i" :style="{ animationDelay: `${(i - 1) * 200}ms` }"></view>
-			</view>
 			<!-- 热门科室列表 -->
-			<view v-else-if="popularDepartments.length > 0">
+			<view v-if="popularDepartments.length > 0">
 				<view class="department-tags" :class="{ 'tags-collapsed': !showAllDepartments }">
 					<view 
 						class="department-tag" 
@@ -153,10 +145,6 @@
 			</view>
 		</view>
 
-		<!-- 加载状态 -->
-		<view class="loading" v-if="loading">
-			<text class="loading-text">加载中...</text>
-		</view>
 	</view>
 </template>
 
@@ -237,13 +225,14 @@
 		},
 		onLoad() {
 			this.checkLoginStatus()
-			this.loadPageData()
+			// 首次加载也使用静默模式，避免显示加载提示
+			this.loadPageData(true)
 		},
 		onShow() {
 			// 页面显示时先重置候补数量，避免显示旧数据
 			this.$set(this, 'waitlistCount', 0)
-			// 页面显示时刷新数据
-			this.loadPageData()
+			// 页面显示时静默刷新数据（不显示加载提示）
+			this.loadPageData(true) // true 表示静默刷新
 			// 同步待就诊数量到storage
 			if (this.upcomingAppointment) {
 				uni.setStorageSync('upcomingAppointment', this.upcomingAppointment)
@@ -252,11 +241,10 @@
 			}
 		},
 		onPullDownRefresh() {
-			// 下拉刷新
-			this.isRefreshing = true
-			this.loadPageData()
-			this.isRefreshing = false
-			uni.stopPullDownRefresh()
+			// 下拉刷新（静默刷新，不显示加载提示）
+			this.loadPageData(true).finally(() => {
+				uni.stopPullDownRefresh()
+			})
 		},
 		methods: {
 			// 检查登录状态
@@ -278,12 +266,22 @@
 			},
 			
 			// 加载页面数据
-			async loadPageData() {
+			async loadPageData(silent = false) {
+				// 防止重复加载
+				if (this.isRefreshing) {
+					return
+				}
+				
 				// 先检查登录状态
 				this.checkLoginStatus()
 				
-				this.loading = true
+				// 完全禁用loading状态，避免闪烁
+				// 使用骨架屏代替，但不在代码中频繁切换loading状态
+				// if (!silent && !this.loading && this.todaySchedules.length === 0 && this.popularDepartments.length === 0) {
+				// 	this.loading = true
+				// }
 				this.hasNetworkError = false
+				this.isRefreshing = true
 				
 				// 加载今日排班（调用真实API）
 				try {
@@ -592,9 +590,13 @@
 					console.error('加载预约/候补数据失败:', error)
 					this.upcomingAppointment = null
 					this.$set(this, 'waitlistCount', 0)
+				} finally {
+					this.isRefreshing = false
+					// 完全禁用loading状态切换，避免闪烁
+					// if (!silent) {
+					// 	this.loading = false
+					// }
 				}
-				
-				this.loading = false
 			},
 			
 			// 格式化日期为 YYYY-MM-DD
@@ -1300,68 +1302,6 @@
 		font-weight: bold;
 	}
 
-	/* 加载状态 */
-	.loading {
-		position: fixed;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		background: rgba(0, 0, 0, 0.75);
-		color: #ffffff;
-		padding: 24rpx 48rpx;
-		border-radius: 16rpx;
-		z-index: 9999;
-		backdrop-filter: blur(10rpx);
-	}
-
-	.loading-text {
-		font-size: 28rpx;
-	}
-
-	/* 骨架屏样式 */
-	.skeleton-container {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 16rpx;
-	}
-
-	.skeleton-item {
-		background: linear-gradient(90deg, #F7FAFC 25%, #EDF2F7 50%, #F7FAFC 75%);
-		background-size: 200% 100%;
-		border-radius: 16rpx;
-		padding: 20rpx 18rpx;
-		height: 100rpx;
-		animation: skeleton-loading 1.5s ease-in-out infinite;
-		opacity: 0;
-		animation-fill-mode: both;
-	}
-
-	.skeleton-tags {
-		display: flex;
-		gap: 14rpx;
-		padding: 6rpx 0;
-	}
-
-	.skeleton-tag {
-		background: linear-gradient(90deg, #F7FAFC 25%, #EDF2F7 50%, #F7FAFC 75%);
-		background-size: 200% 100%;
-		border-radius: 24rpx;
-		padding: 14rpx 24rpx;
-		height: 60rpx;
-		width: 120rpx;
-		animation: skeleton-loading 1.5s ease-in-out infinite;
-		opacity: 0;
-		animation-fill-mode: both;
-	}
-
-	@keyframes skeleton-loading {
-		0% {
-			background-position: 200% 0;
-		}
-		100% {
-			background-position: -200% 0;
-		}
-	}
 
 	/* 空状态样式 */
 	.empty-state {

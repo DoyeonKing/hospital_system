@@ -748,7 +748,6 @@ onUnload() {
 		
 		// 处理支付流程
 		async processPayment() {
-			uni.showLoading({ title: '支付中...' })
 			
 			try {
 				console.log('开始支付，appointmentId:', this.appointmentId)
@@ -762,7 +761,6 @@ onUnload() {
 				
 				// 检查响应
 				if (response && (response.code === '200' || response.appointmentId)) {
-					uni.hideLoading()
 					
 					// 显示支付成功
 					uni.showToast({
@@ -780,7 +778,6 @@ onUnload() {
 				}
 			} catch (error) {
 				console.error('支付失败:', error)
-				uni.hideLoading()
 				uni.showToast({
 					title: error.message || '支付失败，请重试',
 					icon: 'none',
@@ -819,7 +816,6 @@ onUnload() {
 				success: async (res) => {
 					if (res.confirm) {
 						try {
-							uni.showLoading({ title: '取消中...' })
 							const response = await cancelAppointment(this.appointmentId)
 							console.log('取消预约响应:', response)
 						
@@ -845,7 +841,6 @@ onUnload() {
 								icon: 'none'
 							})
 						} finally {
-							uni.hideLoading()
 						}
 					}
 				}

@@ -159,7 +159,9 @@
 				isReschedule: false, // 是否为改约场景
 				rescheduleType: '', // 改约类型：'time' 换时间段, 'doctor' 换医生
 				originalAppointmentId: null, // 原预约ID
-				originalDoctorId: null // 原医生ID（换时间段时使用）
+				originalDoctorId: null, // 原医生ID（换时间段时使用）
+				refreshTimer: null, // 定时刷新定时器
+				isRefreshing: false // 是否正在刷新
 			}
 		},
 		computed: {
@@ -278,6 +280,8 @@
 				}
 				
 				this.loadSchedules()
+				// 启动定时刷新（每5秒刷新一次号源信息）
+				this.startAutoRefresh()
 			} catch (error) {
 				console.error('排班页加载失败:', error)
 				uni.showToast({
@@ -285,6 +289,22 @@
 					icon: 'error'
 				})
 			}
+		},
+		onShow() {
+			// 页面显示时刷新数据（从其他页面返回时，静默刷新，不显示加载提示）
+			if (this.departmentId) {
+				this.loadSchedules(true) // true 表示静默刷新
+			}
+		},
+		onUnload() {
+			// 页面卸载时清除定时器
+			this.stopAutoRefresh()
+		},
+		onPullDownRefresh() {
+			// 下拉刷新
+			this.loadSchedules().finally(() => {
+				uni.stopPullDownRefresh()
+			})
 		},
 		methods: {
 			// 判断号源是否已满
@@ -340,8 +360,33 @@
 			return `${year}-${month}-${day}`
 		},
 		
+		// 启动自动刷新
+		startAutoRefresh() {
+			// 每10秒刷新一次号源信息（降低刷新频率，减少干扰）
+			this.refreshTimer = setInterval(() => {
+				if (!this.isRefreshing) {
+					console.log('定时刷新号源信息...')
+					this.loadSchedules(true) // true 表示静默刷新，不显示加载提示
+				}
+			}, 10000) // 10秒刷新一次，减少干扰
+		},
+		
+		// 停止自动刷新
+		stopAutoRefresh() {
+			if (this.refreshTimer) {
+				clearInterval(this.refreshTimer)
+				this.refreshTimer = null
+			}
+		},
+		
 		// 加载排班数据
-		async loadSchedules() {
+		async loadSchedules(silent = false) {
+			// 防止重复刷新
+			if (this.isRefreshing) {
+				return
+			}
+			
+			this.isRefreshing = true
 			try {
 				// 生成日期范围：最近7天
 				const today = new Date()
@@ -476,6 +521,8 @@
 				} catch (fallbackError) {
 					console.error('Fallback失败:', fallbackError)
 				}
+			} finally {
+				this.isRefreshing = false
 			}
 		},
 		
@@ -583,7 +630,6 @@
 					return
 				}
 
-				uni.showLoading({ title: '申请中...' })
 
 				const payload = {
 					patientId: patientInfo.id,
@@ -632,7 +678,6 @@
 					icon: 'none'
 				})
 			} finally {
-				uni.hideLoading()
 			}
 		}
 	}

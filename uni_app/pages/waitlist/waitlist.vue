@@ -349,7 +349,6 @@
 					success: async (res) => {
 						if (res.confirm) {
 							try {
-								uni.showLoading({ title: '取消中...' })
 								const response = await cancelWaitlist(waitlistId)
 								console.log('取消候补响应:', response)
 								
