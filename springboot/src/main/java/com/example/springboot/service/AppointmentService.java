@@ -117,17 +117,20 @@ public class AppointmentService {
             throw new BadRequestException("Patient is blacklisted and cannot make appointments.");
         }
 
-        Schedule schedule = scheduleRepository.findById(request.getScheduleId())
+        // 使用悲观锁获取排班信息，防止并发抢号问题
+        Schedule schedule = scheduleRepository.findByIdWithLock(request.getScheduleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + request.getScheduleId()));
 
-        System.out.println("创建预约检查 - scheduleId: " + request.getScheduleId() + ", patientId: " + request.getPatientId() + ", bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
+        System.out.println("创建预约检查（已加锁） - scheduleId: " + request.getScheduleId() + ", patientId: " + request.getPatientId() + ", bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
         
         if (schedule.getStatus() != ScheduleStatus.available) {
             throw new BadRequestException("Schedule is not active for booking.");
         }
+        
+        // 再次检查号源是否可用（在锁保护下进行最终检查）
         if (schedule.getBookedSlots() >= schedule.getTotalSlots()) {
             System.out.println("创建预约失败 - 号源已满: bookedSlots(" + schedule.getBookedSlots() + ") >= totalSlots(" + schedule.getTotalSlots() + ")");
-            throw new BadRequestException("No available slots for this schedule.");
+            throw new BadRequestException("抱歉，该号源已被抢完，请选择其他时段或加入候补队列");
         }
         if (schedule.getScheduleDate().isBefore(java.time.LocalDate.now()) ||
                 (schedule.getScheduleDate().isEqual(java.time.LocalDate.now()) && schedule.getSlot().getEndTime().isBefore(java.time.LocalTime.now()))) {
