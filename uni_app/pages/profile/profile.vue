@@ -48,11 +48,6 @@
 				<text class="menu-text">编辑资料</text>
 				<text class="menu-arrow">></text>
 			</view>
-			<view class="menu-item" @click="showAbout">
-				<text class="menu-icon">ℹ️</text>
-				<text class="menu-text">关于我们</text>
-				<text class="menu-arrow">></text>
-			</view>
 		</view>
 
 		<!-- 退出登录 -->
@@ -114,14 +109,6 @@
 			navigateToEditProfile() {
 				uni.navigateTo({
 					url: '/pages/profile/edit'
-				})
-			},
-			showAbout() {
-				uni.showModal({
-					title: '关于我们',
-					content: 'XX大学校医院\n地址：XX市XX区XX路XX号\n总机：0512-66666666\n急诊：0512-66666120\n\n门诊时间\n工作日 8:00-11:30 / 14:00-17:30\n周末仅上午',
-					showCancel: false,
-					confirmText: '知道了'
 				})
 			},
 			async loadWaitlistCount() {
