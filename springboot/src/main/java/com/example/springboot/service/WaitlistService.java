@@ -396,17 +396,12 @@ public class WaitlistService {
         Appointment appointment = new Appointment();
         appointment.setPatient(patient);
         appointment.setSchedule(schedule);
+        appointment.setAppointmentNumber(getNextAppointmentNumber(schedule, patient));
         appointment.setStatus(AppointmentStatus.scheduled);  // 已预约状态
         appointment.setPaymentStatus(PaymentStatus.paid);    // 已支付
         appointment.setPaymentMethod(paymentData.getPaymentMethod());
-        
-        // 先保存预约，然后原子性地分配序号
-        Appointment savedAppointment = appointmentRepository.save(appointment);
-        Integer nextNumber = getNextAppointmentNumberAtomic(schedule);
-        savedAppointment.setAppointmentNumber(nextNumber);
-        savedAppointment.setTransactionId(paymentData.getTransactionId());
-        savedAppointment.setCreatedAt(LocalDateTime.now());
-        savedAppointment = appointmentRepository.save(savedAppointment);
+        appointment.setTransactionId(paymentData.getTransactionId());
+        appointment.setCreatedAt(LocalDateTime.now());
 
         // 6. 号源已经在通知时锁定了（bookedSlots + 1），所以这里不需要再增加
         // 只需要确保 bookedSlots 正确（如果之前同步更新过，这里不需要再改）
@@ -472,31 +467,24 @@ public class WaitlistService {
         return appointmentService.findAppointmentById(savedAppointment.getAppointmentId());
     }
 
-    /**
-     * 原子性地获取下一个预约序号（真正的并发安全）
-     */
-    private synchronized Integer getNextAppointmentNumberAtomic(Schedule schedule) {
-        // 使用synchronized确保同一时刻只有一个线程能执行此方法
-        Integer maxNumber = appointmentRepository.findMaxAppointmentNumberBySchedule(schedule);
-        int nextNumber = (maxNumber == null) ? 1 : maxNumber + 1;
-        
-        System.out.println("候补原子分配预约序号 - 排班ID: " + schedule.getScheduleId() + 
-                          ", 当前最大序号: " + maxNumber + 
-                          ", 新序号: " + nextNumber);
-        
-        return nextNumber;
-    }
-
     private int getNextAppointmentNumber(Schedule schedule, Patient patient) {
-        // 使用数据库聚合函数获取最大序号，避免并发问题
-        Integer maxNumber = appointmentRepository.findMaxAppointmentNumberBySchedule(schedule);
-        int baseNumber = (maxNumber == null) ? 0 : maxNumber;
+        // 获取该排班下所有有效预约（按序号升序排列）
+        List<Appointment> appointments = appointmentRepository.findByScheduleAndStatusNotCancelledOrderByAppointmentNumberAsc(schedule);
         
-        System.out.println("候补分配预约序号 - 排班ID: " + schedule.getScheduleId() + 
-                          ", 当前最大序号: " + maxNumber + 
-                          ", 新序号: " + (baseNumber + 1));
+        // 如果没有预约，从1开始
+        if (appointments.isEmpty()) {
+            return 1;
+        }
         
-        return baseNumber + 1;
+        // 找到最大序号
+        int maxNumber = 0;
+        for (Appointment appointment : appointments) {
+            if (appointment.getAppointmentNumber() != null && appointment.getAppointmentNumber() > maxNumber) {
+                maxNumber = appointment.getAppointmentNumber();
+            }
+        }
+        
+        return maxNumber + 1;
     }
 
     @Transactional(readOnly = true)
