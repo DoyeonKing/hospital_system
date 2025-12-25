@@ -118,7 +118,8 @@
 			return {
 				appointmentList: [],
 				loading: false,
-				listKey: 0 // 用于强制重新渲染
+				listKey: 0, // 用于强制重新渲染
+				refreshTimer: null // 定时刷新定时器
 			}
 		},
 		computed: {
@@ -135,15 +136,26 @@
 				this.loadAppointments()
 			})
 			this.loadAppointments()
+			// 启动定时刷新
+			this.startAutoRefresh()
 		},
 		onShow() {
 			// 页面显示时刷新数据
 			console.log('[appointments onShow] 页面显示，刷新预约列表')
 			this.loadAppointments()
 		},
+		onPullDownRefresh() {
+			// 下拉刷新
+			console.log('[appointments onPullDownRefresh] 下拉刷新')
+			this.loadAppointments().then(() => {
+				uni.stopPullDownRefresh()
+			})
+		},
 		onUnload() {
 			// 页面卸载时移除事件监听
 			uni.$off('refreshAppointmentList')
+			// 清除定时器
+			this.stopAutoRefresh()
 		},
 		methods: {
 			// 加载预约列表
@@ -523,6 +535,25 @@
 					classes.cancelled = true
 				}
 				return classes
+			},
+			
+			// 启动自动刷新
+			startAutoRefresh() {
+				// 清除之前的定时器
+				this.stopAutoRefresh()
+				// 设置30秒自动刷新
+				this.refreshTimer = setInterval(() => {
+					console.log('[appointments] 自动刷新预约列表')
+					this.loadAppointments()
+				}, 30000) // 30秒刷新一次
+			},
+			
+			// 停止自动刷新
+			stopAutoRefresh() {
+				if (this.refreshTimer) {
+					clearInterval(this.refreshTimer)
+					this.refreshTimer = null
+				}
 			},
 			
 			// 格式化日期时间
