@@ -658,11 +658,15 @@ public class AppointmentService {
         appointmentRepository.save(appointment);
 
         logger.info("退款成功 - 预约ID: {}, 患者: {}, 退款时间: {}", 
-               status == AppointmentStatus.CHECKED_IN;
+               appointment.getId(), 
+               appointment.getPatient().getName(), 
+               LocalDateTime.now());
+        
+        return convertToResponseDto(appointment);
     }
 
     /**
-     * 验证退号时间限制
+     * 验证退号时间限
      * 规则3：上午号最晚于就诊日7:00前退号
      * 规则4：下午号最晚于就诊日13:00前退号
      */
