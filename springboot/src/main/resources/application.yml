@@ -20,22 +20,25 @@ spring:
     upload-dir: images/doctors/
 
   datasource:
-    #url: jdbc:mysql://localhost:3306/hospital_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
-    url: jdbc:mysql://localhost:3306/hopital?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
+    # ✅ 本地开发模式：使用华为云数据库
+    url: jdbc:mysql://123.249.30.241:3306/hospital_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
     username: root
-    password: Mga@5182 # 使用引号包裹密码，避免特殊字符解析问题
-    #url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3307/hospital_07?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000}
-    #username: ${SPRING_DATASOURCE_USERNAME:root}
-    #password: ${SPRING_DATASOURCE_PASSWORD:123456} # 使用引号包裹密码，避免特殊字符解析问题
+    password: 123456 # 使用引号包裹密码，避免特殊字符解析问题
+    # 本地数据库配置（已注释，如需切换回本地数据库可取消注释）：
+    # url: jdbc:mysql://localhost:3306/hospital_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000
+    # 环境变量配置（已注释，如需使用环境变量可取消注释）：
+    # url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3307/hospital_07?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true&connectTimeout=5000&socketTimeout=30000}
+    # username: ${SPRING_DATASOURCE_USERNAME:root}
+    # password: ${SPRING_DATASOURCE_PASSWORD:123456} # 使用引号包裹密码，避免特殊字符解析问题
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       # 连接池配置（已优化以支持高并发和长时间运行）
-      minimum-idle: 20  # 最小空闲连接数（从5增加到20，保证基础连接可用）
-      maximum-pool-size: 100  # 最大连接池大小（从20增加到100，支持500并发测试）
+      minimum-idle: 5  # 最小空闲连接数（从5增加到20，保证基础连接可用）
+      maximum-pool-size: 20  # 最大连接池大小（从20增加到100，支持500并发测试）
       auto-commit: true
-      idle-timeout: 600000  # 空闲连接超时时间（从30秒增加到10分钟，减少连接重建）
-      max-lifetime: 7200000  # 连接最大生存时间（从30分钟增加到120分钟，适配2小时稳定性测试）
-      connection-timeout: 90000  # 连接超时时间（增加到90秒，给启动时建立连接池足够时间，适用于华为云等网络延迟场景）
+      idle-timeout: 180000  # 空闲连接超时时间（从30秒增加到10分钟，减少连接重建）
+      max-lifetime: 1200000  # 连接最大生存时间（从30分钟增加到120分钟，适配2小时稳定性测试）
+      connection-timeout: 30000  # 连接超时时间（增加到90秒，给启动时建立连接池足够时间，适用于华为云等网络延迟场景）
       connection-test-query: SELECT 1  # 连接测试查询
       pool-name: HospitalHikariPool
       # 连接泄漏检测（帮助发现未正确关闭的连接）
@@ -56,7 +59,10 @@ spring:
   # Redis配置
   data:
     redis:
-      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      # ✅ 本地开发模式：使用本地Redis
+      host: ${SPRING_DATA_REDIS_HOST:localhost}  # 👈 本地Redis地址
+      # 云服务器Redis配置（已注释，如需切换回云服务器可取消注释）：
+      # host: ${SPRING_DATA_REDIS_HOST:123.249.30.241}  # 👈 云服务器Redis地址
       port: ${SPRING_DATA_REDIS_PORT:6379}
       database: 0
       timeout: 5000ms

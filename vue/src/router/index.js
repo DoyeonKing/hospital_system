@@ -95,7 +95,7 @@ const router = createRouter({
 
 
 // 【重要】路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
     document.title = to.meta.title || '医生工作台';
 
     // 【已修改】使用您自己的 store
@@ -105,10 +105,52 @@ router.beforeEach((to, from, next) => {
     if (to.meta.requiresAuth) {
         // 使用您 store 中的 isAuthenticated getter
         if (!doctorStore.isAuthenticated) {
+            console.log('🔒 路由守卫: 未认证，重定向到登录页');
             // 未登录，重定向到登录页面
             next('/login');
             return;
         }
+        
+        // 额外验证：检查 Token 格式是否合法（JWT Token 应该有3个部分，用.分隔）
+        const token = doctorStore.loggedInDoctorBasicInfo?.token;
+        if (token) {
+            const tokenParts = token.split('.');
+            if (tokenParts.length !== 3) {
+                console.warn('🔒 路由守卫: Token 格式无效，清除登录状态');
+                doctorStore.logout();
+                next('/login');
+                return;
+            }
+            
+            // 验证Token的payload是否被篡改（检查过期时间）
+            try {
+                const payload = JSON.parse(atob(tokenParts[1]));
+                const currentTime = Math.floor(Date.now() / 1000);
+                
+                // 检查Token是否过期
+                if (payload.exp && payload.exp < currentTime) {
+                    console.warn('🔒 路由守卫: Token已过期，清除登录状态');
+                    doctorStore.logout();
+                    next('/login');
+                    return;
+                }
+                
+                // 检查Token的基本字段是否存在
+                if (!payload.identifier && !payload.sub) {
+                    console.warn('🔒 路由守卫: Token payload无效，清除登录状态');
+                    doctorStore.logout();
+                    next('/login');
+                    return;
+                }
+            } catch (e) {
+                console.error('🔒 路由守卫: Token解析失败', e);
+                doctorStore.logout();
+                next('/login');
+                return;
+            }
+        }
+        
+        console.log('🔒 路由守卫: 认证通过');
     }
 
     // 如果已登录且访问登录页面，重定向到医生工作台

@@ -75,6 +75,15 @@ public class LeaveRequestService {
             }
         });
         return requests.stream()
+                .sorted((r1, r2) -> {
+                    // 按创建时间倒序排列（最新的在最上面）
+                    LocalDateTime time1 = r1.getCreatedAt();
+                    LocalDateTime time2 = r2.getCreatedAt();
+                    if (time1 == null && time2 == null) return 0;
+                    if (time1 == null) return 1;
+                    if (time2 == null) return -1;
+                    return time2.compareTo(time1); // 倒序：time2 与 time1 比较
+                })
                 .map(this::convertToResponseDto)
                 .collect(Collectors.toList());
     }
@@ -512,38 +521,104 @@ public class LeaveRequestService {
                 if (substituteDoctorId == null) {
                     // 取消排班
                     Doctor originalDoctor = schedule.getDoctor();
-                    schedule.setStatus(ScheduleStatus.cancelled);
-                    scheduleRepository.save(schedule);
                     
-                    logger.info("排班 #{} 已取消，开始发送通知给 {} 位患者", scheduleId, appointments.size());
-                    
-                    // 给所有患者发送排班取消通知
-                    int notificationCount = 0;
-                    for (com.example.springboot.entity.Appointment appointment : appointments) {
-                        try {
-                            logger.info("发送取消通知给患者 #{}, 预约 #{}", 
-                                appointment.getPatient().getPatientId(), appointment.getAppointmentId());
+                    // 检查是否有预约记录
+                    if (appointments.isEmpty()) {
+                        // 没有预约记录，直接删除排班
+                        logger.info("排班 #{} 没有预约记录，直接删除", scheduleId);
+                        scheduleRepository.delete(schedule);
+                        cancelledCount++;
+                        messages.add("排班 #" + scheduleId + " 已删除（无预约记录）");
+                        logger.info("排班 #{} 删除完成", scheduleId);
+                    } else {
+                        // 有预约记录，将医生换成虚拟医生并设置为取消状态
+                        logger.info("排班 #{} 有 {} 个预约记录，将医生换成虚拟医生并取消排班", scheduleId, appointments.size());
+                        
+                        // 获取虚拟医生
+                        Doctor virtualDoctor = getVirtualDoctor();
+                        if (virtualDoctor != null) {
+                            // 更新排班的医生为虚拟医生
+                            schedule.setDoctor(virtualDoctor);
+                            // 设置排班状态为取消
+                            schedule.setStatus(ScheduleStatus.cancelled);
+                            scheduleRepository.save(schedule);
                             
-                            notificationService.sendScheduleCancelledNotification(
-                                appointment.getPatient().getPatientId().intValue(),
-                                appointment.getAppointmentId(),
-                                originalDoctor.getFullName(),
-                                originalDoctor.getDepartment().getName(),
-                                schedule.getScheduleDate().toString(),
-                                schedule.getSlot().getSlotName()
-                            );
-                            notificationCount++;
-                            logger.info("成功发送取消通知给患者 #{}", appointment.getPatient().getPatientId());
-                        } catch (Exception notifError) {
-                            // 通知发送失败不影响主流程
-                            logger.error("发送取消通知失败 - 患者 #{}: {}", 
-                                appointment.getPatient().getPatientId(), notifError.getMessage(), notifError);
+                            // 同时将所有相关预约的状态更新为cancelled
+                            for (com.example.springboot.entity.Appointment appointment : appointments) {
+                                if (appointment.getStatus() != com.example.springboot.entity.enums.AppointmentStatus.cancelled) {
+                                    appointment.setStatus(com.example.springboot.entity.enums.AppointmentStatus.cancelled);
+                                    appointmentRepository.save(appointment);
+                                    logger.info("预约 #{} 状态已更新为cancelled", appointment.getAppointmentId());
+                                }
+                            }
+                            
+                            logger.info("排班 #{} 医生已更换为虚拟医生并设为取消状态，所有预约状态已更新，开始发送取消通知给 {} 位患者", scheduleId, appointments.size());
+                            
+                            // 给所有患者发送排班取消通知（正常退钱流程）
+                            int notificationCount = 0;
+                            for (com.example.springboot.entity.Appointment appointment : appointments) {
+                                try {
+                                    logger.info("发送排班取消通知给患者 #{}, 预约 #{}", 
+                                        appointment.getPatient().getPatientId(), appointment.getAppointmentId());
+                                    
+                                    notificationService.sendScheduleCancelledNotification(
+                                        appointment.getPatient().getPatientId().intValue(),
+                                        appointment.getAppointmentId(),
+                                        originalDoctor.getFullName(),
+                                        originalDoctor.getDepartment().getName(),
+                                        schedule.getScheduleDate().toString(),
+                                        schedule.getSlot().getSlotName()
+                                    );
+                                    notificationCount++;
+                                    logger.info("成功发送排班取消通知给患者 #{}", appointment.getPatient().getPatientId());
+                                } catch (Exception notifError) {
+                                    // 通知发送失败不影响主流程
+                                    logger.error("发送排班取消通知失败 - 患者 #{}: {}", 
+                                        appointment.getPatient().getPatientId(), notifError.getMessage(), notifError);
+                                }
+                            }
+                            
+                            cancelledCount++;
+                            messages.add("排班 #" + scheduleId + " 已取消（医生已更换为虚拟医生），已通知 " + notificationCount + "/" + appointments.size() + " 位患者");
+                            logger.info("排班 #{} 虚拟医生替换并取消完成，成功通知 {}/{} 位患者", scheduleId, notificationCount, appointments.size());
+                        } else {
+                            // 如果找不到虚拟医生，使用原来的取消逻辑
+                            logger.warn("未找到虚拟医生，使用原有取消排班逻辑");
+                            schedule.setStatus(ScheduleStatus.cancelled);
+                            scheduleRepository.save(schedule);
+                            
+                            // 同时将所有相关预约的状态更新为cancelled
+                            for (com.example.springboot.entity.Appointment appointment : appointments) {
+                                if (appointment.getStatus() != com.example.springboot.entity.enums.AppointmentStatus.cancelled) {
+                                    appointment.setStatus(com.example.springboot.entity.enums.AppointmentStatus.cancelled);
+                                    appointmentRepository.save(appointment);
+                                    logger.info("预约 #{} 状态已更新为cancelled（回退逻辑）", appointment.getAppointmentId());
+                                }
+                            }
+                            
+                            // 给所有患者发送排班取消通知
+                            int notificationCount = 0;
+                            for (com.example.springboot.entity.Appointment appointment : appointments) {
+                                try {
+                                    notificationService.sendScheduleCancelledNotification(
+                                        appointment.getPatient().getPatientId().intValue(),
+                                        appointment.getAppointmentId(),
+                                        originalDoctor.getFullName(),
+                                        originalDoctor.getDepartment().getName(),
+                                        schedule.getScheduleDate().toString(),
+                                        schedule.getSlot().getSlotName()
+                                    );
+                                    notificationCount++;
+                                } catch (Exception notifError) {
+                                    logger.error("发送取消通知失败 - 患者 #{}: {}", 
+                                        appointment.getPatient().getPatientId(), notifError.getMessage(), notifError);
+                                }
+                            }
+                            
+                            cancelledCount++;
+                            messages.add("排班 #" + scheduleId + " 已取消，已通知 " + notificationCount + "/" + appointments.size() + " 位患者");
                         }
                     }
-                    
-                    cancelledCount++;
-                    messages.add("排班 #" + scheduleId + " 已取消，已通知 " + notificationCount + "/" + appointments.size() + " 位患者");
-                    logger.info("排班 #{} 取消完成，成功通知 {}/{} 位患者", scheduleId, notificationCount, appointments.size());
                 } else {
                     // 替换医生
                     Doctor substituteDoctor = doctorRepository.findById(substituteDoctorId)
@@ -689,6 +764,22 @@ public class LeaveRequestService {
         
         // 保留两位小数
         return Math.round(refundAmount * 100.0) / 100.0;
+    }
+
+    /**
+     * 获取虚拟医生
+     * 虚拟医生用于替换取消的排班，确保患者预约记录的完整性
+     * @return 虚拟医生对象，如果不存在则返回null
+     */
+    private Doctor getVirtualDoctor() {
+        try {
+            // 通过特定的工号查找虚拟医生
+            return doctorRepository.findByIdentifier("VIRTUAL_DOCTOR_001")
+                    .orElse(null);
+        } catch (Exception e) {
+            logger.error("获取虚拟医生失败: {}", e.getMessage(), e);
+            return null;
+        }
     }
 
     private LeaveRequestResponse convertToResponseDto(LeaveRequest leaveRequest) {

@@ -109,27 +109,6 @@
           </el-col>
         </el-form-item>
         
-        <el-form-item label="默认号源数">
-          <el-input-number
-            v-model="form.rules.defaultTotalSlots"
-            :min="1"
-            :max="100"
-            style="width: 200px"
-          />
-        </el-form-item>
-        
-        <el-form-item label="默认挂号费">
-          <el-input-number
-            v-model="form.rules.defaultFee"
-            :min="0"
-            :max="1000"
-            :precision="2"
-            :step="0.5"
-            style="width: 200px"
-          />
-          <span class="ml-2">元</span>
-        </el-form-item>
-        
         <el-form-item label="连续工作限制">
           <el-input-number
             v-model="form.rules.consecutiveWorkDaysLimit"

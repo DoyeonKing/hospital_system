@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -19,6 +20,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class WebSecurityConfig {
     
     @Autowired
@@ -46,10 +48,15 @@ public class WebSecurityConfig {
 
                         // 公开接口（不需要Token）
                         .requestMatchers("/api/auth/patient/login").permitAll()
+                        .requestMatchers("/api/auth/patient/register").permitAll()  // 患者自主注册接口
                         .requestMatchers("/api/auth/admin/login").permitAll()
                         .requestMatchers("/api/doctor/auth/login").permitAll()
                         .requestMatchers("/api/auth/verify-patient").permitAll()
                         .requestMatchers("/api/auth/activate-patient").permitAll()
+                        .requestMatchers("/api/files/upload-identity-proof").permitAll()  // 身份证明材料上传接口
+                        .requestMatchers("/api/files/identity-proofs/**").permitAll()  // 身份证明材料访问接口
+                        .requestMatchers("/api/upload").permitAll()  // 请假证明文件上传接口
+                        .requestMatchers("/api/files/leave-proofs/**").permitAll()  // 请假证明文件访问接口
 
                         // 允许 Swagger 访问
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
@@ -57,6 +64,9 @@ public class WebSecurityConfig {
                         // 其他所有 /api/** 接口都需要认证
                         .requestMatchers("/api/**").authenticated()
 
+                        // 静态资源路径（明确排除，避免被当作API处理）
+                        .requestMatchers("/images/**", "/static/**", "/css/**", "/js/**", "/favicon.ico").permitAll()
+                        
                         // 其他请求允许访问
                         .anyRequest().permitAll()
                 );

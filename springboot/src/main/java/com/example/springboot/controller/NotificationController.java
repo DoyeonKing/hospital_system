@@ -1,5 +1,6 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.dto.notification.NotificationResponse;
 import com.example.springboot.entity.enums.UserType;
 import com.example.springboot.service.NotificationService;
@@ -63,6 +64,7 @@ public class NotificationController {
      * 标记通知为已读
      */
     @PutMapping("/{notificationId}/read")
+    @AuditLog(action = "标记通知为已读", targetEntity = "notifications")
     public ResponseEntity<NotificationResponse> markAsRead(@PathVariable Long notificationId) {
         NotificationResponse notification = notificationService.markAsRead(notificationId);
         return ResponseEntity.ok(notification);
@@ -72,6 +74,7 @@ public class NotificationController {
      * 标记所有通知为已读
      */
     @PutMapping("/user/{userId}/read-all")
+    @AuditLog(action = "标记所有通知为已读", targetEntity = "notifications")
     public ResponseEntity<Map<String, String>> markAllAsRead(
             @PathVariable Integer userId,
             @RequestParam UserType userType) {
@@ -85,6 +88,7 @@ public class NotificationController {
      * 删除通知
      */
     @DeleteMapping("/{notificationId}")
+    @AuditLog(action = "删除通知", targetEntity = "notifications")
     public ResponseEntity<Map<String, String>> deleteNotification(@PathVariable Long notificationId) {
         notificationService.deleteNotification(notificationId);
         Map<String, String> response = new HashMap<>();

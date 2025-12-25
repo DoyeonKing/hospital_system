@@ -57,13 +57,17 @@ public class AdminService {
      * @param password 密码
      * @return 登录响应
      */
-    @Transactional
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public LoginResponse login(String username, String password) {
         LocalDateTime now = LocalDateTime.now();
         
         // 1. 查找管理员
         Admin admin = adminRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("用户名或密码错误"));
+        
+        // 调试日志：记录查询到的失败次数
+        System.out.println("[AdminService] 查询到的失败次数: " + admin.getFailedLoginCount() + 
+                          ", 最后失败时间: " + admin.getLastFailedLoginTime());
 
         // 2. 检查账户状态（在验证密码之前）
         if (admin.getStatus() == AdminStatus.inactive) {
@@ -91,32 +95,64 @@ public class AdminService {
             admin.setFailedLoginCount(0);
         }
 
-        // 5. 验证密码
+        // 5. 检查失败登录时间窗口：如果距离最后一次失败登录超过30分钟，重置失败次数
+        // 这样可以避免失败次数无限累积，给用户重新尝试的机会
+        if (admin.getLastFailedLoginTime() != null && admin.getFailedLoginCount() > 0) {
+            long minutesSinceLastFailure = java.time.Duration.between(admin.getLastFailedLoginTime(), now).toMinutes();
+            if (minutesSinceLastFailure >= Constants.ACCOUNT_LOCK_DURATION_MINUTES) {
+                // 超过时间窗口，重置失败次数
+                admin.setFailedLoginCount(0);
+                admin.setLastFailedLoginTime(null);
+                adminRepository.save(admin);
+            }
+        }
+
+        // 6. 验证密码
         boolean passwordMatches = passwordEncoderUtil.matches(password, admin.getPasswordHash());
         
         if (!passwordMatches) {
             // 登录失败：增加失败次数
-            int newFailureCount = admin.getFailedLoginCount() + 1;
-            admin.setFailedLoginCount(newFailureCount);
-            admin.setLastFailedLoginTime(now);
+            // 重新从数据库查询，确保获取最新的失败次数（避免缓存问题）
+            Admin freshAdmin = adminRepository.findByUsername(username)
+                    .orElseThrow(() -> new IllegalArgumentException("用户名或密码错误"));
+            
+            int currentFailureCount = freshAdmin.getFailedLoginCount() != null ? freshAdmin.getFailedLoginCount() : 0;
+            int newFailureCount = currentFailureCount + 1;
+            
+            System.out.println("[AdminService] 登录失败 - 当前失败次数: " + currentFailureCount + 
+                              ", 新失败次数: " + newFailureCount);
+            
+            freshAdmin.setFailedLoginCount(newFailureCount);
+            freshAdmin.setLastFailedLoginTime(now);
+            
+            // 保存失败次数到数据库（确保事务提交）
+            adminRepository.save(freshAdmin);
+            // 强制刷新到数据库，确保数据已保存
+            adminRepository.flush();
+            
+            // 验证保存是否成功
+            Admin verifyAdmin = adminRepository.findByUsername(username).orElse(null);
+            if (verifyAdmin != null) {
+                System.out.println("[AdminService] 保存后验证 - 失败次数: " + verifyAdmin.getFailedLoginCount());
+            }
             
             // 检查是否达到锁定阈值
             if (newFailureCount >= Constants.MAX_LOGIN_FAILURE_COUNT) {
                 // 自动锁定账户
-                admin.setStatus(AdminStatus.locked);
-                admin.setLockedUntil(now.plusMinutes(Constants.ACCOUNT_LOCK_DURATION_MINUTES));
-                adminRepository.save(admin);
+                freshAdmin.setStatus(AdminStatus.locked);
+                freshAdmin.setLockedUntil(now.plusMinutes(Constants.ACCOUNT_LOCK_DURATION_MINUTES));
+                adminRepository.save(freshAdmin);
+                adminRepository.flush();
                 throw new IllegalArgumentException("登录失败次数过多，账户已被锁定，请" + Constants.ACCOUNT_LOCK_DURATION_MINUTES + "分钟后再试或联系系统管理员");
             } else {
-                // 未达到阈值，只保存失败次数
-                adminRepository.save(admin);
+                // 未达到阈值，计算剩余次数
                 int remainingAttempts = Constants.MAX_LOGIN_FAILURE_COUNT - newFailureCount;
                 throw new IllegalArgumentException("用户名或密码错误，还可尝试" + remainingAttempts + "次");
             }
         }
 
-        // 6. 密码正确，登录成功：重置失败次数
-        if (admin.getFailedLoginCount() > 0) {
+        // 7. 密码正确，登录成功：重置失败次数
+        if (admin.getFailedLoginCount() != null && admin.getFailedLoginCount() > 0) {
             admin.setFailedLoginCount(0);
             admin.setLastFailedLoginTime(null);
             adminRepository.save(admin);

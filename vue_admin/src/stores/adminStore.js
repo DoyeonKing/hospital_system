@@ -37,8 +37,26 @@ export const useAdminStore = defineStore('admin', {
                    state.loggedInAdminBasicInfo?.name || 
                    '管理员';
         },
-        // 是否已登录
-        isAuthenticated: (state) => !!state.loggedInAdminBasicInfo,
+        // 是否已登录（同时检查 state 和 localStorage）
+        isAuthenticated: (state) => {
+            // 检查 state 中是否有管理员信息
+            if (!state.loggedInAdminBasicInfo) {
+                return false;
+            }
+            // 检查 localStorage 中是否有对应的会话数据
+            const storedData = localStorage.getItem(ADMIN_SESSION_KEY);
+            if (!storedData) {
+                return false;
+            }
+            try {
+                const parsed = JSON.parse(storedData);
+                // 验证 adminId 是否一致
+                return parsed && parsed.adminId === state.loggedInAdminBasicInfo.adminId;
+            } catch (e) {
+                console.error('解析 localStorage 数据失败:', e);
+                return false;
+            }
+        },
         // 获取管理员ID
         currentAdminId: (state) => {
             const adminId = state.detailedAdminInfo.adminId || state.loggedInAdminBasicInfo?.adminId;
@@ -66,11 +84,16 @@ export const useAdminStore = defineStore('admin', {
         // 登录成功后调用的 action
         loginSuccess(apiResponseData, basicLoginInfoFromLogin) {
             // apiResponseData 是后端 /administrator/login 返回的 res.data (完整的管理员对象)
-            // basicLoginInfoFromLogin 应该包含用于登录的标识符, e.g., { adminId: 'input_value' } or { name: 'input_value' }
+            // basicLoginInfoFromLogin 应该包含用于登录的标识符和Token, e.g., { adminId: 'input_value', token: 'xxx' }
 
             // 确保 adminId 是数字类型
             if (basicLoginInfoFromLogin.adminId && typeof basicLoginInfoFromLogin.adminId === 'string') {
                 basicLoginInfoFromLogin.adminId = parseInt(basicLoginInfoFromLogin.adminId);
+            }
+            
+            // 确保Token被保存
+            if (!basicLoginInfoFromLogin.token) {
+                console.warn('AdminStore: 登录信息中缺少Token');
             }
             
             this.loggedInAdminBasicInfo = basicLoginInfoFromLogin; // 更新 Store 中的基本管理员信息
@@ -78,6 +101,7 @@ export const useAdminStore = defineStore('admin', {
             
             // 确保状态立即更新
             console.log('AdminStore: 登录状态已更新', this.loggedInAdminBasicInfo);
+            console.log('AdminStore: Token已保存', basicLoginInfoFromLogin.token ? '✓' : '✗');
 
             if (apiResponseData && (apiResponseData.adminId || apiResponseData.name)) { // 确保API响应中至少有一个有效标识
                 // 更新 detailedAdminInfo 的逻辑 (确保字段名匹配)
@@ -265,7 +289,25 @@ export const useAdminStore = defineStore('admin', {
             this.clearDetailedAdminInfo();
             this.clearPermissions(); // 清空权限
             localStorage.removeItem(ADMIN_SESSION_KEY);
+            // 额外清除可能存在的 token
+            localStorage.removeItem('token');
             console.log('AdminStore: 已登出, 会话已清除。');
+        },
+
+        // 验证会话是否有效
+        async validateSession() {
+            if (!this.isAuthenticated) {
+                return false;
+            }
+            try {
+                // 尝试获取管理员信息来验证会话
+                await this.fetchDetailedAdminInfo();
+                return this.isAuthenticated;
+            } catch (error) {
+                console.error('会话验证失败:', error);
+                this.logout();
+                return false;
+            }
         },
 
         // 应用初始化时调用

@@ -15,6 +15,9 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -39,25 +42,56 @@ public class DoctorController {
      * 获取单个医生详细信息
      * 使用 GET /api/doctors/{doctorId}
      *
+     * 权限控制：
+     * - 医生只能查看自己的完整信息（包括手机号等敏感信息）
+     * - 其他角色只能查看公开信息（姓名、科室、职称、擅长、简介、头像）
+     *
      * @param doctorId 医生ID
      * @return 医生详细信息
      */
     @GetMapping("/{doctorId}")
     public ResponseEntity<?> getDoctorById(@PathVariable Integer doctorId) {
         try {
+            // 获取当前登录用户信息
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String currentUserIdentifier = authentication.getName();
+            boolean hasAdminRole = authentication.getAuthorities().stream()
+                    .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+
+            // 查找目标医生
             var doctor = doctorService.findDoctorById(doctorId)
-                    .orElseThrow(() -> new RuntimeException("医生不存在"));
-            DoctorResponse response = doctorService.convertToResponseDto(doctor);
+                    .orElseThrow(() -> new ResourceNotFoundException("资源不存在"));
+
+            // 检查是否是医生本人或管理员
+            boolean isSelf = doctor.getIdentifier().equals(currentUserIdentifier);
+
+            DoctorResponse response;
+            if (isSelf || hasAdminRole) {
+                // 医生本人或管理员：返回完整信息
+                response = doctorService.convertToResponseDto(doctor);
+            } else {
+                // 其他人：只返回公开信息
+                response = doctorService.convertToResponseDto(doctor);
+                // 清除敏感信息
+                response.setPhoneNumber(null);
+            }
+
             return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (ResourceNotFoundException e) {
+            // 资源不存在，返回404
+            throw e;  // 让GlobalExceptionHandler处理
         } catch (Exception e) {
-            return new ResponseEntity<>("获取医生信息时发生错误: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            // 记录详细错误到日志，但只返回通用错误信息
+            System.err.println("获取医生信息时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            return new ResponseEntity<>("获取医生信息失败", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-    
+
     /**
      * 获取医生指定日期的患者列表
      * 使用 GET /api/doctor/todays-appointments
-     * 
+     *
      * @param doctorId 医生ID (从请求参数获取)
      * @param date 日期 (YYYY-MM-DD格式)
      * @return 患者预约列表
@@ -124,6 +158,8 @@ public class DoctorController {
     /**
      * 更新医生信息 (包含头像上传)
      * 使用 PUT /api/doctors/info
+     * 
+     * 权限控制：医生只能修改自己的信息
      */
     @PutMapping(value = "/info", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> updateDoctorInfo(
@@ -134,6 +170,18 @@ public class DoctorController {
             @RequestParam(value = "avatarFile", required = false) MultipartFile avatarFile) {
 
         try {
+            // 获取当前登录用户
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String currentUserIdentifier = authentication.getName();
+            boolean isAdmin = authentication.getAuthorities().stream()
+                    .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+            
+            // 权限验证：只能修改自己的信息（管理员除外）
+            if (!isAdmin && !currentUserIdentifier.equals(identifier)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "无权修改其他医生的信息"));
+            }
+            
             // 创建请求对象
             DoctorUpdateInfoRequest request = new DoctorUpdateInfoRequest();
             request.setIdentifier(identifier);

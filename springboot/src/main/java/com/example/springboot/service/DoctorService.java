@@ -65,13 +65,17 @@ public class DoctorService {
      * @param password 密码
      * @return 登录响应
      */
-    @Transactional
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public LoginResponse login(String identifier, String password) {
         LocalDateTime now = LocalDateTime.now();
         
         // 1. 查找医生
         Doctor doctor = doctorRepository.findByIdentifier(identifier)
                 .orElseThrow(() -> new IllegalArgumentException("工号或密码错误"));
+        
+        // 调试日志：记录查询到的失败次数
+        System.out.println("[DoctorService] 查询到的失败次数: " + doctor.getFailedLoginCount() + 
+                          ", 最后失败时间: " + doctor.getLastFailedLoginTime());
 
         // 2. 检查账户状态（在验证密码之前）
         if (doctor.getStatus() == DoctorStatus.inactive) {
@@ -103,32 +107,64 @@ public class DoctorService {
             doctor.setFailedLoginCount(0);
         }
 
-        // 5. 验证密码
+        // 5. 检查失败登录时间窗口：如果距离最后一次失败登录超过30分钟，重置失败次数
+        // 这样可以避免失败次数无限累积，给用户重新尝试的机会
+        if (doctor.getLastFailedLoginTime() != null && doctor.getFailedLoginCount() > 0) {
+            long minutesSinceLastFailure = java.time.Duration.between(doctor.getLastFailedLoginTime(), now).toMinutes();
+            if (minutesSinceLastFailure >= Constants.ACCOUNT_LOCK_DURATION_MINUTES) {
+                // 超过时间窗口，重置失败次数
+                doctor.setFailedLoginCount(0);
+                doctor.setLastFailedLoginTime(null);
+                doctorRepository.save(doctor);
+            }
+        }
+
+        // 6. 验证密码
         boolean passwordMatches = passwordEncoderUtil.matches(password, doctor.getPasswordHash());
         
         if (!passwordMatches) {
             // 登录失败：增加失败次数
-            int newFailureCount = doctor.getFailedLoginCount() + 1;
-            doctor.setFailedLoginCount(newFailureCount);
-            doctor.setLastFailedLoginTime(now);
+            // 重新从数据库查询，确保获取最新的失败次数（避免缓存问题）
+            Doctor freshDoctor = doctorRepository.findByIdentifier(identifier)
+                    .orElseThrow(() -> new IllegalArgumentException("工号或密码错误"));
+            
+            int currentFailureCount = freshDoctor.getFailedLoginCount() != null ? freshDoctor.getFailedLoginCount() : 0;
+            int newFailureCount = currentFailureCount + 1;
+            
+            System.out.println("[DoctorService] 登录失败 - 当前失败次数: " + currentFailureCount + 
+                              ", 新失败次数: " + newFailureCount);
+            
+            freshDoctor.setFailedLoginCount(newFailureCount);
+            freshDoctor.setLastFailedLoginTime(now);
+            
+            // 保存失败次数到数据库（确保事务提交）
+            doctorRepository.save(freshDoctor);
+            // 强制刷新到数据库，确保数据已保存
+            doctorRepository.flush();
+            
+            // 验证保存是否成功
+            Doctor verifyDoctor = doctorRepository.findByIdentifier(identifier).orElse(null);
+            if (verifyDoctor != null) {
+                System.out.println("[DoctorService] 保存后验证 - 失败次数: " + verifyDoctor.getFailedLoginCount());
+            }
             
             // 检查是否达到锁定阈值
             if (newFailureCount >= Constants.MAX_LOGIN_FAILURE_COUNT) {
                 // 自动锁定账户
-                doctor.setStatus(DoctorStatus.locked);
-                doctor.setLockedUntil(now.plusMinutes(Constants.ACCOUNT_LOCK_DURATION_MINUTES));
-                doctorRepository.save(doctor);
+                freshDoctor.setStatus(DoctorStatus.locked);
+                freshDoctor.setLockedUntil(now.plusMinutes(Constants.ACCOUNT_LOCK_DURATION_MINUTES));
+                doctorRepository.save(freshDoctor);
+                doctorRepository.flush();
                 throw new IllegalArgumentException("登录失败次数过多，账户已被锁定，请" + Constants.ACCOUNT_LOCK_DURATION_MINUTES + "分钟后再试或联系管理员");
             } else {
-                // 未达到阈值，只保存失败次数
-                doctorRepository.save(doctor);
+                // 未达到阈值，计算剩余次数
                 int remainingAttempts = Constants.MAX_LOGIN_FAILURE_COUNT - newFailureCount;
                 throw new IllegalArgumentException("工号或密码错误，还可尝试" + remainingAttempts + "次");
             }
         }
 
-        // 6. 密码正确，登录成功：重置失败次数
-        if (doctor.getFailedLoginCount() > 0) {
+        // 7. 密码正确，登录成功：重置失败次数
+        if (doctor.getFailedLoginCount() != null && doctor.getFailedLoginCount() > 0) {
             doctor.setFailedLoginCount(0);
             doctor.setLastFailedLoginTime(null);
             doctorRepository.save(doctor);

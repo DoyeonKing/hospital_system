@@ -1,5 +1,6 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.dto.slotapplication.SlotApplicationCreateRequest;
 import com.example.springboot.dto.slotapplication.SlotApplicationResponse;
 import com.example.springboot.dto.slotapplication.SlotApplicationUpdateRequest;
@@ -31,6 +32,7 @@ public class SlotApplicationController {
      * 创建加号申请
      */
     @PostMapping
+    @AuditLog(action = "创建加号申请", targetEntity = "slot_applications")
     public ResponseEntity<SlotApplicationResponse> createSlotApplication(
             @Valid @RequestBody SlotApplicationCreateRequest request) {
         SlotApplicationResponse response = slotApplicationService.createSlotApplication(request);
@@ -72,6 +74,7 @@ public class SlotApplicationController {
      * 更新加号申请（审批）
      */
     @PutMapping("/{id}")
+    @AuditLog(action = "更新加号申请", targetEntity = "slot_applications")
     public ResponseEntity<SlotApplicationResponse> updateSlotApplication(
             @PathVariable Integer id,
             @Valid @RequestBody SlotApplicationUpdateRequest request) {
@@ -83,6 +86,7 @@ public class SlotApplicationController {
      * 取消加号申请
      */
     @PutMapping("/{id}/cancel")
+    @AuditLog(action = "取消加号申请", targetEntity = "slot_applications")
     public ResponseEntity<SlotApplicationResponse> cancelSlotApplication(
             @PathVariable Integer id,
             @RequestParam Integer doctorId) {

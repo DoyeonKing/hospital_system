@@ -21,8 +21,8 @@
 					<input class="input-field" v-model="loginForm.password" type="password" placeholder="请输入密码" />
 				</view>
 				<button class="submit-btn" @click="handleLogin">登 录</button>
-				<view class="footer-text" @click="switchToActivation">
-					<text>首次使用？点击激活账户</text>
+				<view class="footer-links">
+					<text class="footer-text"  @click="goToRegister">首次使用？点击注册</text>
 				</view>
 			</view>
 
@@ -127,6 +127,12 @@
 					identifier: '',
 					password: ''
 				};
+			},
+			
+			goToRegister() {
+				uni.navigateTo({
+					url: '/pages/register/patient-register'
+				});
 			},
 			
 		// 患者正常登录
@@ -430,6 +436,18 @@
     color: #2563eb;
     font-size: 28rpx;
     text-decoration: underline;
+}
+
+.register-link {
+    text-align: center;
+    margin-top: 60rpx;
+    padding-top: 40rpx;
+    border-top: 1rpx solid #e5e7eb;
+}
+
+.register-link text {
+    color: #6b7280;
+    font-size: 26rpx;
 }
 	
 	/* 激活步骤指示器 */

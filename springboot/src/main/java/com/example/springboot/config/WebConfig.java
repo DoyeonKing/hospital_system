@@ -38,8 +38,12 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/images/**")
                 .addResourceLocations("file:images/");
         
-        // 添加请假证明文件的映射
+        // 添加请假证明文件的映射（简单方式）
         registry.addResourceHandler("/api/files/leave-proofs/**")
                 .addResourceLocations("file:uploads/leave-proofs/");
+        
+        // 添加身份证明材料的映射（简单方式，参考医生照片）
+        registry.addResourceHandler("/api/files/identity-proofs/**")
+                .addResourceLocations("file:uploads/identity-proofs/");
     }
 }

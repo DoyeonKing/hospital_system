@@ -1,5 +1,6 @@
 package com.example.springboot.controller;
 
+import com.example.springboot.annotation.AuditLog;
 import com.example.springboot.dto.common.PageResponse;
 import com.example.springboot.dto.patient.MedicalHistoryResponse;
 import com.example.springboot.dto.patient.MedicalHistoryUpdateRequest;
@@ -33,6 +34,7 @@ public class UserController {
     }
 
     @PostMapping
+    @AuditLog(action = "创建用户", targetEntity = "patients")
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserCreateRequest request) {
         UserResponse response = userService.createUser(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
@@ -40,6 +42,7 @@ public class UserController {
 
     // 新增批量导入接口
     @PostMapping("/import")
+    @AuditLog(action = "批量导入用户", targetEntity = "patients")
     public ResponseEntity<UserImportResponse> importUsers(
             @RequestParam("file") MultipartFile file) throws IOException {
 
@@ -89,6 +92,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}/medical-history")
+    @AuditLog(action = "更新患者病史", targetEntity = "patients")
     public ResponseEntity<MedicalHistoryResponse> updateMedicalHistory(
             @PathVariable Long id,
             @RequestBody MedicalHistoryUpdateRequest request) {
@@ -122,6 +126,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
+    @AuditLog(action = "更新用户信息", targetEntity = "patients")
     public ResponseEntity<UserResponse> updateUser(
             @PathVariable Long id,  // 添加ID路径参数
             @Valid @RequestBody UserUpdateRequest request) {
@@ -159,6 +164,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @AuditLog(action = "删除用户", targetEntity = "patients")
     public ResponseEntity<Void> deleteUser(
             @PathVariable Long id,
             @RequestParam String role) {

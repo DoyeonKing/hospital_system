@@ -81,6 +81,34 @@
         </div>
       </router-link>
 
+      <!-- 审计日志入口 - 需要 audit_log_view 权限 -->
+      <router-link 
+        v-if="hasPermission('audit_log_view')"
+        to="/audit-logs" 
+        class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #F3E8FF;">
+            <el-icon :size="32" color="#9333EA"><List /></el-icon>
+          </div>
+          <h3>审计日志</h3>
+          <p>查看系统操作记录与安全审计</p>
+        </div>
+      </router-link>
+
+      <!-- 权限管理入口 - 需要 system_config 权限 -->
+      <router-link 
+        v-if="hasPermission('system_config')"
+        to="/permission-manage" 
+        class="feature-card-link">
+        <div class="feature-card">
+          <div class="icon-wrapper" style="background-color: #FEF2F2;">
+            <el-icon :size="32" color="#DC2626"><Lock /></el-icon>
+          </div>
+          <h3>权限管理</h3>
+          <p>管理系统权限与访问控制</p>
+        </div>
+      </router-link>
+
       <!-- 排班管理入口 - 需要 schedule_manage -->
       <router-link 
         v-if="hasPermission('schedule_manage')"
@@ -197,7 +225,7 @@
 </template>
 
 <script setup>
-import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Checked, Service, DocumentAdd, Avatar } from '@element-plus/icons-vue';
+import { Tickets, UserFilled, Calendar, Money, Document, DataAnalysis, DataLine, Checked, Service, DocumentAdd, Avatar, List, Lock } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, onMounted } from 'vue';

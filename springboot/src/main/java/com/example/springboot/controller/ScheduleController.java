@@ -108,7 +108,7 @@ public class ScheduleController {
      * 根据参数删除排班
      */
     @DeleteMapping("/delete")
-    public ResponseEntity<Void> deleteScheduleByParams(@Valid @RequestBody ScheduleDeleteRequest request) {
+    public ResponseEntity<Result> deleteScheduleByParams(@Valid @RequestBody ScheduleDeleteRequest request) {
         try {
             System.out.println("=== 后端接收到的删除请求 ===");
             System.out.println("doctorId: " + request.getDoctorId());
@@ -120,17 +120,40 @@ public class ScheduleController {
 
             scheduleService.deleteScheduleByParams(request);
             System.out.println("✅ 排班删除成功");
-            return ResponseEntity.ok().build();
+            // 🔥 返回成功消息
+            return ResponseEntity.ok(Result.success("排班删除成功"));
         } catch (ResourceNotFoundException e) {
             System.err.println("❌ 资源未找到: " + e.getMessage());
-            return ResponseEntity.notFound().build();
+            // 🔥 返回友好的错误消息
+            return ResponseEntity.status(404).body(Result.error("404", e.getMessage()));
         } catch (BadRequestException e) {
             System.err.println("❌ 请求错误: " + e.getMessage());
-            return ResponseEntity.badRequest().build();
+            // 🔥 返回友好的错误消息
+            return ResponseEntity.status(400).body(Result.error("400", e.getMessage()));
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // 🔥 捕获外键约束异常
+            System.err.println("❌ 外键约束错误: " + e.getMessage());
+            e.printStackTrace();
+            String errorMsg = "无法删除排班：该排班存在关联的预约记录，请先处理相关预约后再删除";
+            return ResponseEntity.status(400).body(Result.error("400", errorMsg));
+        } catch (org.hibernate.exception.ConstraintViolationException e) {
+            // 🔥 捕获约束违反异常
+            System.err.println("❌ 约束违反错误: " + e.getMessage());
+            e.printStackTrace();
+            String errorMsg = "无法删除排班：该排班存在关联的预约记录，请先处理相关预约后再删除";
+            return ResponseEntity.status(400).body(Result.error("400", errorMsg));
         } catch (Exception e) {
             System.err.println("❌ 删除排班时发生错误: " + e.getMessage());
             e.printStackTrace();
-            return ResponseEntity.status(500).build();
+            // 🔥 返回友好的错误消息
+            String errorMsg = e.getMessage();
+            if (errorMsg != null && (errorMsg.contains("foreign key constraint") || 
+                                     errorMsg.contains("Cannot delete or update a parent row"))) {
+                errorMsg = "无法删除排班：该排班存在关联的预约记录，请先处理相关预约后再删除";
+            } else if (errorMsg == null || errorMsg.isEmpty()) {
+                errorMsg = "删除排班失败，请稍后重试";
+            }
+            return ResponseEntity.status(500).body(Result.error("500", errorMsg));
         }
     }
 

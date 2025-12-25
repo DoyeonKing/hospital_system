@@ -8,7 +8,7 @@ export function doctorLogin(data) {
     // 注意：在 DoctorLogin.vue 中，我们*绕过*了这个API调用
     // 但保留这个文件是为了 store 能正常导入
     return request({
-        url: '/api/doctor/login', // 假设的后端登录接口
+        url: '/api/doctor/auth/login', // 正确的后端登录接口路径
         method: 'post',
         data: data
     });
