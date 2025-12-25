@@ -263,12 +263,19 @@ public class WaitlistService {
         
         // 计算排队位置（仅对 waiting 状态）
         if (waitlist.getStatus() == WaitlistStatus.waiting) {
-            long position = waitlistRepository.countByScheduleAndStatusAndCreatedAtBefore(
-                waitlist.getSchedule(), 
-                WaitlistStatus.waiting, 
-                waitlist.getCreatedAt()
-            ) + 1;
-            response.setQueuePosition((int) position);
+            // 获取同一排班下状态为waiting的所有候补记录（按创建时间升序）
+            List<Waitlist> waitingList = waitlistRepository
+                    .findByScheduleAndStatusOrderByCreatedAtAsc(waitlist.getSchedule(), WaitlistStatus.waiting);
+            
+            // 计算当前位置
+            int position = 0;
+            for (int i = 0; i < waitingList.size(); i++) {
+                if (waitingList.get(i).getWaitlistId().equals(waitlist.getWaitlistId())) {
+                    position = i + 1; // 位置从1开始
+                    break;
+                }
+            }
+            response.setQueuePosition(position > 0 ? position : null);
         } else {
             response.setQueuePosition(null);
         }
@@ -561,9 +568,19 @@ public class WaitlistService {
 
                     // 计算候补位置（仅waiting状态有效）
                     if (waitlist.getStatus() == WaitlistStatus.waiting) {
-                        long position = waitlistRepository.countByScheduleAndStatusAndCreatedAtBefore(
-                                schedule, WaitlistStatus.waiting, waitlist.getCreatedAt()) + 1;
-                        response.setPosition((int) position);
+                        // 获取同一排班下状态为waiting的所有候补记录（按创建时间升序）
+                        List<Waitlist> waitingList = waitlistRepository
+                                .findByScheduleAndStatusOrderByCreatedAtAsc(schedule, WaitlistStatus.waiting);
+                        
+                        // 计算当前位置
+                        int position = 0;
+                        for (int i = 0; i < waitingList.size(); i++) {
+                            if (waitingList.get(i).getWaitlistId().equals(waitlist.getWaitlistId())) {
+                                position = i + 1; // 位置从1开始
+                                break;
+                            }
+                        }
+                        response.setPosition(position > 0 ? position : null);
                     } else {
                         response.setPosition(null);
                     }
