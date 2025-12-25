@@ -404,9 +404,9 @@ public class WaitlistService {
         Appointment savedAppointment = appointmentRepository.save(appointment);
         Integer nextNumber = getNextAppointmentNumberAtomic(schedule);
         savedAppointment.setAppointmentNumber(nextNumber);
+        savedAppointment.setTransactionId(paymentData.getTransactionId());
+        savedAppointment.setCreatedAt(LocalDateTime.now());
         savedAppointment = appointmentRepository.save(savedAppointment);
-        appointment.setTransactionId(paymentData.getTransactionId());
-        appointment.setCreatedAt(LocalDateTime.now());
 
         // 6. 号源已经在通知时锁定了（bookedSlots + 1），所以这里不需要再增加
         // 只需要确保 bookedSlots 正确（如果之前同步更新过，这里不需要再改）
@@ -415,9 +415,6 @@ public class WaitlistService {
         // 7. 更新候补状态为已预约
         waitlist.setStatus(WaitlistStatus.booked);
         waitlistRepository.save(waitlist);
-
-        // 8. 保存预约
-        Appointment savedAppointment = appointmentRepository.save(appointment);
         
         // 9. 发送支付成功通知
         try {
