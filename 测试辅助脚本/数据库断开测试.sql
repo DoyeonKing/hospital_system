@@ -76,3 +76,4 @@ SELECT COUNT(*) as appointment_count FROM appointments LIMIT 1;
 
 
 
+

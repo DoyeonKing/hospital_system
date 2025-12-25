@@ -585,14 +585,14 @@ onUnload() {
 		// 注意：不包括 pending_payment（待支付状态不显示二维码）
 		isConfirmedStatus(status) {
 			if (!status) {
-				console.log('[detail isConfirmedStatus] status 为空')
 				return false
 			}
 			const statusLower = status.toLowerCase()
 			const result = statusLower === 'confirmed' || 
 				   statusLower === 'scheduled' || 
 				   statusLower === 'checked_in'
-			console.log('[detail isConfirmedStatus] 状态:', status, '转换为:', statusLower, '结果:', result)
+			// 移除频繁日志，仅在开发调试时启用
+			// console.log('[detail isConfirmedStatus] 状态:', status, '转换为:', statusLower, '结果:', result)
 			return result
 		},
 		
@@ -642,7 +642,8 @@ onUnload() {
 			}
 			// 检查预约时间是否已过去（至少1分钟）
 			if (this.isAppointmentTimePassed(this.appointment)) {
-				console.log('[detail canCancelAppointment] 预约时间已过去，不能取消')
+				// 移除频繁日志，仅在开发调试时启用
+				// console.log('[detail canCancelAppointment] 预约时间已过去，不能取消')
 				return false
 			}
 			// 只有已预约或待支付状态可以取消
@@ -650,7 +651,8 @@ onUnload() {
 							  statusLower === 'scheduled' || 
 							  statusLower === 'pending_payment' ||
 							  statusLower === 'pending'
-			console.log('[detail canCancelAppointment] 状态:', status, '可以取消:', canCancel)
+			// 移除频繁日志，仅在开发调试时启用
+			// console.log('[detail canCancelAppointment] 状态:', status, '可以取消:', canCancel)
 			return canCancel
 		},
 		
