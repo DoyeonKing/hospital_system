@@ -185,6 +185,11 @@
 					filtered = filtered.filter(s => s.scheduleDate === this.selectedDate)
 				}
 				
+				// 过滤掉已取消的排班
+				filtered = filtered.filter(schedule => {
+					return schedule.status !== 'cancelled'
+				})
+				
 				// 过滤掉已过期的排班（与后端验证逻辑一致）
 				const now = new Date()
 				const today = this.formatDate(now)
