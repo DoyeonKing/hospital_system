@@ -154,8 +154,6 @@
 				identifier: this.loginForm.identifier,
 				password: this.loginForm.password
 			}, {
-				showLoading: true,
-				loadingText: '登录中...',
 				timeout: 30000 // 增加到30秒超时（真机调试网络可能较慢）
 			});
 			
@@ -202,7 +200,6 @@
 				uni.showToast({ title: errorMsg, icon: 'none' });
 			}
 		} catch (error) {
-			uni.hideLoading();
 			console.error('[LOGIN] 登录请求异常:', error);
 			uni.showToast({ 
 				title: '登录失败，请检查网络连接', 
@@ -219,7 +216,6 @@
 					return;
 				}
 				
-			uni.showLoading({ title: '验证中...' });
 			
 			try {
 				const response = await post('/api/auth/verify-patient', {
@@ -227,7 +223,6 @@
 					initialPassword: this.activationForm.initialPassword
 				});
 				
-				uni.hideLoading();
 				
 				// 后端返回格式：{"message": "..."} 表示成功，{"error": "..."} 表示失败
 				if (response.message) {
@@ -240,7 +235,6 @@
 					uni.showToast({ title: '验证失败', icon: 'none' });
 				}
 			} catch (error) {
-				uni.hideLoading();
 				console.error('验证请求失败:', error);
 			}
 			},
@@ -271,7 +265,6 @@
 				return;
 			}
 			
-		uni.showLoading({ title: '身份验证中...' });
 		
 		try {
 			const response = await post('/api/auth/activate-patient', {
@@ -281,7 +274,6 @@
 				confirmPassword: this.activationForm.confirmPassword
 			});
 			
-			uni.hideLoading();
 			
 			// 后端返回格式：{"message": "..."} 表示成功，{"error": "..."} 表示失败
 			if (response.message) {
@@ -307,7 +299,6 @@
 				uni.showToast({ title: '激活失败', icon: 'none' });
 			}
 		} catch (error) {
-			uni.hideLoading();
 			console.error('激活请求失败:', error);
 		}
 		},

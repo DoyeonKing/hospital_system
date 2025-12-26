@@ -259,7 +259,6 @@
 				}
 				
 				this.submitting = true
-				uni.showLoading({ title: '注册中...', mask: true })
 				
 				try {
 					// 确保两张照片都已上传
@@ -280,7 +279,6 @@
 						idCardBackUrl: this.form.idCardBackUrl
 					})
 					
-					uni.hideLoading()
 					
 					if (res.code === '200' || res.status === 'pending') {
 						uni.showModal({
@@ -302,7 +300,6 @@
 						})
 					}
 				} catch (error) {
-					uni.hideLoading()
 					console.error('注册失败:', error)
 					uni.showToast({
 						title: error.message || '注册失败，请重试',

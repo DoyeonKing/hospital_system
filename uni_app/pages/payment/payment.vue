@@ -342,7 +342,6 @@
 								// 如果是已取消状态，尝试恢复
 								if (currentStatus === 'cancelled' || currentStatus === 'CANCELLED') {
 									try {
-										uni.showLoading({ title: '处理中...' })
 										
 										// 更新预约状态：从 cancelled 改为 scheduled（已预约，待支付）
 										// 注意：数据库字段可能不支持 PENDING_PAYMENT，所以使用 scheduled
@@ -356,7 +355,6 @@
 										
 										console.log('更新预约完整响应:', JSON.stringify(updateResponse, null, 2))
 										
-										uni.hideLoading()
 										
 										// 处理不同的响应格式
 										let updatedAppointment = null
@@ -380,7 +378,6 @@
 											throw new Error(errorMsg)
 										}
 									} catch (restoreError) {
-										uni.hideLoading()
 										console.error('恢复预约失败，错误对象:', restoreError)
 										console.error('恢复预约失败，错误消息:', restoreError.message)
 										console.error('恢复预约失败，错误堆栈:', restoreError.stack)
@@ -485,7 +482,6 @@
 					return
 				}
 				
-				uni.showLoading({ title: '支付中...' })
 				
 				try {
 					console.log('开始支付，appointmentId:', this.appointmentId, 'isWaitlist:', this.isWaitlist)
@@ -548,7 +544,6 @@
 						}
 					}
 					
-					uni.hideLoading()
 					
 					// 显示支付成功
 					uni.showToast({
@@ -565,7 +560,6 @@
 						})
 					}, 2000)
 				} catch (error) {
-					uni.hideLoading()
 					console.error('支付失败，详细信息:', error)
 					console.error('错误堆栈:', error.stack)
 					uni.showToast({

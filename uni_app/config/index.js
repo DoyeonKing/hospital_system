@@ -19,8 +19,8 @@ const USE_AUTO_DETECT = true  // 👈 true=自动检测环境，false=使用固�
 
 // 真机调试时使用的局域网IP（仅在 USE_AUTO_DETECT=true 时生效）
 // 获取IP方法：Windows运行 ipconfig，Mac/Linux运行 ifconfig
-// 常见IP格式：192.168.x.x 或 172.20.x.x 或 10.x.x.x
-const LOCAL_IP = '10.248.1.8'  // 👈 当前电脑的局域网IP地址（WLAN适配器）
+// 常见IP格式：192.168.x.x 或 172.20.x.x
+const LOCAL_IP = '172.20.10.3'  // 👈 WLAN适配器IP地址（热点测试）
 
 // 方式2：固定IP配置（USE_AUTO_DETECT=false 时使用）
 const LOCAL_BACKEND_FIXED = 'http://localhost:8080'  // 👈 固定使用这个地址

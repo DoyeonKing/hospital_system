@@ -98,7 +98,9 @@ public class WaitlistService {
     public WaitlistResponse createWaitlist(WaitlistCreateRequest request) {
         Patient patient = patientRepository.findById(request.getPatientId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id " + request.getPatientId()));
-        Schedule schedule = scheduleRepository.findById(request.getScheduleId())
+        
+        // 使用悲观锁获取排班信息，防止并发抢候补问题
+        Schedule schedule = scheduleRepository.findByIdWithLock(request.getScheduleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id " + request.getScheduleId()));
 
         // 检查患者状态
@@ -195,15 +197,16 @@ public class WaitlistService {
 
             // 找到合适的候补人员，通知患者支付
             // 注意：由于已经在方法开始时使用悲观锁锁定了排班记录，这里不需要再次获取锁
-            // 直接进行最终的号源检查即可
-            if (schedule.getBookedSlots() >= schedule.getTotalSlots()) {
+            // 使用原子更新来锁定号源，确保并发安全
+            int updatedRows = scheduleRepository.incrementBookedSlotsAtomically(schedule.getScheduleId());
+            if (updatedRows == 0) {
                 System.out.println("候补填充时号源已被占用，跳过此候补");
                 continue;
             }
             
-            // 锁定号源：bookedSlots + 1（为候补患者预留）
-            schedule.setBookedSlots(schedule.getBookedSlots() + 1);
-            scheduleRepository.save(schedule);
+            // 刷新 schedule 对象以获取最新的 bookedSlots 值
+            schedule = scheduleRepository.findById(schedule.getScheduleId())
+                    .orElseThrow(() -> new RuntimeException("Schedule not found"));
             System.out.println("候补号源已锁定，bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
             
             waitlist.setStatus(WaitlistStatus.notified); // 标记为已通知（等待支付）
@@ -331,24 +334,26 @@ public class WaitlistService {
         if (waitlist.getStatus() == WaitlistStatus.notified) {
             Schedule schedule = waitlist.getSchedule();
             if (schedule != null) {
-                // 刷新 schedule 对象，确保获取最新的 bookedSlots 值
-                schedule = scheduleRepository.findById(schedule.getScheduleId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
+                Integer scheduleId = schedule.getScheduleId();
                 
-                // 释放号源：bookedSlots - 1（因为通知时已经锁定了）
-                if (schedule.getBookedSlots() > 0) {
-                    schedule.setBookedSlots(schedule.getBookedSlots() - 1);
-                    scheduleRepository.save(schedule);
+                // 使用原子更新释放号源，确保并发安全
+                int updatedRows = scheduleRepository.decrementBookedSlotsAtomically(scheduleId);
+                if (updatedRows > 0) {
+                    // 刷新 schedule 对象以获取最新的 bookedSlots 值
+                    schedule = scheduleRepository.findById(scheduleId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
                     System.out.println("候补取消 - 释放号源，bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
-                }
-                
-                // 触发自动填充（通知下一个候补）
-                if (schedule.getBookedSlots() < schedule.getTotalSlots()) {
-                    try {
-                        createAppointmentFromWaitlist(schedule.getScheduleId());
-                    } catch (Exception e) {
-                        System.err.println("候补取消 - 自动填充失败: " + e.getMessage());
+                    
+                    // 触发自动填充（通知下一个候补）
+                    if (schedule.getBookedSlots() < schedule.getTotalSlots()) {
+                        try {
+                            createAppointmentFromWaitlist(scheduleId);
+                        } catch (Exception e) {
+                            System.err.println("候补取消 - 自动填充失败: " + e.getMessage());
+                        }
                     }
+                } else {
+                    System.out.println("候补取消 - 号源已经是0，无需释放");
                 }
             }
         }
@@ -471,20 +476,19 @@ public class WaitlistService {
     }
 
     private int getNextAppointmentNumber(Schedule schedule, Patient patient) {
-        // 获取该排班下所有有效预约（按序号升序排列）
-        List<Appointment> appointments = appointmentRepository.findByScheduleAndStatusNotCancelledOrderByAppointmentNumberAsc(schedule);
+        // 使用悲观锁查询该排班下所有有效预约（按序号降序排列），确保并发安全
+        // 这样可以防止多个并发请求同时生成相同的序号
+        List<Appointment> appointments = appointmentRepository.findByScheduleAndStatusNotCancelledOrderByAppointmentNumberDescWithLock(schedule);
         
         // 如果没有预约，从1开始
         if (appointments.isEmpty()) {
             return 1;
         }
         
-        // 找到最大序号
+        // 找到最大序号（列表已按降序排列，第一个就是最大值）
         int maxNumber = 0;
-        for (Appointment appointment : appointments) {
-            if (appointment.getAppointmentNumber() != null && appointment.getAppointmentNumber() > maxNumber) {
-                maxNumber = appointment.getAppointmentNumber();
-            }
+        if (!appointments.isEmpty() && appointments.get(0).getAppointmentNumber() != null) {
+            maxNumber = appointments.get(0).getAppointmentNumber();
         }
         
         return maxNumber + 1;
@@ -630,29 +634,31 @@ public class WaitlistService {
             // 释放锁定的号源（候补超时未支付）
             Schedule schedule = waitlist.getSchedule();
             if (schedule != null) {
-                // 刷新 schedule 对象，确保获取最新的 bookedSlots 值
-                schedule = scheduleRepository.findById(schedule.getScheduleId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
+                Integer scheduleId = schedule.getScheduleId();
                 
-                // 释放号源：bookedSlots - 1（因为通知时已经锁定了）
-                if (schedule.getBookedSlots() > 0) {
-                    schedule.setBookedSlots(schedule.getBookedSlots() - 1);
-                    scheduleRepository.save(schedule);
+                // 使用原子更新释放号源，确保并发安全
+                int updatedRows = scheduleRepository.decrementBookedSlotsAtomically(scheduleId);
+                if (updatedRows > 0) {
+                    // 刷新 schedule 对象以获取最新的 bookedSlots 值
+                    schedule = scheduleRepository.findById(scheduleId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
                     System.out.println("候补超时处理 - 释放号源，bookedSlots: " + schedule.getBookedSlots() + ", totalSlots: " + schedule.getTotalSlots());
-                }
-                
-                // 检查是否还有空余号源，触发自动填充（通知下一个候补）
-                if (schedule.getBookedSlots() < schedule.getTotalSlots()) {
-                    System.out.println("候补超时处理 - 触发自动填充，scheduleId: " + schedule.getScheduleId());
-                    try {
-                        createAppointmentFromWaitlist(schedule.getScheduleId());
-                    } catch (Exception e) {
-                        // 自动填充失败不影响超时处理流程，只记录日志
-                        System.err.println("候补超时处理 - 自动填充失败: " + e.getMessage());
-                        e.printStackTrace();
+                    
+                    // 检查是否还有空余号源，触发自动填充（通知下一个候补）
+                    if (schedule.getBookedSlots() < schedule.getTotalSlots()) {
+                        System.out.println("候补超时处理 - 触发自动填充，scheduleId: " + scheduleId);
+                        try {
+                            createAppointmentFromWaitlist(scheduleId);
+                        } catch (Exception e) {
+                            // 自动填充失败不影响超时处理流程，只记录日志
+                            System.err.println("候补超时处理 - 自动填充失败: " + e.getMessage());
+                            e.printStackTrace();
+                        }
+                    } else {
+                        System.out.println("候补超时处理 - 号源已满，无需自动填充");
                     }
                 } else {
-                    System.out.println("候补超时处理 - 号源已满，无需自动填充");
+                    System.out.println("候补超时处理 - 号源已经是0，无需释放");
                 }
             }
         }

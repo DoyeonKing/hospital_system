@@ -259,7 +259,6 @@
 					return
 				}
 				
-				uni.showLoading({ title: '保存中...' })
 				
 				try {
 					const requestData = {
@@ -287,7 +286,6 @@
 					
 					console.log('保存响应:', response)
 					
-					uni.hideLoading()
 					
 					// 后端直接返回 UserResponse 对象，格式为 {role: "PATIENT", userDetails: {...}}
 					// 检查是否有 userDetails 或 role 字段来判断成功
@@ -314,7 +312,6 @@
 						})
 					}
 				} catch (error) {
-					uni.hideLoading()
 					console.error('保存患者信息失败:', error)
 					uni.showToast({
 						title: error.message || '保存失败',
