@@ -402,6 +402,9 @@ public class WaitlistService {
         appointment.setPaymentMethod(paymentData.getPaymentMethod());
         appointment.setTransactionId(paymentData.getTransactionId());
         appointment.setCreatedAt(LocalDateTime.now());
+        
+        // 保存预约并获取保存后的对象（包含 appointmentId）
+        Appointment savedAppointment = appointmentRepository.save(appointment);
 
         // 6. 号源已经在通知时锁定了（bookedSlots + 1），所以这里不需要再增加
         // 只需要确保 bookedSlots 正确（如果之前同步更新过，这里不需要再改）
