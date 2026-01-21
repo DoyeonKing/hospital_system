@@ -30,7 +30,7 @@ function request(options) {
 			url: fullUrl,
 			method: options.method || 'GET',
 			data: options.data || {},
-			timeout: options.timeout || 30000, // 默认30秒超时（真机调试网络可能较慢）
+			timeout: options.timeout || 60000, // 默认60秒超时（真机调试网络可能较慢）
 			header: {
 				'Content-Type': 'application/json;charset=UTF-8',
 				'Accept': 'application/json;charset=UTF-8',

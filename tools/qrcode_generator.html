@@ -13,18 +13,26 @@
             const script = document.createElement('script');
             script.src = 'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js';
             script.onload = function() {
-                console.log('备用CDN加载成功');
+                console.log('✅ 备用CDN1加载成功');
+                window.QRCodeFallback = false; // 确保标记为已加载
             };
             script.onerror = function() {
                 console.log('备用CDN1失败，尝试备用CDN2...');
                 const script2 = document.createElement('script');
                 script2.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js';
                 script2.onload = function() {
-                    console.log('备用CDN2加载成功');
+                    console.log('✅ 备用CDN2加载成功');
+                    window.QRCodeFallback = false; // 确保标记为已加载
                 };
                 script2.onerror = function() {
-                    console.warn('所有CDN都加载失败，将使用在线API作为备用方案');
-                    window.QRCodeFallback = true;
+                    console.warn('⚠️ 所有CDN都加载失败，将使用在线API作为备用方案');
+                    // 延迟设置fallback，给更多时间让脚本加载
+                    setTimeout(function() {
+                        if (typeof QRCode === 'undefined') {
+                            window.QRCodeFallback = true;
+                            console.log('已切换到在线API模式');
+                        }
+                    }, 1000);
                 };
                 document.head.appendChild(script2);
             };
@@ -226,6 +234,12 @@
         <h1>🏥 医院导航二维码生成器</h1>
         <p class="subtitle">生成定位二维码，用于扫码定位功能（从数据库真实位置数据生成）</p>
         
+        <!-- API地址显示 -->
+        <div id="apiInfo" style="text-align: center; margin-bottom: 15px; padding: 10px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 5px;">
+            <strong>当前API地址：</strong><span id="currentApiUrl" style="color: #1976D2; font-family: monospace;">加载中...</span>
+            <br><small style="color: #666;">💡 如需修改，请编辑HTML文件中的 <code>API_BASE_URL</code> 变量</small>
+        </div>
+        
         <div style="text-align: center; margin-bottom: 20px;">
             <button class="generate-btn" onclick="refreshLocations()" style="background: #28a745;">
                 🔄 刷新位置数据（从数据库重新加载）
@@ -263,6 +277,19 @@
     </div>
     
     <script>
+        // ==================== API配置区域 ====================
+        // 👇 请根据实际情况修改后端API地址
+        // ✅ 当前配置：本地后端（后端运行在本地，数据库在华为云）
+        // 本地开发：http://localhost:8080  ← 当前使用（后端服务在本地）
+        // 华为云服务器：http://123.249.30.241:8080（如果后端运行在华为云上）
+        // 局域网IP：http://172.20.10.3:8080（真机调试时使用）
+        // 
+        // 💡 说明：
+        //    - 后端服务运行在本地：localhost:8080
+        //    - 数据库在华为云：123.249.30.241:3306
+        //    - HTML文件应该连接本地后端（与小程序配置一致）
+        const API_BASE_URL = 'http://localhost:8080';  // 👈 本地后端地址（后端在本地，数据库在华为云）
+        
         // 从数据库获取的节点列表（将从API加载）
         let nodes = [];
         
@@ -270,10 +297,12 @@
         async function loadLocationsFromAPI() {
             try {
                 console.log('开始从API加载节点数据...');
+                console.log('API地址:', API_BASE_URL);
                 
                 // 1. 获取所有location（目的地）
-                console.log('正在请求: http://localhost:8080/api/locations');
-                const locationResponse = await fetch('http://localhost:8080/api/locations', {
+                const locationsUrl = `${API_BASE_URL}/api/locations`;
+                console.log('正在请求:', locationsUrl);
+                const locationResponse = await fetch(locationsUrl, {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json',
@@ -307,8 +336,9 @@
                 }
                 
                 // 2. 获取所有途径点（走廊、电梯、楼梯等）
-                console.log('正在请求: http://localhost:8080/api/map/nodes/waypoints');
-                const waypointResponse = await fetch('http://localhost:8080/api/map/nodes/waypoints', {
+                const waypointsUrl = `${API_BASE_URL}/api/map/nodes/waypoints`;
+                console.log('正在请求:', waypointsUrl);
+                const waypointResponse = await fetch(waypointsUrl, {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json',
@@ -354,11 +384,11 @@
                 // 显示更详细的错误信息
                 let errorMsg = '无法连接到后端服务';
                 if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                    errorMsg = '❌ 后端服务未运行或无法连接\n\n请检查：\n1. Spring Boot服务是否在8080端口运行\n2. 防火墙是否阻止了连接\n3. 浏览器控制台是否有CORS错误';
+                    errorMsg = `❌ 后端服务未运行或无法连接\n\n当前API地址: ${API_BASE_URL}\n\n请检查：\n1. Spring Boot服务是否在运行\n2. API地址是否正确（当前: ${API_BASE_URL}）\n3. 防火墙是否阻止了连接\n4. 浏览器控制台是否有CORS错误\n\n💡 提示：如需修改API地址，请编辑HTML文件中的 API_BASE_URL 变量`;
                 } else if (error.message.includes('CORS')) {
-                    errorMsg = '❌ CORS跨域错误\n\n请检查后端CORS配置';
+                    errorMsg = `❌ CORS跨域错误\n\n当前API地址: ${API_BASE_URL}\n\n请检查后端CORS配置`;
                 } else {
-                    errorMsg = `❌ 错误: ${error.message}`;
+                    errorMsg = `❌ 错误: ${error.message}\n\n当前API地址: ${API_BASE_URL}`;
                 }
                 
                 // 如果API失败，使用默认示例数据
@@ -583,32 +613,52 @@
         
         // 页面加载时生成所有二维码
         async function init() {
+            // 显示当前API地址
+            document.getElementById('currentApiUrl').textContent = API_BASE_URL;
+            
             // 先尝试从API加载真实数据
             const apiLoaded = await loadLocationsFromAPI();
             
             // 显示加载状态
             const grid = document.getElementById('qrcodeGrid');
             if (!apiLoaded) {
-                grid.innerHTML = '<div style="text-align: center; padding: 20px; color: #856404; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; margin: 20px 0;">' +
-                    '⚠️ 无法连接到后端API (http://localhost:8080)，使用示例数据。请确保后端服务正在运行。</div>';
+                grid.innerHTML = `<div style="text-align: center; padding: 20px; color: #856404; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; margin: 20px 0;">` +
+                    `⚠️ 无法连接到后端API (${API_BASE_URL})，使用示例数据。请确保后端服务正在运行。<br>` +
+                    `💡 如需修改API地址，请编辑HTML文件中的 <strong>API_BASE_URL</strong> 变量</div>`;
             } else {
                 grid.innerHTML = '<div style="text-align: center; padding: 10px; color: #28a745; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; margin: 20px 0;">' +
                     `✅ 已从数据库加载 ${nodes.length} 个真实位置节点</div>`;
             }
             
-            // 等待一下，让CDN有时间加载
+            // 等待一下，让CDN有时间加载（增加到2秒，给CDN更多时间）
             setTimeout(function() {
+                // 检查二维码库是否加载成功
+                const qrCodeLoaded = typeof QRCode !== 'undefined';
+                const usingFallback = window.QRCodeFallback === true;
+                
                 // 即使库未加载，也可以使用在线API生成
                 generateAllQRCodes();
                 
-                // 如果库未加载，显示提示（但不阻止使用）
-                if (typeof QRCode === 'undefined' && !window.QRCodeFallback) {
+                // 如果库未加载且已切换到备用方案，显示提示（但不阻止使用）
+                if (!qrCodeLoaded && usingFallback) {
                     const statusDiv = document.createElement('div');
                     statusDiv.style.cssText = 'background: #fff3cd; border: 1px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 5px; color: #856404;';
                     statusDiv.innerHTML = '⚠️ 本地二维码库加载失败，已自动切换到在线API生成模式。功能正常，但需要网络连接。';
                     document.querySelector('.container').insertBefore(statusDiv, document.getElementById('qrcodeGrid'));
+                } else if (!qrCodeLoaded) {
+                    // 如果库未加载但还没设置fallback，可能是加载时间不够，再等一会
+                    setTimeout(function() {
+                        if (typeof QRCode === 'undefined' && window.QRCodeFallback !== true) {
+                            // 最终确认加载失败
+                            window.QRCodeFallback = true;
+                            const statusDiv = document.createElement('div');
+                            statusDiv.style.cssText = 'background: #fff3cd; border: 1px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 5px; color: #856404;';
+                            statusDiv.innerHTML = '⚠️ 本地二维码库加载失败，已自动切换到在线API生成模式。功能正常，但需要网络连接。';
+                            document.querySelector('.container').insertBefore(statusDiv, document.getElementById('qrcodeGrid'));
+                        }
+                    }, 2000); // 再等2秒
                 }
-            }, 500); // 给CDN更多时间加载
+            }, 2000); // 增加到2秒，给CDN更多时间加载
         }
         
         // 等待页面和库都加载完成

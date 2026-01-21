@@ -47,11 +47,11 @@
 				<text class="function-title">个人中心</text>
 			</view>
 			
-			<view class="function-card card-4" @click="navigateToAIAssistant">
+			<view class="function-card card-4" @click="showContactInfo">
 				<view class="icon-wrapper">
-					<view class="function-icon">💡</view>
+					<view class="function-icon">📞</view>
 				</view>
-				<text class="function-title">AI 挂号助手</text>
+				<text class="function-title">联系我们</text>
 			</view>
 
 		<view class="function-card card-ai" @click="navigateToPreTriage">
@@ -59,6 +59,13 @@
 				<view class="function-icon">🤖</view>
 			</view>
 			<text class="function-title">AI 预问诊</text>
+		</view>
+
+		<view class="function-card card-ai-assistant" @click="navigateToAIAssistant">
+			<view class="icon-wrapper">
+				<view class="function-icon">💡</view>
+			</view>
+			<text class="function-title">AI 挂号助手</text>
 		</view>
 	</view>
 
@@ -705,6 +712,70 @@
 			},
 			
 			// 显示联系方式
+			showContactInfo() {
+				uni.showActionSheet({
+					itemList: ['客服电话', '紧急求助', '医院地址', '更多信息'],
+					success: (res) => {
+						switch(res.tapIndex) {
+							case 0:
+								// 客服电话
+								uni.makePhoneCall({
+									phoneNumber: '400-123-4567',
+									fail: () => {
+										uni.showModal({
+											title: '客服电话',
+											content: '400-123-4567\n工作时间：周一至周日 8:00-18:00',
+											showCancel: false,
+											confirmText: '知道了'
+										})
+									}
+								})
+								break
+							case 1:
+								// 紧急求助
+								uni.showModal({
+									title: '紧急求助',
+									content: '如有紧急情况，请拨打120急救电话\n或直接前往医院急诊科',
+									confirmText: '拨打120',
+									cancelText: '取消',
+									success: (modalRes) => {
+										if (modalRes.confirm) {
+											uni.makePhoneCall({
+												phoneNumber: '120',
+												fail: () => {
+													uni.showToast({
+														title: '请手动拨打120',
+														icon: 'none',
+														duration: 2000
+													})
+												}
+											})
+										}
+									}
+								})
+								break
+							case 2:
+								// 医院地址
+								uni.showModal({
+									title: '医院地址',
+									content: 'XX大学校医院\n地址：XX市XX区XX路XX号\n邮编：100000',
+									showCancel: false,
+									confirmText: '知道了'
+								})
+								break
+							case 3:
+								// 更多信息
+								uni.showModal({
+									title: '联系我们',
+									content: '客服电话：400-123-4567\n工作时间：周一至周日 8:00-18:00\n邮箱：service@hospital.edu.cn\n地址：XX市XX区XX路XX号',
+									showCancel: false,
+									confirmText: '知道了'
+								})
+								break
+						}
+					}
+				})
+			},
 			
 			// 导航到科室排班
 			navigateToDepartmentSchedule(departmentId) {

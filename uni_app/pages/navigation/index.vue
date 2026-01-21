@@ -123,6 +123,8 @@
 				<text class="debug-text">路径: {{ path.length }}点</text>
 				<text class="debug-text">起点: {{ startNode ? startNode.x + ',' + startNode.y : '无' }}</text>
 				<text class="debug-text">终点: {{ targetNode ? targetNode.x + ',' + targetNode.y : '无' }}</text>
+				<text class="debug-text">Canvas: {{ ctx ? '✅' : '❌' }}</text>
+				<text class="debug-text">地图数据: {{ gridMatrix ? '✅' : '❌' }}</text>
 			</view>
 		</view>
 		
@@ -450,9 +452,22 @@ export default {
 		}
 	},
 	onReady() {
-		// 获取canvas上下文
-		this.ctx = uni.createCanvasContext('mapCanvas', this)
-		console.log('[onReady] Canvas上下文已创建:', !!this.ctx)
+		console.log('[onReady] ========== 页面就绪 ==========')
+		
+		// 获取canvas上下文（真机兼容性处理）
+		try {
+			this.ctx = uni.createCanvasContext('mapCanvas', this)
+			console.log('[onReady] ✅ Canvas上下文已创建:', !!this.ctx)
+			
+			// 测试Canvas是否可用
+			if (this.ctx && typeof this.ctx.draw === 'function') {
+				console.log('[onReady] ✅ Canvas API可用')
+			} else {
+				console.error('[onReady] ❌ Canvas API不可用')
+			}
+		} catch (e) {
+			console.error('[onReady] ❌ 创建Canvas上下文失败:', e)
+		}
 		
 		// 获取Canvas实际尺寸
 		const query = uni.createSelectorQuery().in(this)
@@ -588,9 +603,15 @@ export default {
 		
 	async loadMapData() {
 		this.loading = true
+		console.log('[loadMapData] ========== 开始加载地图数据 ==========')
+		console.log('[loadMapData] 当前楼层:', this.currentFloor || 1)
+		console.log('[loadMapData] Canvas状态:', !!this.ctx)
+		
 		try {
 			// 获取地图配置（传入当前楼层）
+			console.log('[loadMapData] 正在请求API...')
 			const configResponse = await getMapConfig(this.currentFloor || 1)
+			console.log('[loadMapData] ✅ API响应成功')
 			console.log('地图配置响应（完整）:', JSON.stringify(configResponse, null, 2))
 				console.log('响应类型:', typeof configResponse)
 				console.log('响应data:', configResponse?.data)
@@ -979,10 +1000,25 @@ export default {
 					this.useMockData()
 				}
 			} catch (error) {
-				console.error('加载地图数据失败:', error)
-				uni.showToast({
-					title: '加载地图失败',
-					icon: 'none'
+				console.error('[loadMapData] ❌ 加载地图数据失败:', error)
+				console.error('[loadMapData] 错误详情:', JSON.stringify(error))
+				
+				// 显示详细错误信息
+				let errorMsg = '加载地图失败'
+				if (error && error.errMsg) {
+					errorMsg += ': ' + error.errMsg
+				}
+				
+				uni.showModal({
+					title: '地图加载失败',
+					content: '无法连接到服务器，将使用模拟数据展示。\n\n请检查：\n1. 手机和电脑是否在同一WiFi\n2. 后端服务是否运行\n3. IP地址是否正确',
+					showCancel: false,
+					confirmText: '使用模拟数据',
+					success: () => {
+						// 使用模拟数据
+						console.log('[loadMapData] 用户确认使用模拟数据')
+						this.useMockData()
+					}
 				})
 			} finally {
 				this.loading = false

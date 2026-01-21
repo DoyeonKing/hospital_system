@@ -61,6 +61,13 @@ public class WebSecurityConfig {
                         // 允许 Swagger 访问
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
 
+                        // 公开的地图和位置接口（用于二维码生成工具和室内导航）
+                        .requestMatchers("/api/locations").permitAll()  // 获取所有位置（用于二维码生成）
+                        .requestMatchers("/api/map/nodes/waypoints").permitAll()  // 获取途径点（用于二维码生成）
+                        .requestMatchers("/api/map/**").permitAll()  // 地图相关接口（室内导航必需）
+                        .requestMatchers("/api/navigation/**").permitAll()  // 导航路径计算接口（室内导航必需）
+                        .requestMatchers("/api/qrcode/**").permitAll()  // 二维码扫描定位接口（室内导航必需）
+
                         // 其他所有 /api/** 接口都需要认证
                         .requestMatchers("/api/**").authenticated()
 
